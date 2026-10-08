@@ -236,6 +236,13 @@ def _serpstat_result_count(doc: object) -> int | None:
     return None
 
 
+def _spyfu_result_count(doc: object) -> int | None:
+    """Rows a SpyFu answer bills. Every endpoint answers `{"resultCount": N, "results": [...]}` and
+    SpyFu bills per row returned, so an empty list is free. Any other shape settles at the estimate."""
+    results = doc.get("results") if isinstance(doc, dict) else None
+    return len(results) if isinstance(results, list) else None
+
+
 def _rows_billed_micro(mk: MarketplaceCall, ep: dict | None, rows: int | None,
                        credits_per_row: Decimal | None = None) -> int | None:
     """What `rows` billed rows cost, never more than the hold. For a credit-priced row
@@ -560,6 +567,8 @@ def _observed_cost_micro(mk: MarketplaceCall, body: bytes, headers=None) -> int 
                                   Decimal("0.5") if company else None)
     if provider == "serpstat" and mk.cost_type == "per_result" and mk.unit_micro > 0:
         return _rows_billed_micro(mk, ep, _serpstat_result_count(doc))
+    if provider == "spyfu" and mk.cost_type == "per_result" and mk.unit_micro > 0:
+        return _rows_billed_micro(mk, ep, _spyfu_result_count(doc))
     if provider == "thecompaniesapi":
         # `simplified=true` returns a reduced record for zero credits on the endpoints that declare
         # it (catalog notes); otherwise the company search bills one credit per company RETURNED,

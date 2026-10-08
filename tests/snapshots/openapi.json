@@ -2197,7 +2197,7 @@
     },
     "/admin/calls": {
       "get": {
-        "description": "The newest calls, or with `since_id` the calls after that id, oldest first, so a poller\nadvances its cursor to the last id it read. `provider` needs `since_id`: it keeps the read a\nrange over the primary key instead of a walk back through the whole table.",
+        "description": "The newest calls, or with `since_id` the calls after that id, oldest first, so a poller\nadvances its cursor to the last id it read. `provider` needs `since_id`: it keeps the read a\nrange over the primary key instead of a walk back through the whole table. A failed call carries\n`error_reason`, the upstream's own short reason from its stored error answer.",
         "operationId": "admin_calls_admin_calls_get",
         "parameters": [
           {
@@ -3397,6 +3397,69 @@
           }
         },
         "summary": "Admin Referrals"
+      }
+    },
+    "/admin/share": {
+      "get": {
+        "description": "Who served each job over the last `minutes` (at most 360). `requests` counts what callers\nasked (direct calls and routed parents, never a routed attempt); `by_provider` counts the 2xx\nanswers each provider gave, directly or as a routed attempt. One read over an id range.",
+        "operationId": "admin_share_admin_share_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "minutes",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "title": "Minutes",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-treg-token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "X-Treg-Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "treg_session",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Treg Session",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin Share Admin Share Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Share"
       }
     },
     "/admin/stats": {

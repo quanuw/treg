@@ -70,6 +70,9 @@ class Tally:
     hit_decided: int = 0
     paid_hits: int = 0
     free_misses: int = 0
+    # Calls per contract verdict word (`CallRecord.verdict`): `{"valid": 31, "catch_all": 4}`.
+    # Folded and stored per day only: `publish` leaves it out until the word mappings are proven.
+    verdicts: dict[str, int] = field(default_factory=dict)
     # Successful durations. `latency_seen` counts every one folded in; `latencies` keeps at most
     # `LATENCY_SAMPLE` of them, a uniform reservoir (Vitter's algorithm R) so a busy day's
     # percentiles are as honest as a quiet day's exact list. `latency_weights`, parallel to
@@ -89,7 +92,7 @@ class Tally:
 
     def fold(self, *, status_code: int, created_at: datetime, duration_ms: int | None,
              hit: bool | None, cost_observed_micro: int | None, refused_by: str | None,
-             rng: random.Random | None = None) -> bool:
+             verdict: str | None = None, rng: random.Random | None = None) -> bool:
         """Fold one audit row in. Returns False when the row is not evidence about the endpoint.
 
         Mirrors the predicates in `observed()` exactly; see its docstring for why each one is
@@ -114,6 +117,8 @@ class Tally:
                 self.paid_hits += 1
             elif cost_observed_micro == 0:
                 self.free_misses += 1
+        if verdict is not None:
+            self.verdicts[verdict] = self.verdicts.get(verdict, 0) + 1
         if success and duration_ms is not None:
             self.latency_seen += 1
             ms = int(duration_ms)
@@ -140,6 +145,8 @@ class Tally:
         self.hit_decided += other.hit_decided
         self.paid_hits += other.paid_hits
         self.free_misses += other.free_misses
+        for word, count in other.verdicts.items():
+            self.verdicts[word] = self.verdicts.get(word, 0) + count
         self.latency_seen += other.latency_seen
         self.latencies = self.latencies + other.latencies
         self.latency_weights = weights

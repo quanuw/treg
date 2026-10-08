@@ -54,7 +54,9 @@ endpoints are unaffected (they use `require_superadmin`).
 - **Reads:** `admin_stats` (totals, `tools_by_injector`/`tools_by_host`, `credential_health` rollup,
   call volume + success rate, `growth` counts — computed in-process over small result sets),
   `admin_orgs` (every org + member/role/tool/secret/bundle counts), `admin_org_detail`,
-  `admin_users` (+ their memberships), `admin_tools`, `admin_calls`, `admin_health` (non-`ok` secrets).
+  `admin_users` (+ their memberships), `admin_tools`, `admin_calls`, `admin_share` (per job over the
+  last `minutes`: requests asked, and 2xx answers per provider, direct or as a routed attempt),
+  `admin_health` (non-`ok` secrets).
 - **Failure evidence:** `admin_errors` (`?days=7&limit=100&provider=&status=&tier=`) — failed calls at
   every credential tier, including plain own tools (`tier: null`), with `CallRecord.error_request` /
   `error_response`, the redacted capture of what the caller sent and what the provider answered (see

@@ -25,6 +25,9 @@ def input_for(task: str, value: str, query: str = "") -> dict:
         raise WebArenaError("Enter an input of 1 to 500 characters.")
     if task in {"search", "news", "papers", "youtube", "maps"}:
         return {"q": value, **({"limit": 10} if task in {"search", "news", "papers"} else {})}
+    # A bare address such as "apple.com" means its https site; other schemes stay rejected.
+    if "://" not in value:
+        value = "https://" + value
     parsed = urlsplit(value)
     if parsed.scheme not in {"https", "http"} or not parsed.hostname or parsed.username or parsed.password:
         raise WebArenaError("Enter a public HTTP or HTTPS URL.")

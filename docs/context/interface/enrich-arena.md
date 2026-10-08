@@ -180,8 +180,10 @@ normalized result fields. Name-based comparisons require both first and last nam
 before quote creation or upstream dispatch; use a LinkedIn URL when that input is unavailable.
 
 BounceBan joins email verification only through its verified standard-single adapter. The adapter
-maps `result=deliverable` to valid, preserves other provider verdicts as status, and treats a missing
-result such as a pending `verifying` body as a routing miss. Public estimates use the fixed $0.004
+maps `result=deliverable` to valid, preserves other provider verdicts as status, and treats a
+finished answer with no result as a miss. A `verifying` first answer is waited for like any async
+submission (the row's `async` descriptor), and an immediate answer is judged at once
+(`terminal_on_submission`). Public estimates use the fixed $0.004
 upstream cost before the configured platform margin. Waterfall and bulk BounceBan tools remain BYOK
 only and do not enter Arena.
 
@@ -298,6 +300,9 @@ Coverage is structurally usable results divided by usable results plus genuine m
 latest decided observation per endpoint/input/request hash. Wrong requests, rate limits, balances,
 access/service failures, refusals and pending results are excluded. Ambiguous errors, unavailable
 bodies and missing request hashes remain unresolved. Own-key, overflow and cached scopes are omitted.
+Async endpoints are omitted, because their archived first answer is a task id, except a row that
+declares `terminal_on_submission` (BounceBan verification): its finished first answers count as
+usual, and a "still working" first answer is unresolved (`unresolved_pending`), never a miss.
 Only inputs attributable to the selected shape appear in that row. Response time includes repeats
 but requires 20 successful calls with recorded timing. Different cohorts and waterfall positions
 prevent controlled rankings, and returned fields are not independently verified.

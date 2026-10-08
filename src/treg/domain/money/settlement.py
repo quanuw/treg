@@ -154,8 +154,10 @@ def derive_basis(
         return {"when": "terminal" if terminal else "response", "amount": amount,
                 "fallback_micro": fallback,
                 "reserve_micro": reserve}
+    # A fixed per-call price on an async task is owed for the finished answer: the hold waits for
+    # it, and a task that never finishes is released like any other.
     return {
-        "when": "response",
+        "when": "terminal" if terminal and cost.get("type") == "per_call" else "response",
         "amount": {"kind": "observed"},
         "fallback_micro": max(0, int(response_estimate_micro)),
         "reserve_micro": max(0, int(response_estimate_micro)),

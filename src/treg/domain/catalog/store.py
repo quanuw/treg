@@ -224,8 +224,8 @@ class Catalog:
         event — one search credit, one started block — which is what a live successful call
         actually bills and what `usd_per_call` must say. Settlement still reads `usd`.
         """
-        if not cost:
-            return None
+        if not cost or cost.get("varies"):
+            return None  # a routed row whose children bill misses: the note carries the range
         shown = cost.get("display_usd")
         if isinstance(shown, (int, float)) and not isinstance(shown, bool):
             return shown

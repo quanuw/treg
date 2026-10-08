@@ -9,7 +9,6 @@ sources:
   - src/treg/application/onboard/lookup.py
   - src/treg/application/onboard/page.py
   - src/treg/application/onboard/tasks.py
-  - src/treg/application/onboard/work_email.py
   - src/treg/application/house_calls.py
   - src/treg/infra/llm.py
   - src/treg/web/sitetrack.js
@@ -188,14 +187,10 @@ tests use `@onboarding.test`), a new account skips the team-name modal for three
 (`frontend/src/onboarding/OnboardingFlow.vue`); every sheet after the first can go back one.
 
 **The experiment** (`onboarding_v2_experiment`) compares this flow with the team-name modal for
-work addresses only. `onboard/work_email.py` decides: a domain on its `PERSONAL` list (free, ISP and
-disposable mail) is not one; any other is judged once by Jev as a house call, with what its homepage
-says (`page.text`, read for a few seconds at most; a domain's name alone leaves small companies and
-throwaway mail near even odds). 0.5 or more is a company's own domain: a personal domain in the new
-flow costs little, a company left out costs a sample. The verdict is kept per domain for 30 days.
-Sign-up starts the judgment in the background (`first_run.warm`), shared with a concurrent
-`/auth/me`, which waits for it at most a few seconds and asks Jev only for an account with no team it
-named; a judgment Jev could not make counts as personal for ten minutes.
+addresses on a domain of their own: `first_run.in_experiment` admits any domain that is not on the
+catalog's list of mail anyone can get (`paths.email_domain`: free, ISP, disposable and alias mail)
+and not a school's. A personal domain gets in too; both arms take it alike, and a lookup that finds
+nothing asks what the agent will do first. The rule is a list, so `/auth/me` answers at once.
 `GET /auth/me` then says `onboarding_v2_experiment: true`, and only then does the dashboard read the
 PostHog flag `onboarding-v2`: `test` gets this flow, anything else (unanswered included) the modal,
 so only offered users record an exposure. The server lets such an address start and read the flow;
@@ -225,12 +220,15 @@ which arm it is in is PostHog's.
 
 **The lookup** (`application/onboard/lookup.py`) never raises and never spends the user's credit;
 each step is optional and skipped when its setting is empty or it fails, and the whole lookup has a
-deadline. GitHub (the GitHub door's login, else a commit search with `onboarding_github_token`), then
-the company record (`treg.companies.enrich`, short timeout) and the homepage (read directly through
-the SSRF check; a script-only page also through `treg.web.extract`). The LLM (`infra/llm.py`, the
+deadline. GitHub (the GitHub door's login, else a commit search with `onboarding_github_token`), the
+company record (`treg.companies.enrich`, short timeout) and the homepage (read directly through the
+SSRF check; a script-only page also through `treg.web.extract`) run side by side for a work address;
+without one, GitHub goes first and names the company. The LLM (`infra/llm.py`, the
 Vercel AI Gateway, `onboarding_llm_model`) proposes inputs from that evidence only; Jev
 (`openrouter.ai-judge.decide`) ranks the tasks, with the landing path and referrer as evidence, and
-keeps a proposed term, competitor or topic only when its real results fit. A slot nothing grounds
+keeps a proposed term, competitor or topic only when its real results fit. The bento waits on the
+slowest check, so the search check prefers the routed SERP's steadily fast child
+(`lookup.SERP_PROVIDER`) and drops an answer later than `SERP_TIMEOUT_S`. A slot nothing grounds
 keeps its labelled example.
 
 Every catalog call of the lookup is a house call (`application/house_calls.py`): an ordinary metered

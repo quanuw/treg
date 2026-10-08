@@ -726,9 +726,21 @@ _MD_ALT = '<link rel="alternate" type="text/markdown" href="{href}"/>'
 
 
 def _guide_md(fragment: str) -> str:
-    """An agent page's hand-written `guide` HTML as Markdown for the `.md` twin. The fragments use a
-    small fixed vocabulary (p, pre/code, ul/li, a, b, code), so this maps that and strips the rest."""
-    s = re.sub(r"<pre><code>(.*?)</code></pre>", lambda m: f"\n```\n{m.group(1)}\n```\n", fragment, flags=re.S)
+    """Hand-written page sections (an agent's `guide`, a workflow's `sections`) as Markdown for the
+    `.md` twin. The fragments use a small fixed vocabulary (p, table, pre/code, ul/li, a, b, code), so
+    this maps that and strips the rest; a table becomes a pipe table rather than run-together cells."""
+    def _table(m: re.Match) -> str:  # one Markdown table per <table>, header row then a separator
+        rows = [[re.sub(r"<[^>]+>", "", c).strip()
+                 for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", tr, flags=re.S)]
+                for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", m.group(0), flags=re.S)]
+        rows = [r for r in rows if r]
+        if not rows:
+            return ""
+        out = ["| " + " | ".join(rows[0]) + " |", "|" + "---|" * len(rows[0])]
+        out += ["| " + " | ".join(r) + " |" for r in rows[1:]]
+        return "\n" + "\n".join(out) + "\n\n"
+    s = re.sub(r"<table[^>]*>.*?</table>", _table, fragment, flags=re.S)
+    s = re.sub(r"<pre><code>(.*?)</code></pre>", lambda m: f"\n```\n{m.group(1)}\n```\n", s, flags=re.S)
     s = re.sub(r'<a href="([^"]+)">(.*?)</a>',
                lambda m: f"[{m.group(2)}]({get_settings().public_url.rstrip('/')}{m.group(1)})"
                if m.group(1).startswith("/") else f"[{m.group(2)}]({m.group(1)})", s)
@@ -1841,6 +1853,8 @@ async def workflow_page(request: Request, slug: str,
     cat = catalog_store.load()
     base = get_settings().public_url.rstrip("/")
     agent_slug, agent_name = _uc_agent()
+    if spec.get("agent") in agent_pages.AGENTS:  # a workflow may name its own example agent
+        agent_slug, agent_name = spec["agent"], agent_pages.AGENTS[spec["agent"]]["name"]
     steps = await _wf_steps(cat, observations, spec, agent_slug)
     run = spec["run"]
     n_steps = len(steps)
@@ -1863,8 +1877,10 @@ async def workflow_page(request: Request, slug: str,
 
     title = spec["title"].format(n=n_steps, steps=n_steps)
     lede = spec["lede"].format(n=n_steps, steps=n_steps)
-    desc = _serp_desc(f"{spec['sentence']}. {n_steps} steps through one treg.to key, priced before "
+    desc = _serp_desc(spec.get("description") or
+                      f"{spec['sentence']}. {n_steps} steps through one treg.to key, priced before "
                       f"each call, with a real run's receipt.")
+    sections = spec.get("sections") or []
 
     if as_md:
         md = [f"# {spec['sentence']}", "", lede, "",
@@ -1886,6 +1902,8 @@ async def workflow_page(request: Request, slug: str,
         md += [f"- {k}: {v}" for k, v in run["receipt"]]
         md += [""] + list(run["narrative"])
         md += ["", f"Download the CSV of this run: {base}{run['csv']}", ""]
+        for sec in sections:
+            md += [f"## {sec['h2']}", "", _guide_md(sec["html"]), ""]
         md += ["## Why go through treg.to", ""] + [f"- **{t}** {d}" for t, d in agent_pages.WHY_TREG]
         md += ["", "## Where it goes wrong", ""]
         for h, p in spec["failure_modes"]:
@@ -2008,6 +2026,11 @@ async def workflow_page(request: Request, slug: str,
           f'<dl class="receipt">{receipt}</dl>{narrative}'
           f'<p><a class="ghostbtn" href="{_esc_html(run["csv"])}">Download the CSV of this run</a></p>'
           '</div></section>'
+
+        # Hand-written sections from the spec (trusted static HTML), after the receipt they quote.
+        + "".join(f'<section id="{_esc_html(sec["id"])}" class="guide"><div class="wrap">'
+                  f'<div class="seclab">{_esc_html(sec["seclab"])}</div><h2>{_esc_html(sec["h2"])}</h2>'
+                  f'{sec["html"]}</div></section>' for sec in sections)
 
         + '<section id="why"><div class="wrap"><div class="seclab">Why treg.to</div>'
           '<h2>Why go through treg.to</h2>'
@@ -4189,7 +4212,6 @@ async def blog_work_email_finding_bench():
         '<th style="text-align:left;padding:8px 0"></th>'
         '<th style="text-align:right;padding:8px 12px">treg.to</th>'
         '<th style="text-align:right;padding:8px 12px">Clay</th>'
-        '<th style="text-align:right;padding:8px 12px">Monid</th>'
         '<th style="text-align:right;padding:8px 12px">Freckle</th>'
         '<th style="text-align:right;padding:8px 12px">Deepline</th>'
         '</tr></thead>'
@@ -4197,62 +4219,53 @@ async def blog_work_email_finding_bench():
         '<tr><td style="padding:6px 0">Found</td>'
         '<td style="text-align:right;padding:6px 12px">289</td>'
         '<td style="text-align:right;padding:6px 12px">280</td>'
-        '<td style="text-align:right;padding:6px 12px">250</td>'
         '<td style="text-align:right;padding:6px 12px">281</td>'
         '<td style="text-align:right;padding:6px 12px">266</td></tr>'
         '<tr><td style="padding:6px 0">Exact match</td>'
         '<td style="text-align:right;padding:6px 12px">264</td>'
         '<td style="text-align:right;padding:6px 12px">262</td>'
-        '<td style="text-align:right;padding:6px 12px">233</td>'
         '<td style="text-align:right;padding:6px 12px">263</td>'
         '<td style="text-align:right;padding:6px 12px">253</td></tr>'
         '<tr><td style="padding:6px 0">Success (exact/292)</td>'
         '<td style="text-align:right;padding:6px 12px;font-weight:600">90.4%</td>'
         '<td style="text-align:right;padding:6px 12px">89.7%</td>'
-        '<td style="text-align:right;padding:6px 12px">79.8%</td>'
         '<td style="text-align:right;padding:6px 12px">90.1%</td>'
         '<td style="text-align:right;padding:6px 12px">86.6%</td></tr>'
         '<tr><td style="padding:6px 0">Precision (exact/found)</td>'
         '<td style="text-align:right;padding:6px 12px">91.3%</td>'
         '<td style="text-align:right;padding:6px 12px">93.6%</td>'
-        '<td style="text-align:right;padding:6px 12px">93.2%</td>'
         '<td style="text-align:right;padding:6px 12px">93.6%</td>'
         '<td style="text-align:right;padding:6px 12px">95.1%</td></tr>'
         '<tr><td style="padding:6px 0">Off-domain</td>'
         '<td style="text-align:right;padding:6px 12px">5</td>'
         '<td style="text-align:right;padding:6px 12px">4</td>'
-        '<td style="text-align:right;padding:6px 12px">0</td>'
         '<td style="text-align:right;padding:6px 12px">4</td>'
         '<td style="text-align:right;padding:6px 12px">0</td></tr>'
         '<tr style="border-top:1px solid var(--border)"><td style="padding:6px 0">Cost (finding only)</td>'
         '<td style="text-align:right;padding:6px 12px;font-weight:600">$1.49</td>'
         '<td style="text-align:right;padding:6px 12px">$10.34</td>'
-        '<td style="text-align:right;padding:6px 12px">$5.98</td>'
         '<td style="text-align:right;padding:6px 12px">$11.22</td>'
         '<td style="text-align:right;padding:6px 12px">$23.38</td></tr>'
         '<tr><td style="padding:6px 0">Per row</td>'
         '<td style="text-align:right;padding:6px 12px;font-weight:600">$0.0051</td>'
         '<td style="text-align:right;padding:6px 12px">$0.0354</td>'
-        '<td style="text-align:right;padding:6px 12px">$0.0205</td>'
         '<td style="text-align:right;padding:6px 12px">$0.0384</td>'
         '<td style="text-align:right;padding:6px 12px">$0.0801</td></tr>'
         '<tr><td style="padding:6px 0">Per correct</td>'
         '<td style="text-align:right;padding:6px 12px;font-weight:600">$0.0056</td>'
         '<td style="text-align:right;padding:6px 12px">$0.0395</td>'
-        '<td style="text-align:right;padding:6px 12px">$0.0257</td>'
         '<td style="text-align:right;padding:6px 12px">$0.0427</td>'
         '<td style="text-align:right;padding:6px 12px">$0.0924</td></tr>'
         '<tr><td style="padding:6px 0">Hit latency (median)</td>'
         '<td style="text-align:right;padding:6px 12px">0.44s</td>'
         '<td style="text-align:right;padding:6px 12px">11.2s</td>'
-        '<td style="text-align:right;padding:6px 12px">2.0s</td>'
         '<td style="text-align:right;padding:6px 12px">65s</td>'
         '<td style="text-align:right;padding:6px 12px;color:var(--muted)">batch</td></tr>'
         '</tbody>'
         '</table>'
         '</div>'
         '<p style="color:var(--muted);font-size:0.85em;margin-top:8px">'
-        'Monid = Hunter only. Freckle = LeadMagic&rarr;Findymail. Deepline = ZeroBounce-first play. '
+        'Freckle = LeadMagic&rarr;Findymail. Deepline = ZeroBounce-first play. '
         'Clay dollars are at Clay&#x27;s Launch data-credit list price ($0.05/credit on 2026-09-16).</p>'
         '<h2 style="margin-top:32px;font-size:1.1em">What the numbers say</h2>'
         '<ul style="margin:16px 0;padding-left:24px">'
@@ -4264,7 +4277,7 @@ async def blog_work_email_finding_bench():
         '7x to 16x treg.to per correct row. Deepline is an outlier because ZeroBounce fires on every '
         'pattern guess.</li>'
         '<li style="margin:8px 0"><strong>Latency only matters for per-call paths.</strong> '
-        'treg.to (0.44s) and Monid (2.0s) are per-call; do not rank batch tools on speed.</li>'
+        'treg.to (0.44s) is per-call; do not rank batch tools on speed.</li>'
         '<li style="margin:8px 0"><strong>Aggregator columns are routes, not products.</strong> '
         'Each column represents how that aggregator dispatched the query to its underlying providers.</li>'
         '</ul>'

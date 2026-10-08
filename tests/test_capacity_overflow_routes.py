@@ -311,6 +311,7 @@ _UNRECORDED_SIGNATURE = {
     "spidercloud",  # funded dollar balance remains; no empty-balance response was forced
     "perplexity",  # auto top-up is enabled; no empty-credit response was forced
     "trestleiq",  # funded wallet remains; documented 403/429 shapes do not identify empty balance
+    "hlrlookup",  # empty balance is a per-result INSUFFICIENT_CREDIT inside HTTP 200; not forced
     "you",  # funded wallet remains; no provider-specific empty-balance response was forced
     "valyu",  # subscription credits remain; no provider-specific empty-balance response was forced
     "octen",  # PAYG balance remains; no provider-specific empty-balance response was forced

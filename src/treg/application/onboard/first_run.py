@@ -29,15 +29,13 @@ from ...models import Membership, OnboardingProfile, Org, User
 from ...timeutil import utcnow_naive
 from .. import signup
 from ..house_calls import HouseCalls
-from . import OnboardError, work_email
+from . import OnboardError
 from .lookup import DEADLINE_S, Hints, Lookup, State, _squash, is_recommended, ranked
 from .tasks import DEFAULT_RANK, SHOWN, TASKS, USE_CASES, public_library
 
 log = logging.getLogger("treg.onboarding")
 
 _owners: dict[int, asyncio.Task] = {}
-_warming: set[asyncio.Task] = set()
-_http: httpx.AsyncClient | None = None
 
 
 def enabled(email: str) -> bool:
@@ -46,25 +44,18 @@ def enabled(email: str) -> bool:
     return s.onboarding_v2 or _listed(email)
 
 
-async def in_experiment(email: str, http: httpx.AsyncClient | None = None) -> bool:
-    """Whether this address may enter the `onboarding-v2` experiment: the experiment is on and it is
-    a work address. With `http`, an unjudged domain is put to Jev, but only for an account that can
-    still be onboarded (no team it named); without, only a kept verdict counts."""
+def in_experiment(email: str) -> bool:
+    """Whether this address may enter the `onboarding-v2` experiment: the experiment is on and its
+    domain is not one anyone can get an address at (`paths.email_domain`: free, ISP, disposable and
+    alias mail) or a school's. A personal domain gets in too; both arms take it alike, and a lookup
+    that finds nothing asks what the agent will do first."""
     if not get_settings().onboarding_v2_experiment:
         return False
-    known = await work_email.cached(email)
-    if known is not None or http is None:
-        return known is True
-    async with session_maker() as db:
-        if await _named_team(db, email):
-            return False      # an account that already has a team is never asked about again
-    try:
-        return await asyncio.wait_for(work_email.is_work(email, http), AUTH_WAIT_S)
-    except TimeoutError:
-        return False      # the judgment goes on (it is shared and shielded) and is kept for next time
+    d = email_domain(email)
+    return bool(d) and not _SCHOOL.search(d)
 
 
-AUTH_WAIT_S = 3
+_SCHOOL = re.compile(r"\.(edu|edu\.[a-z]{2}|ac\.[a-z]{2})$")
 
 
 async def _named_team(db, email: str) -> bool:
@@ -74,26 +65,10 @@ async def _named_team(db, email: str) -> bool:
         User, User.id == Membership.user_id).where(User.email == email, Org.name != email).limit(1))).first() is not None
 
 
-def use_http(http: httpx.AsyncClient) -> None:
-    """The app's shared client, for work started outside a request (`warm`). Set at startup."""
-    global _http
-    _http = http
-
-
-def warm(email: str) -> None:
-    """At sign-up: judge the new address's domain in the background, so the first page load reads a
-    kept verdict instead of waiting on Jev. Nothing when the experiment is off or the flow is on."""
-    if not get_settings().onboarding_v2_experiment or enabled(email) or _http is None:
-        return
-    task = asyncio.create_task(work_email.is_work(email, _http))
-    _warming.add(task)
-    task.add_done_callback(_warming.discard)
-
-
 async def allowed(email: str) -> bool:
     """Who may start and read the flow: everyone it is on for, and the experiment's work addresses
     (the dashboard sends only its `test` arm here)."""
-    return enabled(email) or await in_experiment(email)
+    return enabled(email) or in_experiment(email)
 
 
 def _pack(value: dict) -> str:
@@ -530,7 +505,7 @@ async def preview_call(user: User, pid: str, call: dict, http: httpx.AsyncClient
 
 
 async def shutdown() -> None:
-    tasks = list(_owners.values()) + list(_previews.values()) + list(_warming)
+    tasks = list(_owners.values()) + list(_previews.values())
     for task in tasks:
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)

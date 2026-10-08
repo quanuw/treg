@@ -35,10 +35,14 @@ contracts:
       verified: {type: bool, note: "the provider says it checked the mailbox"}
     miss: "email == null"
     idempotent: true            # a lookup — error-fallback to the next provider is safe
+    # The provider's own claim, stored per call; a finder with no `verified` output stores none.
+    verdict: {from: verified, words: [verified, unverified], map: {true: verified, false: unverified}}
     # Attached as `_treg.advice` when a hit's `verified` is not true. A find is a guess the provider
     # scored, not a delivery check: 2026-09-06 one team sent to catch-all (`accept_all`) and
     # pattern-guessed hits without verifying and bounced on most of them.
-    advice_unverified: "This address was found, not confirmed deliverable (verified != true). Run treg.people.email.verify on it before outreach — a fraction of a cent, and it catches catch-all domains and dead mailboxes."
+    advice_unverified: "This address was found, not confirmed deliverable (verified != true). Send X-Treg-Route-Verify: true and treg checks it with treg.people.email.verify in the same call, or run that check yourself before outreach — a fraction of a cent, and it catches catch-all domains and dead mailboxes."
+    # `X-Treg-Route-Verify`: checks every hit, a finder's own `verified` included; BounceBan first here only.
+    check: {endpoint: treg.people.email.verify, field: email, prefer: [bounceban]}
 
   # ---- batch 1: social lookups (2026-08-28) ---------------------------------------------------
   instagram.user.profile:
@@ -122,13 +126,33 @@ contracts:
       linkedin_handle: "linkedin_handle(linkedin_url)"
     filters: {}
     output:
-      phone: {type: str, required: true, note: "as the provider formats it; E.164 when it offers one"}
+      phone: {type: str, required: true, note: "as the provider formats it; E.164 when it offers one, and +1 added to a 10-digit number the provider marks US or CA"}
       line_type: {type: str}
       country_code: {type: str}
     miss: "phone == null"
     idempotent: true
     # No phone provider reports a line check, so every hit carries this.
-    advice_unverified: "This number was found, not confirmed live. Validate it (catalog_search 'verify phone number', e.g. tomba.people.phone.verify) before dialing or texting."
+    advice_unverified: "This number was found, not confirmed live. Send X-Treg-Route-Verify: true and treg checks the line with a live network lookup (hlrlookup.people.phone.verify) in the same call. For a US number, trestleiq.people.contact.verify also checks that it belongs to this person."
+    # `X-Treg-Route-Verify`: HLR's live check; a national-form number would be read as another country's.
+    check: {endpoint: hlrlookup.people.phone.verify, field: phone, when: "e164_digits(phone) != null", skip_reason: not_international,
+            skip_advice: "This number has no country code, so it was not checked: a live lookup would read its first digits as a country code. Add the country code (+ and the digits), or call hlrlookup.people.phone.verify with input_format set to the ISO3 country code (for example USA)."}
+
+  people.phone.live:
+    summary: "Check whether a phone number is live on its network — a live network lookup, not a format check"
+    routed: false               # one provider; the phone find's check calls it directly
+    identity:
+      - {phone: str}
+    filters: {}
+    output:
+      live_status: {type: str, required: true, note: "the provider's own word (LIVE, DEAD, ABSENT_SUBSCRIBER, …)"}
+      phone: {type: str}
+      line_type: {type: str}
+      current_network: {type: str}
+      ported: {type: bool}
+    miss: "live_status == null"
+    idempotent: true
+    # Never `verified`: a live line is not proof it is this person's number.
+    verdict: {from: live_status, words: [live, dead, unknown]}
 
   people.phone.verify:
     summary: "Validate a phone number's format and numbering-plan validity; not a live-line check"
@@ -156,6 +180,9 @@ contracts:
       score: {type: int}
     miss: "status == null"
     idempotent: true
+    # Stored per call. Each adapter maps its provider's words (`verdicts`); `unknown` is a word,
+    # not a miss, and catch-all is kept apart from `risky` so it can be counted on its own.
+    verdict: {from: status, words: [valid, invalid, catch_all, risky, unknown]}
 
   people.enrich:
     summary: "Enrich a person from an email, a LinkedIn URL or a name + company domain — treg picks the provider and names the one that served"

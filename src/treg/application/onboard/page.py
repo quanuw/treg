@@ -185,12 +185,6 @@ async def read(http: httpx.AsyncClient, site: str, *, timeout: float = 5.0) -> P
     return page
 
 
-async def text(http: httpx.AsyncClient, site: str, *, timeout: float = 2.0) -> str:
-    """https://<site>'s title, meta and visible text; empty when it cannot be read safely and quickly."""
-    page = await _get(http, f"https://{site}", timeout)
-    return page.text if page else ""
-
-
 async def exists(http: httpx.AsyncClient, url: str, *, timeout: float = 4.0) -> bool:
     """Whether `url` answers an HTML page (after safe redirects); the body is never read."""
     return await _get(http, url, timeout, probe=True) is not None

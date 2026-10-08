@@ -376,6 +376,9 @@ def _show_hint_line(resp: httpx.Response) -> None:
     kind = headers.get("X-Treg-Hint")
     if kind is None and headers.get("X-Treg-Review") == "requested":
         kind = "review"
+    if routed := headers.get("X-Treg-Routed-Tool"):
+        print(f"treg: {routed} does this job and picks the provider, with fallback; "
+              "prefer it unless you need options only this provider has.", file=sys.stderr)
     if not call_id:
         return
     if kind == "review":
@@ -2383,6 +2386,8 @@ from .domain.asynctasks import extract_submission as _extract_submission  # noqa
 from .domain.asynctasks import fetch_command as _async_fetch_command  # noqa: E402
 from .domain.asynctasks import shown as _shown  # noqa: E402
 from .domain.asynctasks import classify_terminal as _classify_terminal  # noqa: E402
+from .domain.asynctasks import finished_on_submission as _finished_on_submission  # noqa: E402
+from .domain.asynctasks import max_age as _async_max_age  # noqa: E402
 from .domain.asynctasks import json_path as _json_path  # noqa: E402
 
 
@@ -2435,39 +2440,46 @@ def await_async_task(descriptor: dict, submission: httpx.Response, call_fn, cloc
         recovery = f"treg call {shlex.quote(target)}"
 
     interval = float(descriptor.get("interval") or 10)
+    # A provider that asks callers to stop polling sooner (`max_age`) bounds the wait.
+    timeout = min(timeout, _async_max_age(descriptor).total_seconds())
     start = clock.monotonic()
     failures = 0
     warned: set[str] = set()
+    # The submission may already be the finished answer (`terminal_on_submission`): no poll.
+    ready = (submission, submitted) if _finished_on_submission(descriptor, submitted) else None
     while True:
-        if clock.monotonic() - start >= timeout:
-            return {"code": 3, "task_id": str(task_id), "recovery": recovery,
-                    "error": "timed out while waiting for the async task"}
-        clock.sleep(interval if failures == 0 else min(60.0, interval * (2 ** (failures - 1))))
-        try:
-            response = call_fn(target, params)
-        except (httpx.RequestError, OSError) as exc:
-            failures += 1
-            _clock_report(clock, f"async poll retry {failures}/5 after a network error: {exc}")
-            if failures >= 5:
+        if ready is not None:
+            (response, terminal), ready = ready, None
+        else:
+            if clock.monotonic() - start >= timeout:
                 return {"code": 3, "task_id": str(task_id), "recovery": recovery,
-                        "error": f"polling failed five consecutive times: {exc}"}
-            continue
-        if response.status_code >= 500:
-            failures += 1
-            _clock_report(clock, f"async poll retry {failures}/5 after HTTP {response.status_code}")
-            if failures >= 5:
+                        "error": "timed out while waiting for the async task"}
+            clock.sleep(interval if failures == 0 else min(60.0, interval * (2 ** (failures - 1))))
+            try:
+                response = call_fn(target, params)
+            except (httpx.RequestError, OSError) as exc:
+                failures += 1
+                _clock_report(clock, f"async poll retry {failures}/5 after a network error: {exc}")
+                if failures >= 5:
+                    return {"code": 3, "task_id": str(task_id), "recovery": recovery,
+                            "error": f"polling failed five consecutive times: {exc}"}
+                continue
+            if response.status_code >= 500:
+                failures += 1
+                _clock_report(clock, f"async poll retry {failures}/5 after HTTP {response.status_code}")
+                if failures >= 5:
+                    return {"code": 3, "task_id": str(task_id), "recovery": recovery,
+                            "error": f"polling returned {response.status_code} five consecutive times"}
+                continue
+            if response.status_code >= 400:
                 return {"code": 3, "task_id": str(task_id), "recovery": recovery,
-                        "error": f"polling returned {response.status_code} five consecutive times"}
-            continue
-        if response.status_code >= 400:
-            return {"code": 3, "task_id": str(task_id), "recovery": recovery,
-                    "error": f"polling returned HTTP {response.status_code}"}
-        failures = 0
-        try:
-            terminal = response.json()
-        except ValueError:
-            return {"code": 3, "task_id": str(task_id), "recovery": recovery,
-                    "error": "a polling response was not JSON"}
+                        "error": f"polling returned HTTP {response.status_code}"}
+            failures = 0
+            try:
+                terminal = response.json()
+            except ValueError:
+                return {"code": 3, "task_id": str(task_id), "recovery": recovery,
+                        "error": "a polling response was not JSON"}
         status = str(_json_path(terminal, descriptor["status"]["path"]))
         outcome = _classify_terminal(descriptor, terminal)
         if outcome == "success":
@@ -2528,6 +2540,8 @@ def _call_envelope(response: httpx.Response, content_type: str) -> dict:
         meta["async"] = True
     if kind := headers.get("X-Treg-Hint"):
         meta["hint"] = kind
+    if routed := headers.get("X-Treg-Routed-Tool"):
+        meta["routed_tool"] = routed
     return {"result": result, "_treg": meta}
 
 
@@ -5811,6 +5825,8 @@ def _catalog_get(endpoint_id: str, cfg) -> None:
         _dim("  a miss tries the next one (ceiling $1 per call by default); --header 'X-Treg-Route-Max-Cost: 0.05' to cap it,")
         _dim("  --header 'X-Treg-Route-Waterfall: 0' to stop at the first miss,")
         _dim("  --header 'X-Treg-Route-Strict-Filters: 1' to refuse (422, unbilled) rather than call a provider that ignores a filter you sent")
+        if "X-Treg-Route-Verify" in (routing.get("headers") or {}):
+            _dim("  --header 'X-Treg-Route-Verify: true' to check a hit in the same call, at the check's own price")
         also = routing.get("also") or []
         if also:
             print(f"\n{_A}ALSO{_R}  {_M}the same job from providers treg does not route to (yet) — call them by id{_R}")

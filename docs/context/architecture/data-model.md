@@ -49,6 +49,8 @@ sources:
   - src/treg/alembic/versions/0041_searchlog.py
   - src/treg/alembic/versions/0055_find_v2_log.py
   - src/treg/alembic/versions/0056_searchlog_verdict.py
+  - src/treg/alembic/versions/0065_call_verdict.py
+  - src/treg/alembic/versions/0066_endpointdaystat_verdicts.py
   - src/treg/timeutil.py
   - src/treg/infra/db.py
   - src/treg/domain/referrals.py
@@ -99,7 +101,9 @@ inserting a submission `CallRecord`, so a poll that finishes first still gives t
 verdict; when the audit row wins the race, the finalizer queues a background correction. Both use the
 original `call_ref`, including routed children. A confirmed terminal failure stores `false`
 for endpoints with verified result rules, since that attempt produced no hit. A pending or
-timed-out submission remains undecided.
+timed-out submission remains undecided. Revision `0065` adds the nullable `verdict` word beside it,
+written by the same finalizer and copied by the same insert and correction; only a successful
+terminal answer carries one.
 
 Migration `0019` adds `consecutive_failures` with a retained server default of zero, allowing old
 writers during rollout. Valid polls reset it; failures grow the retry delay to 15 minutes.
@@ -270,7 +274,8 @@ uses this metadata, never the encrypted token's shape.
   observed reliability and the Arena's rolling insights, are scheduled `treg-worker` commands
   that walk it incrementally by primary key. Revision 0038 adds their catalog half:
   `EndpointDayStat` (one row per endpoint per UTC day: counts, newest success, hit tallies and a
-  bounded latency sample; primary key `(endpoint_id, day)`, indexed by `day` for the window prune)
+  bounded latency sample, plus `verdicts`, calls per verdict word, added nullable by `0066`;
+  primary key `(endpoint_id, day)`, indexed by `day` for the window prune)
   and the single-row `EndpointStatCursor` (`cursor_id`, the `created_at` watermark and
   `caught_up_at`, which is what lets the reader fall back to the live aggregate until the worker
   has caught up). `application/catalog_stats.py` is the only writer of both; see
@@ -338,6 +343,13 @@ uses this metadata, never the encrypted token's shape.
   until its answer is read (or, when the answer streams on, until its headers arrive). It leaves
   out token refresh, archive lookup, a `retry-after` sleep and treg's own work. NULL when no
   request reached the provider, and on rows written before the column existed.
+
+  `verdict` (Alembic `0065`) is the contract's verdict word for the answer, set beside `hit` by the
+  same adapter: `valid` / `invalid` / `catch_all` / `risky` / `unknown` for an email verify,
+  `verified` / `unverified` for an email find (the provider's own claim). One word from the
+  contract's closed list, never content. NULL when the contract records no verdict, the answer
+  carried none, or the provider used a word its adapter does not map. See
+  [catalog](catalog.md) for the declarations.
 - **`IdempotentCall`** - a caller-scoped, 24-hour replay cache for metered successes, keyed by
   `(membership_id, key)` and also carrying `org_id` for team cleanup. It is not an audit record: once
   the membership is revoked there is no valid caller that can replay it. `delete_membership` removes

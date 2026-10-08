@@ -72,8 +72,9 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: Per-page maximum number of results to return (1-50, default 20). A provider may return a
-          smaller native page; follow nextCursor for more.
+        note: 'Page size to ask for (1-50, default 20). Some sources honor it; others always return
+          their whole native page of about 20. A page is never trimmed after the call, so follow
+          nextCursor to continue exactly where this response ended.'
         default: 20
         min: 1
         max: 50
@@ -191,12 +192,10 @@ endpoints:
         - last-week
         - last-month
         - last-year
-      page:
-        type: integer
+      cursor:
+        type: string
         required: false
-        note: 1-based results page.
-        default: 1
-        min: 1
+        note: Pagination cursor from a previous response's nextCursor.
       query:
         type: string
         required: true
@@ -240,9 +239,9 @@ endpoints:
   name: Google Search
   summary: Run a Google web search and get the organic results (title, link, snippet, position) as clean
     JSON. Returns about 10 results per call - Google stopped honoring bulk result counts in September
-    2025, so a limit above 10 is accepted but returns no more than a page. Pass the returned nextCursor
-    back as cursor to walk further, or use google.search_100 for up to 100 ranked results in one call,
-    which is cheaper past roughly 20 results.
+    2025, so a limit above 10 is accepted but returns no more than a page. Send page 2, 3, ... to walk
+    further, or use google.search_100 for up to 100 ranked results in one call, which is cheaper past
+    roughly 20 results.
   input:
     body:
       autocorrect:
@@ -253,8 +252,9 @@ endpoints:
       cursor:
         type: string
         required: false
-        note: Continuation token from a previous response's nextCursor. Pass it back to fetch the next
-          page of results.
+        note: 'Deprecated: send page instead. A continuation token from an earlier response''s nextCursor
+          is still accepted and still continues on the source that issued it; page is ignored when cursor
+          is sent alongside it.'
       gl:
         type: string
         required: false
@@ -270,10 +270,13 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: Maximum number of organic results to return in this response. Google stopped honoring bulk
-          result counts in September 2025, so one page is about 10 results and a limit above 10 is accepted
-          but will not return more than that. To go deeper, either page through with cursor (about 10
-          results per...
+        note: 'Page size to ask for. Google returns about 10 organic results per page and stopped
+          honoring larger counts in September 2025, so a limit above 10 still returns about 10. Some
+          sources return their whole page of about 10 whatever limit says: a page is never trimmed
+          after the call, so nextCursor always continues exactly where this response ended. To go
+          deeper, send page (about 10 results per page, each billed as a request) or use
+          google.search_100, which returns up to 100 ranked results in a single call for one flat
+          charge and is cheaper past roughly 20 results. Price is flat per request.'
         default: 10
         min: 1
         max: 100
@@ -284,6 +287,13 @@ endpoints:
         note: Fine-grained location for result localization, given as a canonical Google location string
           (e.g. 'New York, United States', 'London, United Kingdom'). More specific than the country-level
           gl.
+      page:
+        type: integer
+        required: false
+        note: Which page of about 10 organic results to return, starting at 1. Send page 2, 3, ... to walk
+          deeper; each page is billed as one request and any source can serve any page. Replaces cursor.
+        default: 1
+        min: 1
       query:
         type: string
         required: true
@@ -407,11 +417,13 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: Maximum number of authored tweets and replies to return in the current bulk call (1-1000).
-          The provider may return fewer results.
+        note: 'Page size to ask for (1-100, default 20). Some sources honor it; others always return
+          their whole native page of about 20 authored tweets and replies. A page is never trimmed
+          after the call, so follow nextCursor and pass it back as cursor to continue exactly where
+          this response ended.'
         default: 20
         min: 1
-        max: 1000
+        max: 100
         example: 20
     bodyType: json
   test_request:
@@ -458,6 +470,11 @@ endpoints:
         type: string
         required: false
         note: Filter to a specific company by its LinkedIn numeric company id.
+      cursor:
+        type: string
+        required: false
+        note: Opaque pagination cursor from a previous response's nextCursor. Omit for the first page;
+          pass it to fetch the next page of job listings.
       employmentType:
         type: string
         required: false
@@ -487,7 +504,8 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: Maximum number of results to return (1-25, default 25).
+        note: 'Accepted for compatibility and ignored: each call returns one full source page (10 or 25
+          jobs depending on source); follow nextCursor for more.'
         min: 1
         max: 25
         example: 3
@@ -1739,6 +1757,11 @@ endpoints:
     An empty result is valid and does not assert whether the target post exists.'
   input:
     body:
+      cursor:
+        type: string
+        required: false
+        note: Opaque pagination cursor from a previous response's nextCursor. Omit for the first page;
+          pass it to fetch the next page of replies.
       limit:
         type: integer
         required: false
@@ -1949,6 +1972,11 @@ endpoints:
         type: string
         required: false
         note: Filter to a specific company by name (e.g. Google).
+      cursor:
+        type: string
+        required: false
+        note: Opaque pagination cursor from a previous response's nextCursor. Omit for the first page;
+          pass it to fetch the next page of job listings.
       easyApply:
         type: boolean
         required: false
@@ -1977,8 +2005,8 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: Maximum number of results to return (1-25, default 25). You are billed per result returned,
-          so a lower limit costs less.
+        note: 'Accepted for compatibility and ignored: each call returns one full page of up to 25 jobs
+          at one flat price per call; follow nextCursor for more.'
         min: 1
         max: 25
         example: 3
@@ -2044,25 +2072,24 @@ endpoints:
       workplaceType: remote
   cost:
     type: per_success
-    value: 0.0273
+    value: 0.0286
     currency: USD
     unit: call
     reported_charge:
       path: costUsd
       unit: usd
-    source: observed
+    source: rate_card_api
     source_url: https://api.getanyapi.com/v1/apis/linkedin.jobs
-    checked: '2026-09-11'
+    checked: '2026-10-06'
     confidence: verified
   example_response: examples/anyapi.linkedin.search.jobs.full.json
   verified: '2026-09-19'
   docs_url: https://getanyapi.com/api/linkedin/jobs
   note: 'The FULL tier of LinkedIn job search: description, salary, applicant count, seniority and company
-    detail. `linkedin.search.jobs` above (`linkedin.jobs_thin`) returns listing fields only. Priced per
-    result, so the charge tracks how many you ask for; the committed test_request asks for 3 and metered
-    $0.0044 on 2026-09-08. AnyAPI slug `linkedin.jobs`. Price is the p90 of what AnyAPI really charged
-    for this endpoint over the 60 days to 2026-09-09 (510 charged calls, $0.01155 median), not a list
-    price; roughly one call in ten settles above it. 1 source can serve it; the cheapest serves first
+    detail. `linkedin.search.jobs` above (`linkedin.jobs_thin`) returns listing fields only. Since 2026-10-06
+    each call returns one full page of up to 25 jobs at a flat $0.0286, whatever `limit` says; pass `nextCursor`
+    back as `cursor` for the next page. AnyAPI slug `linkedin.jobs`. Price is the live rate card''s flat
+    per-call price (read 2026-10-06), replacing the earlier per-result p90. 1 source can serve it; the cheapest serves first
     and a failed attempt is retried on the next, up to a $0.0286 ceiling per request. Every response reports
     its exact charge as `costUsd`, so `reported_charge` settles the real number rather than this estimate.
     A request no source could serve answers non-2xx and is not charged; a source that answers not-found is a 2xx whose `found` is false and IS charged (probed 2026-09-19). Send the `max_cost_usd` query parameter to refuse

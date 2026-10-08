@@ -156,7 +156,7 @@ def email_domain(v: Any) -> str | None:
     return None if d in _FREE_MAIL else d
 
 
-# Mailboxes anyone can open (global and regional free mail, ISP mail, common disposable services):
+# Mailboxes anyone can open (global and regional free mail, ISP mail, common disposable and alias services):
 # their domain says nothing about the person's company.
 _FREE_MAIL = frozenset({
     # global free mail
@@ -182,6 +182,10 @@ _FREE_MAIL = frozenset({
     "mailinator.com", "guerrillamail.com", "10minutemail.com", "temp-mail.org", "tempmail.com",
     "yopmail.com", "trashmail.com", "sharklasers.com", "getnada.com", "dispostable.com",
     "maildrop.cc", "throwawaymail.com", "mohmal.com", "emailondeck.com", "fakeinbox.com",
+    # forwarding aliases: a real company's site, but anyone can get an address there
+    "duck.com", "privaterelay.appleid.com", "mozmail.com", "relay.firefox.com", "simplelogin.com",
+    "simplelogin.co", "simplelogin.fr", "slmail.me", "aleeas.com", "8alias.com", "addy.io", "anonaddy.com",
+    "anonaddy.me", "passmail.net", "passmail.com", "passinbox.com", "33mail.com",
 })
 
 
@@ -255,10 +259,47 @@ def choose(condition: Any, when_true: Any, when_false: Any) -> Any:
     return when_true if condition else when_false
 
 
+def e164_digits(v: Any) -> str | None:
+    """`+44 7790 606023` or `0044…` → `447790606023`; None for a number not written internationally.
+
+    Digits alone are never trusted: a national `6175551212` reads as a `61` (Australian) number."""
+    if not isinstance(v, str):
+        return None
+    s = v.strip()
+    if s.startswith("+"):
+        digits = re.sub(r"\D", "", s)
+    elif s.startswith("00"):
+        digits = re.sub(r"\D", "", s)[2:]
+    else:
+        return None
+    return digits if 7 <= len(digits) <= 15 else None
+
+
+# A national number is trusted only with a country whose numbering plan it fits exactly.
+_NATIONAL_PLANS = {"US": ("1", re.compile(r"[2-9]\d{9}")), "CA": ("1", re.compile(r"[2-9]\d{9}"))}
+
+
+def with_country_code(v: Any, country: Any) -> Any:
+    """`6175550142` or `(617) 555-0142` with country `US` → `+16175550142`; anything else comes back unchanged.
+
+    Only national digits (spaces, `-`, `.` and parentheses aside) that fit the plan of a country in
+    `_NATIONAL_PLANS` are rewritten."""
+    plan = _NATIONAL_PLANS.get(country.strip().upper()) if isinstance(country, str) else None
+    digits = re.sub(r"[\s\-.()]", "", v) if isinstance(v, str) else ""
+    if plan is None or not plan[1].fullmatch(digits):
+        return v
+    return f"+{plan[0]}{digits}"
+
+
+def starts_with(v: Any, prefix: Any) -> bool:
+    return isinstance(v, str) and prefix is not None and v.startswith(str(prefix))
+
+
 TRANSFORMS = {"values": values, "get": get_path, "null_if": null_if, "choose": choose, "split_first": split_first, "split_last": split_last, "join": join, "has_type": has_type, "len": length,
               "dfs_location": dfs_location, "seranking_source": seranking_source, "lower": lower, "upper": upper,
               "list": as_list, "at_least": at_least, "at_most": at_most, "linkedin_handle": linkedin_handle, "linkedin_url": linkedin_url,
-              "email_domain": email_domain, "host": host, "fmt": fmt, "obj": obj, "tca_filter": tca_filter, "csv": csv, "country_name": country_name}
+              "email_domain": email_domain, "host": host, "fmt": fmt, "obj": obj, "tca_filter": tca_filter, "csv": csv, "country_name": country_name,
+              "e164_digits": e164_digits, "starts_with": starts_with, "with_country_code": with_country_code}
 
 _CALL = re.compile(r"^(\w+)\((.*)\)$")
 _DIV = re.compile(r"^(.+?)\s*/\s*(\d+(?:\.\d+)?)$")

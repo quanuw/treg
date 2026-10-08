@@ -14,6 +14,10 @@ platform vendor 401/403 responses are errors because another child may work. A M
 `adapter.miss`) stops unless the
 caller turned the waterfall off (`X-Treg-Route-Waterfall: 0`). The waterfall is ON by default —
 the endpoint's job is to find the thing — bounded by `X-Treg-Route-Max-Cost` (default $1.00).
+
+`X-Treg-Route-Verify` asks for one more call after a hit, the contract's `check` (an email find
+checked by `treg.people.email.verify`). It is its own linked child `:v` with its own hold and
+verdict, reported in `_treg.verification`; the find's answer is not altered.
 """
 
 from __future__ import annotations
@@ -30,11 +34,14 @@ import httpx
 from ... import audit
 from ...config import get_settings
 from ...infra.db import session_maker
+from ...domain import asynctasks as asynctasks_rules
 from ...domain.capacity.routes_view import view as overflow_routes_view
 from ...domain.capacity.view import view as capacity_view
 from ...domain.capacity.signatures import classify as classify_capacity
+from ...domain.catalog import results as catalog_results
 from ...domain.catalog import stats as endpoint_stats
 from ...domain.catalog import store as catalog_store
+from ...domain.catalog.routing import paths as P
 from ...domain.catalog.routing.contracts import canonical_identity, declared_miss, miss_status
 from ...domain.catalog.routing.plan import (
     MAX_ERROR_FALLBACKS, Candidate, Plan, candidates_for, cost_at, ignored_filters, rank, unscoped,
@@ -81,10 +88,12 @@ EXCLUDE_HEADER = "x-treg-route-exclude"
 MIN_RESULTS_HEADER = "x-treg-route-min-results"
 MERGE_HEADER = "x-treg-route-merge"
 STRICT_FILTERS_HEADER = "x-treg-route-strict-filters"
+VERIFY_HEADER = "x-treg-route-verify"
 _DROP_FROM_CHILD = frozenset({b"content-length", b"content-type", b"transfer-encoding", b"idempotency-key",
                               b"x-treg-route-waterfall", b"x-treg-route-max-cost", b"x-treg-route-prefer",
                               b"x-treg-route-exclude", b"x-treg-route-min-results",
-                              b"x-treg-route-merge", b"x-treg-route-strict-filters", b"host"})
+                              b"x-treg-route-merge", b"x-treg-route-strict-filters",
+                              b"x-treg-route-verify", b"host"})
 _CALLER_FAULT = frozenset({400, 401, 403, 404, 405, 409, 422})
 _CANDIDATE_LOCAL_FAILURES = frozenset({"tool_access_denied", "policy_denied", "capability_pinned"})
 _GLOBAL_REFUSALS = frozenset({"insufficient_balance", "tag_spend_cap_reached",
@@ -134,6 +143,7 @@ class RouteOptions:
     min_results: int = 1     # a hit with fewer rows than this is WEAK: keep looking, keep the best
     merge: bool = False      # union the rows of every attempt that returned some (list answers only)
     strict_filters: bool = False  # drop any candidate that cannot express a filter the caller sent
+    verify: bool = False     # after a hit, run the contract's check (`X-Treg-Route-Verify`)
 
     @classmethod
     def from_headers(cls, get, default_max_cost_micro: int | None = None) -> "RouteOptions":
@@ -154,9 +164,11 @@ class RouteOptions:
                                    detail=f"{MIN_RESULTS_HEADER} must be a whole number, got {get(MIN_RESULTS_HEADER)!r}")
         mg = str(get(MERGE_HEADER) or "").strip().lower()
         sf = str(get(STRICT_FILTERS_HEADER) or "").strip().lower()
+        vf = str(get(VERIFY_HEADER) or "").strip().lower()
         return cls(waterfall=wf not in ("0", "false", "no", "off"),
                    max_cost_micro=max_cost, prefer=_list(get(PREFER_HEADER)), exclude=_list(get(EXCLUDE_HEADER)),
-                   min_results=mr, merge=mg in ("1", "true", "yes", "on"), strict_filters=sf in ("1", "true", "yes", "on"))
+                   min_results=mr, merge=mg in ("1", "true", "yes", "on"), strict_filters=sf in ("1", "true", "yes", "on"),
+                   verify=vf in ("1", "true", "yes", "on"))
 
 
 class _Bytes:
@@ -345,7 +357,7 @@ async def build_plan(ep: dict, identity_given: dict, caller, options: RouteOptio
 
 
 def _child_input(parent, ep: dict, query: dict[str, str], body: dict,
-                 remaining_micro: int | None = None) -> object:
+                 remaining_micro: int | None = None, extra_headers: tuple = ()) -> object:
     from .types import CallInput
     has_body = ep["method"] in ("POST", "PUT", "PATCH") and body is not None
     payload = json.dumps(body).encode() if has_body else b""
@@ -355,6 +367,7 @@ def _child_input(parent, ep: dict, query: dict[str, str], body: dict,
         # resolved, margin-inclusive reservation; advisory candidate prices cannot authorize spend.
         ceiling = f"{remaining_micro // 1_000_000}.{remaining_micro % 1_000_000:06d}"
         headers.append((MAX_COST_HEADER.encode(), ceiling.encode()))
+    headers += list(extra_headers)
     if has_body:
         headers += [(b"content-type", b"application/json"), (b"content-length", str(len(payload)).encode())]
     items = tuple(query.items())
@@ -369,6 +382,14 @@ async def _read(response: UpstreamResponse) -> bytes:
         chunks.append(chunk)
     await response.close()
     return b"".join(chunks)
+
+
+def _finished_on_submission(descriptor: dict, raw: bytes) -> bool:
+    """The child already answered (`terminal_on_submission`): judged like any synchronous answer."""
+    try:
+        return asynctasks_rules.finished_on_submission(descriptor, json.loads(raw))
+    except (ValueError, UnicodeDecodeError):
+        return False
 
 
 async def _async_cost(parent: CallContext, child_ref: str, fallback: int = 0) -> int:
@@ -433,6 +454,13 @@ async def _run_routed(parent: CallContext, ep: dict, body_bytes: bytes, get_head
     contract = catalog_store.load().contracts.get(ep["capability"])
     options = RouteOptions.from_headers(
         get_header, int(round(contract.default_max_cost_usd * 1_000_000)) if contract and contract.default_max_cost_usd else None)
+    if options.verify and (contract is None or contract.check is None):
+        # Refused before anything is planned or held: an agent must not believe a check ran.
+        checked = sorted(f"treg.{cap}" for cap, c in catalog_store.load().contracts.items() if c.check)
+        raise ResolutionFailed("catalog_parameter_invalid", status_code=422, detail={
+            "error": "route_verify_unsupported", "endpoint_id": ep["id"],
+            "message": f"{VERIFY_HEADER} works only on {', '.join(checked)}; {ep['id']} has no check. "
+                       "Nothing was charged."})
     await capacity_view.load()
     if get_settings().overflow_mode != "off":
         await overflow_routes_view.load()
@@ -520,7 +548,8 @@ async def _run_routed(parent: CallContext, ep: dict, body_bytes: bytes, get_head
         charged = int(_header(response, "X-Treg-Cost-Micro") or 0)
         descriptor = cand.endpoint.get("async")
         async_outcome = ""
-        if descriptor and 200 <= response.status < 300:
+        if (descriptor and 200 <= response.status < 300
+                and not _finished_on_submission(descriptor, raw)):
             kickoff_raw = raw
             reserved = charged
             poll_rule = descriptor.get("poll") or {}
@@ -731,6 +760,7 @@ async def _run_routed(parent: CallContext, ep: dict, body_bytes: bytes, get_head
             last = next(t for t in reversed(tried) if t.outcome == "miss")
             body_out = {"output": {k: None for k in plan.contract.output}, "raw": None,
                         "_treg": {"served_by": None, "outcome": "miss", "tried": [t.view() for t in tried], "charged_micro": spent,
+                                  **({"verification": _unchecked("no_hit")} if options.verify else {}),
                                   **({"capped": True} if cost_capped else {}),
                                   **({"dropped": plan.dropped} if plan.dropped else {})}}
             _audit_parent(parent, ep, 200, spent, audit_client)
@@ -766,14 +796,30 @@ async def _run_routed(parent: CallContext, ep: dict, body_bytes: bytes, get_head
     # A found contact is not a confirmed one. When the contract says so and the provider did not
     # vouch for deliverability (`verified` absent or false — Hunter's `accept_all`, LeadMagic's
     # personal finder, every phone provider), say it where the agent reads the answer. A
-    # suggestion only: the verify call is the agent's to make.
+    # suggestion only, unless the caller sent `X-Treg-Route-Verify`: then the check runs below.
     advice = (plan.contract.advice_unverified
               if plan.contract.advice_unverified and output and output.get("verified") is not True else "")
+    verification = None
+    check = plan.contract.check
+    if options.verify and check is not None and winner_outcome in ("hit", "weak"):
+        # The find's holds stay open in `pending` while the check runs: a cancellation releases
+        # them with everything else, and `run_routed` still closes each exactly once.
+        remaining = max(0, options.max_cost_micro - spent) if options.max_cost_micro is not None else None
+        verification, check_cost = await _run_check(parent, check, output, remaining,
+                                                    pending, execute_child, upstream_client)
+        spent += check_cost
+        if verification["checked"]:
+            advice = ""   # the verdict answers what the advice suggests
+        elif check.skip_advice and verification["reason"] == check.skip_reason:
+            advice = check.skip_advice   # the caller asked; say why this hit was not checked
+    elif options.verify:
+        verification = _unchecked("no_hit")   # a miss is never checked; say why
     body_out = {"output": output or {k: None for k in plan.contract.output}, "raw": doc,
                 "_treg": {"served_by": served, "provider": cand.endpoint["provider"], "tier": cand.tier,
                           **({"merged_from": merged_from} if merged_from else {}),
                           **({"advice": advice} if advice else {}),
                           "outcome": winner_outcome, "tried": [t.view() for t in tried], "charged_micro": spent,
+                          **({"verification": verification} if verification is not None else {}),
                           **({"capped": True} if cost_capped else {}),
                           **({"ignored_filters": list(cand.ignored)} if cand.ignored else {}),
                           **({"dropped": plan.dropped} if plan.dropped else {})}}
@@ -783,6 +829,84 @@ async def _run_routed(parent: CallContext, ep: dict, body_bytes: bytes, get_head
                                  **({"X-Treg-Ignored-Filters": ",".join(cand.ignored)} if cand.ignored else {}),
                                  **({"X-Treg-Route-Capped": "true"} if cost_capped else {}),
                                  "X-Treg-Route-Outcome": winner_outcome}), spent
+
+
+_CHECK_REASONS = {"route_max_cost": "over_cost_limit", "route_no_candidate": "no_checker",
+                  **{k: "spend_limit" for k in _GLOBAL_REFUSALS},
+                  **{k: "not_allowed" for k in _CANDIDATE_LOCAL_FAILURES}}
+
+
+def _unchecked(reason: str) -> dict:
+    return {"verdict": "unknown", "checked": False, "served_by": None, "cost_micro": 0, "reason": reason}
+
+
+async def _run_check(parent: CallContext, check, output: dict, remaining: int | None, pending: list,
+                     execute_child, upstream_client) -> tuple[dict, int]:
+    """The contract's check on a hit, as an ordinary call: (`_treg.verification`, money it moved).
+
+    A routed check (`treg.people.email.verify`) runs its own waterfall and closes its own holds;
+    a direct one leaves its hold in the find's `pending`. Either way the caller's own key comes
+    first, its limits and access rules apply, and a failure costs the find nothing: no check ran."""
+    cat = catalog_store.load()
+    ep = cat.by_id.get(check.endpoint)
+    value = output.get(check.field)
+    if ep is None or not isinstance(value, str) or not value.strip():
+        return _unchecked("no_checker"), 0
+    if check.when and not P.evaluate(check.when, {check.field: value}):
+        return _unchecked(check.skip_reason), 0
+    routed = ep.get("kind") == "routed"
+    if routed:
+        query, body = {}, {check.field: value}
+    else:
+        adapter = cat.adapters.get(ep["id"])
+        contract = cat.contracts.get(ep.get("capability"))
+        if adapter is None or not adapter.verified or contract is None:
+            return _unchecked("no_checker"), 0
+        identity, variant = canonical_identity(contract, {check.field: value})
+        if variant is None:
+            return _unchecked("no_checker"), 0
+        query, body = adapter.to_upstream(identity, variant)
+    prefer = ((PREFER_HEADER.encode(), ",".join(check.prefer).encode()),) if routed and check.prefer else ()
+    child = CallContext(input=_child_input(parent, ep, query, body, remaining, prefer),
+                        call_ref=f"{parent.call_ref}:v", meta=parent.meta,
+                        deferred_settles=None if routed else pending)
+    try:
+        response = await execute_child(child, upstream_client)
+        raw = await _read(response)
+    except CallFailure as exc:
+        return _unchecked(_CHECK_REASONS.get(exc.kind, "checker_failed")), 0
+    except Exception:  # noqa: BLE001 - a broken check never fails the find it checks
+        log.warning("check %s failed after %s", check.endpoint, parent.call_ref, exc_info=True)
+        return _unchecked("checker_failed"), 0
+    try:
+        doc = json.loads(raw)
+    except ValueError:
+        doc = None
+    if routed:
+        meta = (doc.get("_treg") or {}) if isinstance(doc, dict) else {}
+        if response.status == 202 and meta.get("outcome") == "pending":
+            # Still running after the routed wait (BounceBan `verifying`): its hold stays with the
+            # async worker, which settles or releases it; nothing of it is charged now.
+            return {"verdict": "unknown", "checked": True, "served_by": meta.get("served_by"),
+                    "cost_micro": int(meta.get("reserved_micro") or 0), "pending": True,
+                    "call_id": meta.get("call_ref")}, 0
+        cost = int(_header(response, "X-Treg-Cost-Micro") or 0)
+        served = meta.get("served_by")
+        if not 200 <= response.status < 300 or meta.get("outcome") not in ("hit", "weak", "miss"):
+            return {**_unchecked("checker_failed"), "cost_micro": cost}, cost
+        word = (catalog_results.verdict(served, 200, json.dumps(doc.get("raw")).encode())
+                if served and meta.get("outcome") != "miss" else None)
+        return {"verdict": word or "unknown", "checked": True, "served_by": served, "cost_micro": cost}, cost
+    cost = int(_header(response, "X-Treg-Cost-Micro") or 0)
+    adapter = cat.adapters[ep["id"]]
+    try:
+        missed = doc is None or adapter.is_miss(doc)
+    except Exception:  # noqa: BLE001 - an unreadable answer is a failed check
+        missed = True
+    if not 200 <= response.status < 300 or missed:
+        return {**_unchecked("checker_failed"), "cost_micro": cost}, cost
+    word = catalog_results.verdict(ep["id"], response.status, raw)
+    return {"verdict": word or "unknown", "checked": True, "served_by": ep["id"], "cost_micro": cost}, cost
 
 
 def _audit_parent(parent: CallContext, ep: dict, status: int, charged: int, client: str) -> None:

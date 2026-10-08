@@ -17,7 +17,7 @@ from sqlmodel import select
 
 from conftest import make_upstream
 from treg.api import app
-from treg.application.onboard import first_run, page, work_email
+from treg.application.onboard import first_run, lookup, page
 from treg.application.onboard.lookup import Hints, Lookup
 from treg.application.onboard.tasks import DEFAULT_RANK, TASKS, build_calls
 from treg.config import get_settings
@@ -234,6 +234,26 @@ def test_tasks_with_the_users_own_input_lead_the_examples():
     assert first_run._shape("ready", p)["preselect"] == "maps"
 
 
+async def test_a_search_check_asks_the_fast_provider_and_drops_a_slow_answer(configured, monkeypatch):
+    monkeypatch.setattr(lookup, "SERP_TIMEOUT_S", 0.2)
+    asked = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(request.headers.get("X-Treg-Route-Prefer"))
+        if json.loads(request.content)["q"] == "slow":
+            await asyncio.sleep(1)
+        return httpx.Response(200, json={"output": {"results": [{"title": "a", "link": "https://a.io/x"}]}})
+
+    async def save(state, house):
+        pass
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        lk = Lookup("ada@acme.io", Hints(door="google"), http, save)
+        fast, slow = await asyncio.gather(lk._serp("fast"), lk._serp("slow"))
+    assert fast and slow is None
+    assert asked == [lookup.SERP_PROVIDER] * 2
+
+
 async def test_nothing_public_skips_the_judge_and_shows_the_default_order(configured):
     world = World()
     state, _ = await _lookup(world, "nobody@gmail.com")
@@ -305,43 +325,22 @@ async def test_the_routes_are_off_without_the_flag(c):
     assert "onboarding_v2" not in (await c.get("/auth/me")).json()
 
 
-async def test_the_experiment_is_for_work_addresses_judged_once_per_domain(c, monkeypatch):
+async def test_the_experiment_is_for_addresses_not_anyone_can_get(c, monkeypatch):
     monkeypatch.setenv("TREG_ONBOARDING_V2_EXPERIMENT", "1")
-    monkeypatch.setenv("TREG_ONBOARDING_TREG_TOKEN", "house-token")
     get_settings.cache_clear()
-    asked = []
-
-    def judge(request: httpx.Request) -> httpx.Response:
-        state = json.loads(request.content)["state"]
-        asked.append(state)
-        # the homepage is the evidence: a company's site says so
-        return httpx.Response(200, json={"answers": {"work": {"noul": 0.9 if "Acme builds" in state else 0.1}}})
-
-    async def homepage(_http, d: str) -> str:
-        return "Title: Acme builds rockets" if d == "acme.io" else ""
-
-    monkeypatch.setattr(work_email, "_homepage", homepage)
-    await app.state.http.aclose()
-    app.state.http = AsyncClient(transport=httpx.MockTransport(judge))
     try:
-        for email, work in (("ada@gmail.com", False), ("ada@acme.io", True), ("bob@acme.io", True),
-                            ("cy@mail.example", False)):
+        for email, offered in (("ada@gmail.com", False), ("ada@duck.com", False), ("ada@cs.example.edu", False),
+                               ("ada@ox.ac.uk", False), ("ada@acme.io", True), ("ada@ada.dev", True)):
             c.cookies.set("treg_session", sess.make_session(await _new_user(email)))
             me = (await c.get("/auth/me")).json()
-            assert me.get("onboarding_v2_experiment", False) is work, email
+            assert me.get("onboarding_v2_experiment", False) is offered, email
             assert "onboarding_v2" not in me        # the flag's arm decides, not the server
-        assert len(asked) == 2                       # a listed mailbox is never asked; a domain once
-        assert "<domain>mail.example</domain>" in asked[1] and "Not read" in asked[1]
-        # an account that already has a team is never put to Jev
-        c.cookies.set("treg_session", sess.make_session(await _new_user("old@older.io")))
-        assert (await c.post("/orgs", json={"name": "Older"})).status_code == 200
-        assert "onboarding_v2_experiment" not in (await c.get("/auth/me")).json()
-        assert len(asked) == 2
-        assert (await c.get("/onboarding")).status_code == 404     # cy@mail.example: not a work address
-        c.cookies.set("treg_session", sess.make_session(await _new_user("dee@acme.io")))
-        assert (await c.get("/onboarding")).status_code == 200
+        assert (await c.get("/onboarding")).status_code == 200      # ada@ada.dev may read the flow
+        c.cookies.set("treg_session", sess.make_session(await _new_user("bob@gmail.com")))
+        assert (await c.get("/onboarding")).status_code == 404
         monkeypatch.setenv("TREG_ONBOARDING_V2_EXPERIMENT", "0")  # the off switch closes it
         get_settings.cache_clear()
+        c.cookies.set("treg_session", sess.make_session(await _new_user("cy@acme.io")))
         assert (await c.get("/onboarding")).status_code == 404
     finally:
         get_settings.cache_clear()
@@ -416,31 +415,6 @@ async def test_start_survives_a_reserved_name_a_double_click_and_a_personal_team
         r = await c.post("/onboarding/start")
         assert r.status_code == 200, r.text
         assert r.json()["team"]["name"] == "Example"
-    finally:
-        get_settings.cache_clear()
-
-
-async def test_a_domain_jev_could_not_judge_is_not_asked_again_at_once(c, monkeypatch):
-    monkeypatch.setenv("TREG_ONBOARDING_V2_EXPERIMENT", "1")
-    monkeypatch.setenv("TREG_ONBOARDING_TREG_TOKEN", "house-token")
-    get_settings.cache_clear()
-    asked = []
-
-    def down(request: httpx.Request) -> httpx.Response:
-        asked.append(1)
-        return httpx.Response(503, json={})
-
-    async def no_homepage(_http, _d: str) -> str:
-        return ""
-
-    monkeypatch.setattr(work_email, "_homepage", no_homepage)
-    await app.state.http.aclose()
-    app.state.http = AsyncClient(transport=httpx.MockTransport(down))
-    try:
-        for email in ("ada@flaky.io", "bob@flaky.io"):
-            c.cookies.set("treg_session", sess.make_session(await _new_user(email)))
-            assert "onboarding_v2_experiment" not in (await c.get("/auth/me")).json()
-        assert len(asked) == 1            # the outage is remembered for a while, not paid per page load
     finally:
         get_settings.cache_clear()
 

@@ -39,7 +39,10 @@ from .evidence import (
     _caller_request_snippet,
     _error_response_evidence,
     _redact_snippet,
+    _ERROR_SCAN_MAX,
+    UNSCANNABLE_ERROR_BODY,
     _safe_secret_renderings,
+    redact_error_response,
 )
 from .idempotency import IDEMPOTENCY_HEADER, _hold_claim_lease, _store_idempotent
 from .intake import META_HEADER, _parse_call_meta, _tag_telemetry, prepare_call_intake
@@ -321,6 +324,32 @@ async def _drain(response: UpstreamResponse) -> bytes:
     body = b"".join(chunks)
     response.body_stream = _one_chunk(body)
     return body
+
+
+def _with_body(response: UpstreamResponse, body: bytes) -> UpstreamResponse:
+    """`response` carrying `body` instead, identity-encoded, with its own Content-Length."""
+    headers = tuple((k, v) for k, v in response.raw_headers
+                    if k.lower() not in (b"content-length", b"content-encoding"))
+    return UpstreamResponse(response.status, headers + ((b"content-length", str(len(body)).encode()),),
+                            _one_chunk(body), response.close)
+
+
+def _redact_error_body(
+    response: UpstreamResponse, body: bytes, tool, secrets: dict,
+) -> tuple[UpstreamResponse, bytes]:
+    """Mask injected credentials out of a WHOLE error body before the caller receives it.
+
+    Providers echo the request back in errors (TikHub's 402 "Insufficient balance" returns every
+    request header, Authorization included). Unchanged bodies keep their original bytes and
+    encoding; a redacted one is re-sent identity-encoded.
+    """
+    encoding = next((v.decode("latin-1") for k, v in response.raw_headers
+                     if k.lower() == b"content-encoding"), "")
+    redacted, was_redacted = redact_error_response(
+        body, tool, secrets, content_encoding=encoding)
+    if not was_redacted:
+        return response, body
+    return _with_body(response, redacted), redacted
 
 
 async def _verify_public_managed_resources(
@@ -884,7 +913,7 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
 
     def _audit(status_code: int, *, observed_micro: int | None = None, charged_micro: int | None = None,
                duration_ms: int | None = None, response_bytes: int | None = None,
-               refused_by: str | None = None, hit: bool | None = None,
+               refused_by: str | None = None, hit: bool | None = None, verdict: str | None = None,
                error_request: str | None = None, error_response: str | None = None,
                capacity_signal: str | None = None, answered: bool = True,
                defer_analytics: bool = False, async_submission: bool = False) -> dict | None:
@@ -917,6 +946,8 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                 "params_hash": mk.params_hash,
                 # found / not found, when this endpoint's routing adapter could read the body
                 **({"hit": hit} if hit is not None else {}),
+                # the contract's verdict word (`valid`, `catch_all`, `verified`...) when it has one
+                **({"verdict": verdict} if verdict is not None else {}),
                 # The stored answer's identities — the join to the archive for `/calls/{id}/result`.
                 **({"archive_key_hash": archive_key_hash,
                     "archive_content_hash": archive_content_hash} if archive_key_hash else {}),
@@ -1304,7 +1335,7 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                 # TREG_ARCHIVE_MODE says otherwise; record() is fire-and-forget and never raises.
                 # `own_credential` here means billed OAuth: the org's token, treg's bill.
                 if (mk.metered and archive.recording() and 200 <= response.status < 300
-                        and spooled_bytes is None
+                        and spooled_bytes is None and not _unfinished_submission(mk, body)
                         and not (own_credential and _echoes_own_credential(tool, secrets, body))
                         and not _account_out_2xx(mk, response, body)):
                     _ct = next((v.decode("latin-1") for k, v in response.raw_headers
@@ -1330,7 +1361,8 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                 # snapshot's origin — the archive decides who else it may serve.
                 response, whole = await _read_whole_if_small(
                     response, get_settings().archive_max_body_bytes)
-                if whole is not None and not _echoes_own_credential(tool, secrets, whole):
+                if (whole is not None and not _echoes_own_credential(tool, secrets, whole)
+                        and not _unfinished_submission(mk, whole)):
                     body = whole
                     _ct = next((v.decode("latin-1") for k, v in response.raw_headers
                                 if k.lower() == b"content-type"), "")
@@ -1348,9 +1380,17 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                         observation=body_observation, origin_org_id=caller.org_id,
                         scope=cache_scopes[0])
             elif response.status >= 400:
-                # Preserve streaming for own-key and own-tool calls while retaining only the small
-                # diagnostic head. The replacement response replays every consumed byte verbatim.
-                response, body = await _peek_stream_head(response, _ERROR_BODY_SLICE)
+                # A provider can echo the injected credential anywhere in an error body, so the
+                # caller receives only a body scanned whole (bounded). One too large to scan streams
+                # untouched only when nothing was injected; otherwise it is replaced, never a prefix.
+                response, whole = await _read_whole_if_small(response, _ERROR_SCAN_MAX)
+                if whole is not None:
+                    response, body = _redact_error_body(response, whole, tool, secrets)
+                elif _safe_secret_renderings(tool, secrets) != []:
+                    body = UNSCANNABLE_ERROR_BODY
+                    response = _with_body(response, body)
+                else:
+                    response, body = await _peek_stream_head(response, _ERROR_BODY_SLICE)
         except GatewayFailed:
             raise
         except httpx.RequestError as exc:  # upstream down/timeout is a gateway fault, not treg's 500
@@ -1424,7 +1464,9 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
         terminal_2xx = (mk.settlement_basis.get("when") == "terminal"
                         and 200 <= response.status < 300)
         rejected = _submission_rejected(mk, body) if terminal_2xx else ""
-        deferred = terminal_2xx and not rejected
+        # A provider that may answer at once (`terminal_on_submission`) and did: an ordinary
+        # settle below, on the same hold, with no pending task.
+        deferred = terminal_2xx and not rejected and not _finished_on_submission(mk, body)
         account_out_2xx = _account_out_2xx(mk, response, body)
         try:
             request.context.finalization = FinalizationState.FINALIZING
@@ -1519,7 +1561,7 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                 err_response = _error_response_evidence(
                     response.raw_headers, body, _renderings)
         may_overflow = (response.status >= 400 or account_out_2xx) and mk.tier == "platform"
-        from ...domain.catalog.results import classify, has_result_rules
+        from ...domain.catalog.results import classify, has_result_rules, verdict
 
         # The submission is only a task ticket. Its contact verdict is learned from the
         # terminal poll and copied onto this same CallRecord by the async finalizer.
@@ -1538,6 +1580,7 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                          response_bytes=(None if streaming_free_result else spooled_bytes
                                          if spooled_bytes is not None else len(body)),
                          hit=result.hit if result else None,
+                         verdict=verdict(mk.endpoint_id, response.status, body) if not deferred else None,
                          capacity_signal=capacity_signal, error_request=err_request, error_response=err_response,
                          defer_analytics=may_overflow, async_submission=deferred)
         served_via = ""
@@ -1577,6 +1620,13 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                 _capture(_overflow_event(pending, outcome, charged))
             else:
                 _capture(pending)  # the vendor's own answer stands
+        # Redact credentials from error response bodies before returning to caller or storing
+        # in idempotency. This prevents platform keys or org secrets from leaking when upstream
+        # providers echo request headers in error bodies (e.g. TikHub's 402 "Insufficient balance").
+        # Applied after settlement/capacity processing (which need the original body) but before
+        # the body reaches the caller or is persisted for replay.
+        if response.status >= 400 and spooled_bytes is None:
+            response, body = _redact_error_body(response, body, tool, secrets)
         if idem_key:
             # Here, and not earlier: this is the first point where BOTH the response and what it
             # actually cost are known, and a replay has to hand back the real charge rather than the
@@ -1641,6 +1691,21 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
         if smoothed:
             _set_response_header(response, "X-Treg-Smoothed", " ".join(smoothed))
     return response
+
+
+def _finished_on_submission(mk, body: bytes) -> bool:
+    try:
+        document = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return asynctasks_rules.finished_on_submission(mk.async_descriptor, document)
+
+
+def _unfinished_submission(mk, body: bytes) -> bool:
+    """A row whose first answer may already be finished answered "still working" instead: a task
+    id, not an answer, so the archive keeps nothing a later identical question could replay."""
+    return ((mk.async_descriptor or {}).get("terminal_on_submission") is True
+            and not _finished_on_submission(mk, body))
 
 
 def _submission_rejected(mk, body: bytes) -> str:

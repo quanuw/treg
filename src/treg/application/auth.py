@@ -273,8 +273,6 @@ async def verify_email_login(email: str, code: str, *, entry_surface: str = "") 
             raise EmailAuthError("suspended")
         await db.commit()
         signup.track_signup(user, created, "email", entry_surface)
-        if user.id in created:
-            first_run.warm(user.email)
         token = sess.make_identity(
             user.id, user.token_version, ttl=sess.BOOTSTRAP_TTL_SECONDS,
             scope=sess.BOOTSTRAP_SCOPE,
@@ -490,7 +488,6 @@ async def _provision_social_user(email: str, state: str, door: str, entry_surfac
         await db.commit()
         signup.track_signup(user, created, door, entry_surface)
         if user.id in created:  # what the door knew, for the first-run lookup (onboard.first_run)
-            first_run.warm(user.email)
             await first_run.remember_hints(user.id, user.email, door=door, github_login=github_login, name=name)
         # Browser session OR `treg login` handshake — both go through the /login team picker now.
         return SocialLoginProof(user=user, cli_state=_cli_states.pop(state, None))

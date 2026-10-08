@@ -181,8 +181,14 @@ idle SSE streams which can never deliver useful work.
 `call` is annotated **destructive + open-world + non-idempotent**, which reads as pessimistic until
 you notice treg does not model the upstream: it relays to somebody else's API and cannot know whether
 that endpoint charges, writes or deletes. Claiming otherwise would be a guess presented as a fact.
-`feedback` and `catalog_request` are the other non-reads. `catalog_request` is a write, but a harmless one (a row on treg itself,
-nothing upstream, nothing spent), so it stays closed-world and non-destructive. It relays to
+`feedback`, `review` and `catalog_request` are the other non-reads. They are harmless writes (a row on treg itself,
+nothing upstream, nothing spent), so they are non-destructive; on the team MCP they are open-world,
+because their text leaves the caller's account for the treg team (a review's reason may be quoted on a
+public catalog page), which is how the Codex plugin review reads that hint. OpenAI's clients (`openai-mcp/` for ChatGPT and its plugin reviewer, `codex-mcp-client/`
+for Codex, by User-Agent) are not offered `review` at all: `_OpenAIClientGate` drops it from
+`tools/list` and the review sentence from the instructions, and call results carry no review or
+feedback invitation for them, because that review reads agent-initiated rating as analytics
+collection. Other clients keep both. `catalog_request` relays to
 `POST /tool-requests` so rate limiting and field caps live in one place, forwarding the edge's
 `X-Forwarded-For` — the in-process relay would otherwise collapse every MCP caller into one
 rate-limit bucket. `catalog_search`'s zero-result hint names it, so an agent that just searched

@@ -228,9 +228,30 @@ def test_async_descriptor_must_be_a_mapping():
     assert any("async must be a mapping" in error for error in _async_errors([]))
 
 
-def test_async_descriptor_requires_per_success_cost():
-    errors = _async_errors(_valid_async(), {"type": "per_call"})
-    assert any("cost.type per_success" in error for error in errors)
+def test_async_descriptor_requires_per_success_or_per_call_cost():
+    assert _async_errors(_valid_async(), {"type": "per_call"}) == []
+    errors = _async_errors(_valid_async(), {"type": "per_result"})
+    assert any("cost.type per_success or per_call" in error for error in errors)
+
+
+def test_async_descriptor_bounded_by_max_age_may_have_no_failure_word():
+    descriptor = _valid_async()
+    del descriptor["status"]["failure"]
+    assert any("failure (optional with max_age)" in error for error in _async_errors(descriptor))
+    descriptor.update(max_age=300, terminal_on_submission=True)
+    assert _async_errors(descriptor) == []
+
+
+@pytest.mark.parametrize(("key", "value", "message"), [
+    ("max_age", 0, "async.max_age must be a positive number"),
+    ("max_age", 86401, "async.max_age must be a positive number"),
+    ("max_age", True, "async.max_age must be a positive number"),
+    ("terminal_on_submission", False, "terminal_on_submission must be true"),
+])
+def test_async_descriptor_rejects_invalid_bounds(key, value, message):
+    descriptor = _valid_async()
+    descriptor[key] = value
+    assert any(message in error for error in _async_errors(descriptor))
 
 
 def test_async_descriptor_rejects_non_get_or_non_utility_targets():

@@ -13,6 +13,20 @@ from . import paths as P
 
 
 @dataclass(frozen=True)
+class Check:
+    """The opt-in check after a hit (`X-Treg-Route-Verify`): one more call, to `endpoint`, with the
+    hit's `field` as its identity key of the same name. `prefer` orders that call's providers only.
+    `when` is an expression over `{field: value}`; a hit failing it is not checked, for `skip_reason`,
+    and `skip_advice` replaces the find's advice then: the caller already asked for the check."""
+    endpoint: str
+    field: str
+    prefer: tuple[str, ...] = ()
+    when: str = ""
+    skip_reason: str = ""
+    skip_advice: str = ""
+
+
+@dataclass(frozen=True)
 class Contract:
     capability: str
     summary: str
@@ -29,8 +43,7 @@ class Contract:
     # before outreach. Empty = no advice. A search contract has no `verified` output, so advice
     # set there attaches to EVERY hit — deliberate for `people.search`, whose rows carry emails
     # nobody vouched for (2026-09-08: 73 of 79 bounces were unverified directory rows). A
-    # suggestion only: treg never chains the verify call itself, which would double every hit's
-    # price and change what the find bills for.
+    # suggestion only unless the caller asks for the check (`check`, below).
     advice_unverified: str = ""
     # False = the contract exists so the archive can judge found/empty (`results.has_result_rules`
     # needs a verified adapter, and an adapter verifies only against a contract); no
@@ -45,6 +58,15 @@ class Contract:
     # time and reliability: for `ai-search.perplexity.answer` it ranked the cheaper, slower and less
     # reliable cloro above dataforseo. A caller's own prefer header still replaces it.
     prefer: tuple[str, ...] = ()
+    # The per-call verdict word (`CallRecord.verdict`): `verdict_from` names the output field it is
+    # read from, `verdict_words` the only words a call may be stored with, and `verdict_map` turns a
+    # value of that field into one (`true` -> `verified`). Each adapter adds its provider's own
+    # words. Empty `verdict_words` = this contract records no verdict.
+    verdict_from: str = ""
+    verdict_words: tuple[str, ...] = ()
+    verdict_map: dict[str, str] = field(default_factory=dict)
+    # The check a caller may ask for with `X-Treg-Route-Verify`; None = the header is refused.
+    check: Check | None = None
 
     @property
     def required_output(self) -> tuple[str, ...]:
@@ -68,6 +90,12 @@ class Adapter:
     verified_capabilities: tuple[str, ...] = ()
     verified: bool = False
     verify_note: str = ""
+    # The provider's own verdict words -> the contract's (`ok: valid`), and optionally the
+    # expression that reads the provider's word when the contract's `verdict.from` field cannot
+    # (a separate catch-all flag). `_verdict` is the contract's rule, attached at load.
+    verdict: str = ""
+    verdicts: dict[str, str] = field(default_factory=dict)
+    _verdict: tuple[str, tuple[str, ...], tuple[str, ...], dict[str, str]] | None = None
     _filter_keys: tuple[str, ...] = ()        # contract filter names, set at load (always sent)
 
     def to_upstream(self, identity: dict[str, Any], variant: tuple[str, ...] | None = None) -> tuple[dict[str, str], Any]:
@@ -112,6 +140,38 @@ class Adapter:
     def is_miss(self, provider_body: Any) -> bool:
         return bool(P.evaluate(self.miss, provider_body))
 
+    @property
+    def records_verdict(self) -> bool:
+        return self._verdict is not None
+
+    def verdict_raw(self, provider_body: Any) -> str | None:
+        """The provider's own verdict word for this answer, normalized (`Catch-All` -> `catch_all`),
+        or None when the contract records no verdict or the answer does not fill the contract's
+        required output (a find that found nothing has no claim to report)."""
+        if self._verdict is None:
+            return None
+        source, _, required, _ = self._verdict
+        core = self.from_upstream(provider_body)
+        if any(core.get(k) in (None, "") for k in required):
+            return None
+        return _verdict_key(P.evaluate(self.verdict, provider_body) if self.verdict else core.get(source))
+
+    def verdict_word(self, raw: str | None) -> str | None:
+        """The contract's word for a normalized provider word; None when it maps to none."""
+        if raw is None or self._verdict is None:
+            return None
+        _, words, _, contract_map = self._verdict
+        word = self.verdicts.get(raw) or contract_map.get(raw) or raw
+        return word if word in words else None
+
+
+def _verdict_key(value: Any) -> str | None:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return re.sub(r"[\s-]+", "_", value.strip().lower())
+
 
 def _variants(raw) -> tuple[tuple[str, ...], ...]:
     out = []
@@ -143,8 +203,35 @@ def parse_contracts(doc: dict) -> dict[str, Contract]:
             advice_unverified=str(c.get("advice_unverified") or ""),
             routed=bool(c.get("routed", True)),
             scoping=tuple(str(k) for k in scoping),
-            prefer=tuple(str(p).lower() for p in c.get("prefer") or ()))
+            prefer=tuple(str(p).lower() for p in c.get("prefer") or ()),
+            check=_parse_check(cap, c.get("check"), c.get("output") or {}),
+            **_parse_verdict(cap, c.get("verdict")))
     return out
+
+
+def _parse_check(cap: str, raw, output: dict) -> Check | None:
+    if not raw:
+        return None
+    if not isinstance(raw, dict) or not raw.get("endpoint") or raw.get("field") not in output:
+        raise ValueError(f"contract {cap}: check needs an `endpoint` and a `field` from its output")
+    if bool(raw.get("when")) != bool(raw.get("skip_reason")):
+        raise ValueError(f"contract {cap}: check `when` and `skip_reason` come together")
+    if raw.get("skip_advice") and not raw.get("when"):
+        raise ValueError(f"contract {cap}: check `skip_advice` needs a `when`")
+    return Check(endpoint=str(raw["endpoint"]), field=str(raw["field"]),
+                 prefer=tuple(str(p).lower() for p in raw.get("prefer") or ()),
+                 when=str(raw.get("when") or ""), skip_reason=str(raw.get("skip_reason") or ""),
+                 skip_advice=str(raw.get("skip_advice") or ""))
+
+
+def _parse_verdict(cap: str, raw) -> dict:
+    if not raw:
+        return {}
+    words = tuple(str(w) for w in raw.get("words") or ())
+    mapping = {_verdict_key(k) or str(k): str(v) for k, v in (raw.get("map") or {}).items()}
+    if not raw.get("from") or not words or any(v not in words for v in mapping.values()):
+        raise ValueError(f"contract {cap}: verdict needs `from`, `words`, and a `map` into those words")
+    return {"verdict_from": str(raw["from"]), "verdict_words": words, "verdict_map": mapping}
 
 
 def parse_adapters(doc: dict) -> dict[str, Adapter]:
@@ -157,7 +244,9 @@ def parse_adapters(doc: dict) -> dict[str, Adapter]:
             cost_units=str(a.get("cost_units") or ""),
             additional_capabilities=tuple(a.get("additional_capabilities") or ()),
             route=a.get("route", True) is not False,
-            const=dict(a.get("const") or {}), out_map=dict(a.get("out") or {}), miss=str(a.get("miss") or ""))
+            const=dict(a.get("const") or {}), out_map=dict(a.get("out") or {}), miss=str(a.get("miss") or ""),
+            verdict=str(a.get("verdict") or ""),
+            verdicts={_verdict_key(k) or str(k): str(v) for k, v in (a.get("verdicts") or {}).items()})
     return out
 
 
@@ -299,7 +388,10 @@ def load_routing(directory: Path, endpoints_by_id: dict[str, dict], read_yaml, r
         ep = endpoints_by_id.get(eid)
         contract = contracts.get((ep or {}).get("capability") or "")
         if contract is not None:
-            ad = Adapter(**{**ad.__dict__, "_filter_keys": tuple(contract.filters or ())})
+            ad = Adapter(**{**ad.__dict__, "_filter_keys": tuple(contract.filters or ()),
+                            "_verdict": (contract.verdict_from, contract.verdict_words,
+                                         contract.required_output, contract.verdict_map)
+                            if contract.verdict_words else None})
         if ep is None or contract is None:
             verified[eid] = Adapter(**{**ad.__dict__, "verified": False, "verify_note": "unknown endpoint or no contract"})
             continue

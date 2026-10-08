@@ -21,6 +21,7 @@ from sqlmodel import select
 
 from .. import analytics, crypto
 from ..domain import arena as rules, money
+from ..domain import asynctasks as asynctasks_rules
 from . import asynctasks as async_task_app
 from ..domain.catalog import store as catalog_store
 from ..domain.catalog.routing.paths import country_name
@@ -638,7 +639,8 @@ async def _run(run_id, mode, capability, payload, caller, client, client_ip, onl
                 except (ValueError, UnicodeDecodeError):
                     doc = None
                 async_outcome = ""
-                if ep.get("async") and 200 <= response.status < 300 and not oversized:
+                if (ep.get("async") and 200 <= response.status < 300 and not oversized
+                        and not asynctasks_rules.finished_on_submission(ep["async"], doc)):
                     descriptor = ep["async"]
                     reserved = int(route._header(response, "X-Treg-Cost-Micro") or 0)
                     kickoff = bytes(buf)

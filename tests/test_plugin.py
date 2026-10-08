@@ -79,8 +79,7 @@ ALL_MANIFESTS = {"codex": MANIFEST, "claude": CLAUDE_MANIFEST, "cursor": CURSOR_
 # The one line that positions the product. It is the same sentence `llms.txt` opens with, and it is
 # hand-maintained in three places across two stores — which is exactly the shape of thing that
 # drifts, so it is pinned rather than trusted.
-POSITIONING = ("OpenRouter for tools - 2,896 agent-friendly tools, "
-               "pay for the usage, not subscription")
+POSITIONING = "Live data for AI agents"
 
 
 def package_version() -> str:
@@ -123,7 +122,9 @@ def test_no_unsubstituted_placeholder_reaches_the_plugin(variant):
     plugin, so shipping the literal would break every URL in the most-read page of the product."""
     text = ALL_SKILLS[variant].read_text(encoding="utf-8")
     assert "{BASE}" not in text
-    assert "https://treg.to/install.sh" in text
+    # The Codex skill rides an MCP connector and must not install anything (OpenAI's plugin review
+    # refuses a skill that downloads or runs code outside the package); every other copy installs the CLI.
+    assert ("https://treg.to/install.sh" in text) is (variant != "codex")
 
 
 def test_the_connector_points_at_production_over_https():
@@ -131,11 +132,12 @@ def test_the_connector_points_at_production_over_https():
     exactly one person, and reviewers test from their own machines."""
     import json as _json
     mcp = _json.loads((PLUGIN / ".mcp.json").read_text(encoding="utf-8"))
-    assert set(mcp) == {"treg"}
-    url = mcp["treg"]["url"]
+    # The documented shape (`mcpServers`, url only): the OpenAI plugin portal offers no Connect for a
+    # server declared any other way. Auth is OAuth, which the portal and Codex both run themselves.
+    assert set(mcp) == {"mcpServers"} and set(mcp["mcpServers"]) == {"treg"}
+    url = mcp["mcpServers"]["treg"]["url"]
     assert url.startswith("https://"), url
     assert "ngrok" not in url and "localhost" not in url and "127.0.0.1" not in url
-    assert mcp["treg"]["bearer_token_env_var"] == "TREG_TOKEN"
 
 
 def test_at_most_three_default_prompts(manifest):

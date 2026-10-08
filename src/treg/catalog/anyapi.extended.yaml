@@ -3118,6 +3118,10 @@ endpoints:
         - GB
         - DE
         - FR
+      cursor:
+        type: string
+        required: false
+        note: Pagination cursor from a previous response's nextCursor.
       includeQuotePosts:
         type: boolean
         required: false
@@ -3131,7 +3135,7 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: Maximum number of posts to return (1-100, default 10).
+        note: 'Most posts to return (1-100, default 10). Ignored on sources that page: each call returns one full page of 50 posts; follow nextCursor for more. Sources that cannot page return up to `limit` posts in one call with no nextCursor.'
         default: 10
         min: 1
         max: 100
@@ -3190,10 +3194,14 @@ endpoints:
   summary: Fetch recent public LinkedIn profile posts with portable identity, author, engagement, article, image, video, and repost fields.
   input:
     body:
+      cursor:
+        type: string
+        required: false
+        note: Pagination cursor from a previous response's nextCursor.
       limit:
         type: integer
         required: false
-        note: Maximum number of posts to return (10-100, default 10).
+        note: 'Most posts to return (10-100, default 10). Ignored on sources that page: each call returns one full page of 50 posts; follow nextCursor for more. Sources that cannot page return up to `limit` posts in one call with no nextCursor.'
         default: 10
         min: 10
         max: 100
@@ -3586,6 +3594,10 @@ endpoints:
   summary: 'Cheap people search: name/handle, headline, VANITY profile URL, location. No full profile or email - for full profiles per hit use linkedin.search_profiles, add emails with linkedin.search_profiles_email.'
   input:
     body:
+      cursor:
+        type: string
+        required: false
+        note: Opaque pagination cursor from a previous response's nextCursor. Omit for the first page; a page holds 10 profiles.
       query:
         type: string
         required: true
@@ -3882,7 +3894,7 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: 'Requested number of posts. Note: the upstream returns one page (about 25 posts) per call; values larger than a page are not delivered in a single response. To fetch more, pass `nextCursor` back as `cursor`.'
+        note: Page size to ask for (up to 100). Some sources honor it; others always return their whole page of about 25 posts. A page is never trimmed after the call, so pass nextCursor back as cursor to continue exactly where this response ended.
         default: 25
         min: 1
         max: 100
@@ -4048,7 +4060,7 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: Maximum number of comments to return in this response (a page cap, not a total). Defaults to 25.
+        note: Page size to ask for (up to 100, default 25). Some sources honor it; others always return their whole page of about 25 comments. A page is never trimmed after the call, so pass nextCursor back as cursor to continue exactly where this response ended.
         default: 25
         min: 1
         max: 100
@@ -4217,7 +4229,7 @@ endpoints:
       cursor:
         type: string
         required: false
-        note: Page number for pagination (defaults to 1).
+        note: Opaque cursor from a previous response's nextCursor. Omit it for the first page.
       duration:
         type: string
         required: false
@@ -4589,6 +4601,10 @@ endpoints:
   summary: List recent TikTok videos for a hashtag (creator, caption, views, likes, shares).
   input:
     body:
+      cursor:
+        type: string
+        required: false
+        note: Opaque pagination cursor from a previous response's nextCursor. Omit for the first page; pass it to fetch the next page of videos.
       hashtag:
         type: string
         required: true
@@ -5982,7 +5998,7 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: Per-page maximum number of followers to return (default 200). A native page holds up to 200 accounts, so a larger limit still returns at most one native page; follow the response's nextCursor for more.
+        note: 'Accepted but does not change the page: every call returns one full native page of followers (up to 200, depending on the source), never trimmed, so follow nextCursor to continue exactly where this response ended.'
         default: 200
         min: 1
         max: 100000
@@ -6031,7 +6047,7 @@ endpoints:
       limit:
         type: integer
         required: false
-        note: Per-page maximum number of followed accounts to return (default 200). A native page holds up to 200 accounts, so a larger limit still returns at most one native page; follow the response's nextCursor for more.
+        note: 'Accepted but does not change the page: every call returns one full native page of followed accounts (about 50), never trimmed, so follow nextCursor to continue exactly where this response ended.'
         default: 200
         min: 1
         max: 100000

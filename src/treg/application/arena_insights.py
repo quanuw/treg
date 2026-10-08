@@ -23,6 +23,7 @@ from sqlalchemy import Integer, String, case, column, delete, func, select, valu
 
 from ..domain import arena, arena_insights as rules
 from .. import archive_bodies
+from ..domain import asynctasks
 from ..domain.catalog import store
 from ..infra.db import session_maker
 from ..models import ArenaInsightState, ArenaObservation, ArchiveKey, ArchiveSnapshot, CallRecord
@@ -42,12 +43,18 @@ def _catalog():
     endpoints = {eid: ep for eid, ep in cat.by_id.items()
                  if ep.get("capability") in arena.TASKS and ep.get("capability") not in arena.DISCOVERY_TASKS and eid in cat.adapters
                  and cat.adapters[eid].verified and cat.adapters[eid].route and ep.get("provider") not in {"treg", "wrangle"}
-                 and eid not in arena.EXCLUDED and not ep.get("async") and ".bulk" not in eid}
+                 and eid not in arena.EXCLUDED and _first_answer_judged(ep) and ".bulk" not in eid}
     fingerprint = {eid: {"path": ep.get("path"), "method": ep.get("method"),
                         "adapter": cat.adapters[eid].__dict__, "contract": cat.contracts[ep["capability"]].__dict__}
                    for eid, ep in sorted(endpoints.items())}
     version = hashlib.sha256(json.dumps([rules.RULES_VERSION, arena.VERSION, fingerprint], sort_keys=True, default=str).encode()).hexdigest()
     return cat, endpoints, version
+
+
+def _first_answer_judged(ep: dict) -> bool:
+    """Insights judge the archived first answer. An async row's first answer is a task id, unless
+    the row declares that it usually answers at once (`terminal_on_submission`)."""
+    return not ep.get("async") or ep["async"].get("terminal_on_submission") is True
 
 
 def _insert(db, model):
@@ -261,6 +268,10 @@ async def collect_batch(session_factory=session_maker):
                 inp, category = "unknown", "unresolved_evidence"
             if category in ("hit", "miss") and not record.params_hash:
                 category = "unresolved_identity"
+            if (category in ("hit", "miss") and ep.get("async")
+                    and not asynctasks.finished_on_submission(ep["async"], evidence[record.id][2])):
+                # "Still working" is no answer yet: neither a hit nor a miss.
+                category = "unresolved_pending"
             values = dict(id=record.id, version=version, endpoint=record.endpoint_id, task=ep["capability"],
                 input=inp, request_hash=record.params_hash or "", category=category,
                 duration_ms=record.duration_ms, created_at=record.created_at)

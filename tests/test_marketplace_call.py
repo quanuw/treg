@@ -160,6 +160,54 @@ async def test_adyntel_byok_pair_wins_and_remains_unmetered(
 
 
 @pytest.fixture
+def hlrlookup_platform_on(monkeypatch):
+    monkeypatch.setenv("TREG_PLATFORM_KEY_HLRLOOKUP", "PLATFORM-HLR-KEY")
+    monkeypatch.setenv("TREG_PLATFORM_KEY_HLRLOOKUP_SECRET", "PLATFORM-HLR-SECRET")
+    monkeypatch.setenv("TREG_PLATFORM_PROVIDERS", "hlrlookup")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+_HLR_LIVE = {"telephone_number": "447540822872", "save_to_cache": "PRIVATE",
+             "cache_days_global": 0, "cache_days_private": 0}
+
+
+async def test_hlrlookup_platform_pair_rides_the_body_and_settles_reported_credits(
+    clients, hlrlookup_platform_on,
+):
+    seen = []
+    answers = iter([
+        {"error": "NONE", "credits_spent": 1, "live_status": "LIVE"},
+        {"error": "NONE", "credits_spent": 2, "live_status": "LIVE"},
+        {"error": "NONE", "credits_spent": 0, "live_status": "NO_COVERAGE"},
+        {"error": "INSUFFICIENT_CREDIT"},
+    ])
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/apiv2/hlr"
+        seen.append(json.loads(request.content))
+        return httpx.Response(
+            200, stream=httpx.ByteStream(json.dumps({"results": [next(answers)]}).encode()),
+            headers={"content-type": "application/json"},
+        )
+
+    await A.app.state.http.aclose()
+    A.app.state.http = AsyncClient(transport=httpx.MockTransport(upstream))
+    charges = []
+    for body in (_HLR_LIVE, {**_HLR_LIVE, "usa_status": "YES"}, _HLR_LIVE, _HLR_LIVE):
+        before = await _balance(clients)
+        response = await clients.post("/call/hlrlookup.people.phone.verify", json=body)
+        assert response.status_code == 200, response.text
+        charges.append(before - await _balance(clients))
+    # One credit is $0.006608; a US mobile with usa_status costs two; free answers cost nothing.
+    assert charges == [6_608, 13_216, 0, 0]
+    assert seen[0] == {**_HLR_LIVE, "api_key": "PLATFORM-HLR-KEY",
+                       "api_secret": "PLATFORM-HLR-SECRET"}
+    assert seen[1]["usa_status"] == "YES"
+
+
+@pytest.fixture
 def tavily_platform_on(monkeypatch):
     monkeypatch.setenv("TREG_PLATFORM_KEY_TAVILY", "PLATFORM-TAVILY")
     monkeypatch.setenv("TREG_PLATFORM_PROVIDERS", "tavily")
@@ -1334,6 +1382,7 @@ def test_platform_estimate_normalizes_per_result_pricing():
     per_row = {"type": "per_result", "usd": 0.0001}
     assert call_resolution._platform_estimate_micro(per_row, {}) == 0.0001 * call_resolution._PLATFORM_PAGE_DEFAULT * 1_000_000
     assert call_resolution._platform_estimate_micro(per_row, {"limit": "5"}) == 500
+    assert call_resolution._platform_estimate_micro(per_row, {"pastNMonths": "1"}) == 100  # spyfu: a row a month
     assert call_resolution._platform_estimate_micro(per_row, {"limit": "100000"}) == 0.0001 * call_resolution._PLATFORM_PAGE_MAX * 1_000_000
     assert call_resolution._platform_estimate_micro({"type": "per_call", "usd": None}, {}) == 0
     # rounds UP — a sub-micro fraction must never round to free
@@ -3047,6 +3096,13 @@ def _usd_to_micro_for_test(usd) -> int:
     ("thecompaniesapi.companies.search", {"size": "10"}, None, b'{"companies":[{},{}]}', 2),
     # Findymail employee search: one credit per contact, never above the hold.
     ("findymail.search.employees", None, {"website": "x.io", "job_titles": ["CEO"], "count": 5}, b'[]', 0),
+    # SpyFu: one row per `results` item, an empty list is free, an unknown shape estimates.
+    ("spyfu.google.domain.overview", {"domain": "example.com", "pastNMonths": "1"}, None,
+     b'{"resultCount":1,"domain":"example.com","results":[{}]}', 1),
+    ("spyfu.google.domain.paid_keywords", {"query": "example.com", "pageSize": "10"}, None,
+     b'{"resultCount":0,"totalMatchingResults":0,"results":[]}', 0),
+    ("spyfu.google.domain.paid_keywords", {"query": "example.com", "pageSize": "10"}, None,
+     b'{"message":"unexpected"}', None),
 ])
 def test_per_result_search_settles_on_rows_returned_not_rows_requested(endpoint_id, query, req, body, rows):
     """Each reserves the requested page; the body says how many rows the vendor billed. The unit

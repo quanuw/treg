@@ -77,14 +77,15 @@ def record_call(
     ))
 
 
-def record_async_call_hit(call_id: str, endpoint_id: str, org_id: int, hit: bool) -> None:
+def record_async_call_hit(call_id: str, endpoint_id: str, org_id: int, hit: bool, *,
+                          verdict: str | None = None) -> None:
     """Queue the terminal audit correction without delaying the provider's response.
 
     If the insert has not landed, its task-row read supplies the durable verdict. If it
     has landed, this update corrects it. Both operations use the one audit writer.
     """
     _enqueue(_AsyncHitUpdate, dict(call_id=call_id, endpoint_id=endpoint_id,
-                                   org_id=org_id, hit=hit))
+                                   org_id=org_id, hit=hit, verdict=verdict))
 
 
 def _known_fields(model, telemetry: dict | None) -> dict:
@@ -221,11 +222,12 @@ async def _write_batch(rows: list[tuple[type, dict]]) -> bool:
                         CallRecord.call_ref == fields["call_id"],
                         CallRecord.endpoint_id == fields["endpoint_id"],
                         CallRecord.org_id == fields["org_id"],
-                    ).values(hit=fields["hit"]))
+                    ).values(hit=fields["hit"], verdict=fields["verdict"]))
                     continue
                 values = {k: v for k, v in fields.items() if k != "_async_submission"}
                 if fields.get("_async_submission") and (task := tasks.get(fields["call_ref"])) is not None:
                     values["hit"] = task.hit
+                    values["verdict"] = task.verdict
                 records.append(model(**values))
             session.add_all(records)
             await session.commit()

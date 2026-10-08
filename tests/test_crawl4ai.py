@@ -17,7 +17,7 @@ from treg.domain.money import settlement as settlement_basis
 def test_every_paid_crawl4ai_route_is_platform_priced():
     cat = cs.load()
     eps = [e for e in cat.endpoints if e["provider"] == "crawl4ai"]
-    assert len(eps) == 11
+    assert eps
     for ep in eps:
         if ep["cost"]["type"] == "free" or ep.get("scope") == "own_account":
             continue

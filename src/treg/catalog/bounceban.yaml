@@ -21,13 +21,27 @@ endpoints:
     path: /v1/verify/single
     resource_ownership:
       produces: [{kind: single, path: id}]
+    # Usually finished at once; `verifying` is polled within BounceBan's 10-polls-in-5-minutes rule.
+    async:
+      id_from: id
+      poll:
+        endpoint: bounceban.people.email.verify.status
+        param: {in: queryParams, name: id}
+      status:
+        path: status
+        progress: [verifying, queue]
+        success: [success]
+      result: {path: result}
+      interval: 30
+      max_age: 300
+      terminal_on_submission: true
     name: Verify email — catch-all, disposable and role flags
     summary: Verify email deliverability, including catch-all and protected mailboxes
     input:
       queryParams:
         email: {type: string, required: true, note: "email address to verify", example: "dev@bounceban.com"}
         mode: {type: string, required: false, enum: [regular, deepverify], default: regular, note: "deepverify assumes the domain matches the person's current company"}
-      note: "The standard endpoint waits up to 15 seconds. A 200 response can have status=verifying; poll bounceban.people.email.verify.status with its id. Platform calls always use full verification: the zero-cost disable_catchall_verify option is not exposed on this tool."
+      note: "The standard endpoint waits up to 15 seconds. A 200 response can have status=verifying; poll bounceban.people.email.verify.status with its id (treg call --await does this), at most every 30 seconds and for five minutes. Platform calls always use full verification: the zero-cost disable_catchall_verify option is not exposed on this tool."
     test_request: {queryParams: {email: "dev@bounceban.com"}}
     cost:
       type: per_call
@@ -39,9 +53,10 @@ endpoints:
       source_url: https://bounceban.com/public/doc/api.html#tag/Single-Verification
       checked: '2026-09-16'
       confidence: verified
-      note: "One verification credit for every accepted standard submission, including a 200 status=verifying response and final unknown results. Invalid input returned 400 and used no credit. The supplied acquisition rate is $0.004 per credit."
+      note: "One verification credit for every accepted standard submission, including a 200 status=verifying response and final unknown results. On treg's key a verifying answer is charged when its result arrives, and released if none arrives within five minutes. Invalid input returned 400 and used no credit. The supplied acquisition rate is $0.004 per credit."
     verified: '2026-09-16'
     example_response: examples/bounceban.people.email.verify.json
+    terminal_example_response: examples/bounceban.people.email.verify.json
     docs_url: https://bounceban.com/public/doc/api.html#tag/Single-Verification
 
   - id: bounceban.people.email.verify.waterfall

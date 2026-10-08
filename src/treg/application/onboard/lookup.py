@@ -41,6 +41,8 @@ DEADLINE_S = 40.0
 COMPANY_TIMEOUT_S = 3.0      # a record is a bonus; a small company's waterfall takes minutes
 HOMEPAGE_TIMEOUT_S = 5.0     # the catalog's readers, only for a page that is mostly script
 THIN_PAGE_CHARS = 300
+SERP_TIMEOUT_S = 6.0         # a term's results later than this are dropped; the slowest term holds the bento
+SERP_PROVIDER = "scrapecreators"   # the routed SERP's fastest steady child (about 2s); a miss still falls through
 # Hosts a GitHub "blog" field points at that are not the person's company site.
 _NOT_A_COMPANY = ("github.com", "github.io", "medium.com", "substack.com", "linkedin.com", "x.com",
                   "twitter.com", "youtube.com", "notion.site", "dev.to", "hashnode.dev", "linktr.ee")
@@ -118,12 +120,13 @@ class Lookup:
         return bool(self.house) and self.house.cost_micro < self.s.onboarding_max_house_micro
 
     async def _call(self, endpoint: str, body: dict, kind: str, *, method: str = "POST",
-                    params: dict | None = None, timeout: float = 12) -> dict | None:
+                    params: dict | None = None, timeout: float = 12, prefer: str = "") -> dict | None:
         if not self._budget_left():
             return None
         a = await self.house.request(method, endpoint, kind, json=body if method == "POST" else None,
                                      params=params, timeout=timeout,
-                                     headers={"X-Treg-Route-Max-Cost": "0.02"})
+                                     headers={"X-Treg-Route-Max-Cost": "0.02",
+                                              **({"X-Treg-Route-Prefer": prefer} if prefer else {})})
         if a.status != 200:
             return None
         return a.body
@@ -169,18 +172,22 @@ class Lookup:
             "landing_page": self.hints.landing, "referrer": self.hints.referrer, "utm_source": self.hints.utm_source,
             **({"name": self.hints.name} if self.hints.name else {}),
         }
-        await self._github()
-        await self._commit()
-        # With the site already known (the work domain, or the company's site on GitHub), reading
-        # it and asking for its company record run side by side; with only a name, the record
-        # comes first and names the site.
-        site = domain or (self.state.evidence.get("github") or {}).get("company_site", "")
-        if site:
-            await asyncio.gather(self._company(domain), self._homepage(site))
+        if domain:
+            # A work address names the site: GitHub only adds the person, so it runs alongside the
+            # company record and the homepage instead of in front of them.
+            await asyncio.gather(self._github(), self._company(domain), self._homepage(domain))
         else:
-            await self._company(domain)
+            await self._github()
             await self._commit()
-            await self._homepage()
+            # With the company's site on GitHub, reading it and asking for its record run side by
+            # side; with only a name, the record comes first and names the site.
+            site = (self.state.evidence.get("github") or {}).get("company_site", "")
+            if site:
+                await asyncio.gather(self._company(""), self._homepage(site))
+            else:
+                await self._company("")
+                await self._commit()
+                await self._homepage()
         await self._commit()
         if not self._has_evidence():
             self.state.step("personal", "skip", "Nothing public to go on yet; showing the tasks new teams start with")
@@ -424,8 +431,17 @@ class Lookup:
             self.state.pending.append("videos")
         return work
 
+    async def _serp(self, term: str) -> dict | None:
+        """One term's Google results from the fastest provider, or None past SERP_TIMEOUT_S: the
+        bento waits on the slowest of the terms, so a slow answer is dropped, not waited for."""
+        try:
+            return await asyncio.wait_for(self._call("treg.google.serp.organic", {"q": term}, "check_serp",
+                                                     prefer=SERP_PROVIDER, timeout=SERP_TIMEOUT_S), SERP_TIMEOUT_S)
+        except TimeoutError:
+            return None
+
     async def _check_terms(self, terms: list[str], brand: str, own: str) -> None:
-        serps = await asyncio.gather(*(self._call("treg.google.serp.organic", {"q": t}, "check_serp") for t in terms))
+        serps = await asyncio.gather(*(self._serp(t) for t in terms))
         results = {t: _serp_rows(d) for t, d in zip(terms, serps)}
         results = {t: rows for t, rows in results.items() if rows}
         if not results:

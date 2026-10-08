@@ -615,7 +615,6 @@ def _intercom_user_hash(email: str) -> str:
 
 @app.get("/auth/me")
 async def auth_me(
-    request: Request,
     x_treg_token: str = Header(default=""),
     treg_session: str = Cookie(default=""),
 ) -> dict:
@@ -630,7 +629,7 @@ async def auth_me(
            "github": identity.github}
     if first_run.enabled(identity.email):
         out["onboarding_v2"] = True
-    elif not identity.onboarded and await first_run.in_experiment(identity.email, request.app.state.http):
+    elif not identity.onboarded and first_run.in_experiment(identity.email):
         out["onboarding_v2_experiment"] = True     # the dashboard reads the flag `onboarding-v2`
     if first_run.may_preview(identity.email, identity.is_superadmin):
         out["onboarding_preview"] = True

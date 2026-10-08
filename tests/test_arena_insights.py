@@ -238,3 +238,42 @@ async def test_corrupt_compressed_body_does_not_block_other_arena_evidence(clien
 def test_explicit_unknown_body_error_is_not_a_coverage_miss():
     assert rules.body_failure({"status":"error", "message":"unexpected provider failure"}) == "unresolved_body_error"
     assert rules.body_failure({"error":"unrecognized failure"}) == "unresolved_body_error"
+
+
+async def test_bounceban_finished_answers_count_and_verifying_is_unresolved(clients):
+    """BounceBan's row is async only for the rare `verifying` answer (`terminal_on_submission`), so
+    it stays on the leaderboard: a finished first answer is judged as usual, a `verifying` one is no
+    answer yet."""
+    bb = "bounceban.people.email.verify"
+    assert bb in service._catalog()[1]
+
+    async def bounceban(hash_, response):
+        async with session_maker() as db:
+            row = CallRecord(user_email="synthetic@example.test", tool_name=bb, method="GET",
+                path="/v1/verify/single", status_code=200, endpoint_id=bb, provider="bounceban",
+                credential_tier="platform", params_hash=hash_, error_request="?email=dev%40bounceban.com",
+                cached=False, duration_ms=100, created_at=now() - timedelta(seconds=180))
+            db.add(row); await db.flush()
+            key = ArchiveKey(key_hash=f"synthetic-{row.id}", endpoint_id=bb,
+                req_url="https://api.bounceban.com/v1/verify/single?email=dev%40bounceban.com")
+            db.add(key); await db.flush()
+            db.add(ArchiveSnapshot(key_id=key.id, content_hash=f"body-{row.id}", body=json.dumps(response).encode()))
+            row.archive_key_hash = key.key_hash; row.archive_content_hash = f"body-{row.id}"
+            db.add(row); await db.commit()
+
+    await bounceban("found", {"id": "a", "status": "success", "result": "deliverable"})
+    await bounceban("no-verdict", {"id": "b", "status": "success", "result": None})
+    await bounceban("verifying", {"id": "c", "status": "verifying", "try_again_at": 1})
+    assert not await service.collect_batch(session_maker)
+    snapshot = await service.public_snapshot(session_maker)
+    row = next(r for r in snapshot["rows"] if r["endpoint"] == bb)
+    assert row["hits"] == 1 and row["misses"] == 1 and row["unresolved"] == 1
+    async with session_maker() as db:
+        categories = (await db.execute(select(ArenaObservation.category).where(
+            ArenaObservation.endpoint == bb))).scalars().all()
+    assert sorted(categories) == ["hit", "miss", "unresolved_pending"]
+
+
+def test_async_rows_without_terminal_on_submission_stay_out_of_insights():
+    endpoints = service._catalog()[1]
+    assert "wiza.people.email.find" not in endpoints

@@ -453,6 +453,12 @@ class CallRecord(SQLModel, table=True):
     # request until its answer is read. NULL when no request reached the provider, and on rows
     # written before the column existed.
     upstream_ms: int | None = Field(default=None)
+    # The contract's verdict word for this answer (`catalog/contracts.yaml` `verdict`): `valid`,
+    # `catch_all`, `unknown`... for a verify, `verified`/`unverified` for a find. Set where `hit`
+    # is, by the same adapter, and like `hit` copied from the task row for an async submission.
+    # NULL = the contract records no verdict, the answer carried none, or the provider used a
+    # word its adapter does not map. Never content: one word from a closed list.
+    verdict: str | None = Field(default=None)
 
 
 class RunRecord(SQLModel, table=True):
@@ -871,6 +877,8 @@ class AsyncTaskRecord(SQLModel, table=True):
 
     # Attribution snapshot: never infer ownership from a current membership or lossy audit.
     tags: dict | None = Field(default=None, sa_column=Column("tags", JSON, nullable=True))
+    # The terminal answer's verdict word, kept with `hit` for the same insert race.
+    verdict: str | None = Field(default=None)
 
 
 class AsyncResourceRecord(SQLModel, table=True):
@@ -2012,6 +2020,9 @@ class EndpointDayStat(SQLModel, table=True):
     latency_seen: int = Field(default=0)   # successful rows with a duration, for the reservoir
     latency_sample: list = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     updated_at: NaiveUTC = Field(default_factory=_now)
+    # Calls per contract verdict word (`CallRecord.verdict`), `{"valid": 31, "catch_all": 4}`.
+    # NULL on a bucket folded before the column existed; read as empty.
+    verdicts: dict | None = Field(default=None, sa_column=Column(JSON, nullable=True))
 
 
 class EndpointStatCursor(SQLModel, table=True):

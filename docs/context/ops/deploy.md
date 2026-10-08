@@ -378,7 +378,7 @@ without importing the heavy database stack into the light `treg` CLI.
   through the Vercel AI Gateway (`TREG_AI_GATEWAY_API_KEY`), and stores the run under Ephemeral for the page.
   Both variables also belong on the web service, which needs them for the visitor judge endpoint.
   The first-run onboarding (`TREG_ONBOARDING_V2`, or `TREG_ONBOARDING_V2_EMAILS` for a list, or
-  `TREG_ONBOARDING_V2_EXPERIMENT` for work addresses in the PostHog experiment `onboarding-v2`) runs
+  `TREG_ONBOARDING_V2_EXPERIMENT` for addresses on a domain of their own, in the PostHog experiment `onboarding-v2`) runs
   on the web service and reads `TREG_ONBOARDING_TREG_TOKEN` (a member token of the team its setup
   lookups bill), `TREG_ONBOARDING_GITHUB_TOKEN` and `TREG_AI_GATEWAY_API_KEY`; each is optional, and a
   missing one skips its step.

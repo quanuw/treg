@@ -283,20 +283,22 @@ endpoints:
     scope: any_account
     method: POST
     path: /v3/search/companies
+    # Ocean.io rejects unknown top-level keys with 422; refuse them before the call instead.
+    body_allowlist: true
     name: "Search companies by industry, technology or region"
     summary: "Search companies using filters"
     input:
       body:
         size: {type: integer, required: false, note: "how many companies to return, max 10,000 with your own key; the shared key requires an explicit size of 1-100. You are billed per company returned. Use `searchAfter` for more than 10,000", example: 2}
         searchAfter: {type: string, required: false, note: "the cursor returned by the previous call; pass it back for the next page"}
-        companiesFilters: {type: object, required: false, note: "the company filter block. `lookalikeDomains` is the headline one — seed it with domains you already like and the result is companies semantically similar to them, each row tagged `relevance` A/B/C. The rest: includeDomains, excludeDomains, companySizes, employeeCountOcean, employeeCountLinkedin, revenues, yearFounded, fundingRound, industries, excludeIndustries, industryCategories, linkedinIndustries, primaryLocations, otherLocations, countriesCount, locationsCount, technologies, keywords, webTraffic, socialMedias, mobileApps, ecommerce, departmentSizes, headcountGrowth, departmentHeadcountGrowth, minRelevance, maxRelevance, updatedWithinMonths, fieldsExist, fieldsNotExist, companyMatchingMode", example: {lookalikeDomains: ["stripe.com"]}}
+        companiesFilters: {type: object, required: false, note: "the company filter block. `lookalikeDomains` is the headline one — seed it with domains you already like and the result is companies semantically similar to them, each row tagged `relevance` A/B/C. The rest: includeDomains, excludeDomains, companySizes, employeeCountOcean, employeeCountLinkedin, revenues, yearFounded, fundingRound, industries, excludeIndustries, industryCategories, linkedinIndustries, primaryLocations, otherLocations, countriesCount, locationsCount, technologies, keywords, webTraffic, socialMedias, mobileApps, ecommerce, departmentSizes, headcountGrowth, departmentHeadcountGrowth, minRelevance, maxRelevance, updatedWithinMonths, fieldsExist, fieldsNotExist, companyMatchingMode. `technologies` is an object, not a list: {apps: {any_of: [...]}} or {categories: {...}}, each taking all_of, any_of or none_of. Industry and technology values must match GET /v2/data-fields exactly; free text returns zero rows", example: {lookalikeDomains: ["stripe.com"]}}
         peopleFilters: {type: object, required: false, note: "narrows to companies that EMPLOY people matching these filters — seniorities, departments, jobTitleKeywords, skills, countries, cities, states and more"}
         fields: {type: "array[string]", required: false, note: "which Company fields to return; omit for the full record", example: ["domain", "name", "webTraffic", "technologies", "headcountGrowth"]}
       note: "the provider's distinctive endpoint. `total` reports the full match count while `size` controls how many you pay for, so run with a small size first to size a segment before buying it. Valid values for the industries/technologies/regions filters come from GET /v2/data-fields"
     test_request:
       body:
         size: 2
-        companiesFilters: {lookalikeDomains: ["stripe.com"]}
+        companiesFilters: {includeDomains: ["stripe.com"]}
         fields: ["domain", "name", "description", "employeeCountOcean", "webTraffic", "technologies", "headcountGrowth", "primaryCountry", "industries"]
     cost:
       type: per_result
@@ -311,7 +313,7 @@ endpoints:
       reported_charge: {path: creditsUsed, unit: credit}
       note: 'OBSERVED live 2026-08-20: size=2 returned creditsUsed 0.4 and the balance fell by 0.4 — 0.2 per company returned, four times the bulk-lookup rate. `size` is the whole price. Matches the published rate card: "Search Companies — 0.2 credits / result".'
     docs_url: https://app.ocean.io/docs/searchCompaniesV3
-    verified: '2026-08-20'
+    verified: '2026-10-06'
     example_response: examples/oceanio.companies.search.json
 
   - id: oceanio.companies.lookalike
@@ -321,13 +323,16 @@ endpoints:
     scope: any_account
     method: POST
     path: /v3/search/companies
+    # Ocean.io rejects unknown top-level keys with 422; refuse them before the call instead.
+    body_allowlist: true
     name: "Find lookalike companies from seed domains"
     summary: "Search companies using filters — seeded with lookalikeDomains, this returns companies similar to your seeds"
     input:
       body:
-        companiesFilters: {type: object, required: true, note: "must carry `lookalikeDomains`: a list of seed domains (your best customers, a competitor's logo wall). Combine with the ordinary filters — primaryLocations, companySizes, industries — to constrain the neighbourhood", example: {lookalikeDomains: ["stripe.com", "adyen.com"], companySizes: ["201-500"]}}
+        companiesFilters: {type: object, required: true, note: "must carry `lookalikeDomains` INSIDE this object, never at the top level of the body: a list of up to 10 seed domains (your best customers, a competitor's logo wall). Combine with the ordinary filters — primaryLocations, companySizes, industries — to constrain the neighbourhood", example: {lookalikeDomains: ["stripe.com", "adyen.com"], companySizes: ["201-500"]}}
         size: {type: integer, required: false, note: "how many similar companies to return — the price dial, max 10,000 with your own key; the shared key requires an explicit size of 1-100", example: 2}
         searchAfter: {type: string, required: false, note: "cursor from the previous page"}
+        peopleFilters: {type: object, required: false, note: "narrows to companies that EMPLOY people matching these filters"}
         fields: {type: "array[string]", required: false, note: "which Company fields to return"}
       note: "the same route as oceanio.companies.search, listed separately because lookalike-by-seed-domain is a job of its own and few providers do it. Each row carries `relevance`: A / B / C. `minRelevance` and `maxRelevance` inside companiesFilters let you keep only the close matches"
     test_request:
@@ -358,6 +363,8 @@ endpoints:
     scope: any_account
     method: POST
     path: /v3/search/people
+    # Ocean.io rejects unknown top-level keys with 422; refuse them before the call instead.
+    body_allowlist: true
     name: "Search people by job title, skills or company filters"
     summary: "Search people using filters and/or people Ids"
     input:

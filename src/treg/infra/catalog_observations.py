@@ -94,6 +94,10 @@ class PostgresEndpointObservationReader:
                                               EndpointDayStat.day >= stats.window_days()))).scalars().all()
             live_async = (await stats.observed(db, async_ids, per_success=set())
                           if async_ids else {})
+        # `observed_from` on an entry drops the days before it: the provider replaced the service,
+        # and those calls measured the old one.
+        since = {i: str((cat.by_id.get(i) or {}).get("observed_from") or "") for i in folded_ids}
+        rows = [row for row in rows if row.day >= since.get(row.endpoint_id, "")]
         tallies = stats.merged((row.endpoint_id, stats.Tally(
             n=row.n, ok=row.ok, bad=row.bad, last_ok=row.last_ok_at, hits=row.hits,
             hit_decided=row.hit_decided, paid_hits=row.paid_hits, free_misses=row.free_misses,

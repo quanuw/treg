@@ -59,7 +59,7 @@ def _tally_of(row: EndpointDayStat) -> stats.Tally:
     return stats.Tally(n=row.n, ok=row.ok, bad=row.bad, last_ok=row.last_ok_at, hits=row.hits,
                        hit_decided=row.hit_decided, paid_hits=row.paid_hits,
                        free_misses=row.free_misses, latency_seen=row.latency_seen,
-                       latencies=list(row.latency_sample or []))
+                       latencies=list(row.latency_sample or []), verdicts=dict(row.verdicts or {}))
 
 
 async def _first_id_at(db: AsyncSession, since: datetime) -> int:
@@ -124,14 +124,14 @@ async def refresh(session_factory=session_maker, *, max_rows: int = 500_000,
             rows = (await db.execute(
                 select(CallRecord.id, CallRecord.endpoint_id, CallRecord.status_code,
                        CallRecord.created_at, CallRecord.duration_ms, CallRecord.hit,
-                       CallRecord.cost_observed_micro, CallRecord.refused_by)
+                       CallRecord.cost_observed_micro, CallRecord.refused_by, CallRecord.verdict)
                 .where(CallRecord.id > state.cursor_id).order_by(CallRecord.id).limit(limit)
             )).all()
             touched: dict[tuple[str, str], stats.Tally] = {}   # this batch only, read under the lock
             batch_touched: set[tuple[str, str]] = set()
             last: tuple[int, datetime] | None = None
             deferred = False
-            for row_id, endpoint_id, status_code, created_at, duration_ms, hit, cost, refused_by in rows:
+            for row_id, endpoint_id, status_code, created_at, duration_ms, hit, cost, refused_by, verdict in rows:
                 if created_at >= young:
                     deferred = True     # still inside the commit lag: this row and everything after it wait
                     break
@@ -146,7 +146,8 @@ async def refresh(session_factory=session_maker, *, max_rows: int = 500_000,
                     tally = _tally_of(existing) if existing is not None else stats.Tally()
                     touched[key] = tally
                 if tally.fold(status_code=status_code, created_at=created_at, duration_ms=duration_ms,
-                              hit=hit, cost_observed_micro=cost, refused_by=refused_by):
+                              hit=hit, cost_observed_micro=cost, refused_by=refused_by,
+                              verdict=verdict):
                     batch_touched.add(key)
             buckets_touched |= batch_touched
             for endpoint_id, day in sorted(batch_touched):
@@ -154,7 +155,8 @@ async def refresh(session_factory=session_maker, *, max_rows: int = 500_000,
                 values = dict(endpoint_id=endpoint_id, day=day, n=t.n, ok=t.ok, bad=t.bad,
                               last_ok_at=t.last_ok, hits=t.hits, hit_decided=t.hit_decided,
                               paid_hits=t.paid_hits, free_misses=t.free_misses,
-                              latency_seen=t.latency_seen, latency_sample=t.latencies, updated_at=at)
+                              latency_seen=t.latency_seen, latency_sample=t.latencies,
+                              verdicts=t.verdicts, updated_at=at)
                 stmt = insert_for(EndpointDayStat).values(**values)
                 await db.execute(stmt.on_conflict_do_update(
                     index_elements=["endpoint_id", "day"],

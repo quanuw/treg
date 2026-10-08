@@ -67,6 +67,42 @@ async def test_wiza_async_email_finder_completes_inside_arena(clients, monkeypat
     get_settings.cache_clear()
 
 
+BOUNCEBAN_DONE = {"id": "bb-1", "status": "success", "email": "dev@bounceban.com",
+                  "result": "deliverable", "score": 99, "is_accept_all": False}
+
+
+@pytest.mark.parametrize("answers,methods", [
+    ([BOUNCEBAN_DONE], ["GET"]),  # finished at once: no wait, no poll
+    ([{"id": "bb-1", "status": "verifying"}, BOUNCEBAN_DONE], ["GET", "GET"]),
+])
+async def test_bounceban_verify_inside_arena_is_charged_per_call(clients, monkeypatch, answers, methods):
+    from treg.config import get_settings
+
+    monkeypatch.setenv("TREG_PLATFORM_KEY_BOUNCEBAN", "PLATFORM-BOUNCEBAN")
+    monkeypatch.setenv("TREG_PLATFORM_PROVIDERS", "bounceban")
+    get_settings.cache_clear()
+    endpoint = arena.catalog_store.load().by_id["bounceban.people.email.verify"]
+    monkeypatch.setitem(endpoint["async"], "interval", 0.01)
+    seen = []
+    monkeypatch.setattr(service, "relay", _relay_by_provider(
+        {"bounceban": [(200, doc) for doc in answers]}, seen))
+    r = await clients.post("/arena/plans", json={
+        "capability": "people.email.verify", "identity": {"email": "dev@bounceban.com"},
+        "mode": "compare", "providers": ["bounceban"], "max_cost_micro": 1_000_000})
+    assert r.status_code == 200, r.text
+    quote = r.json()
+    [offer] = quote["providers"]
+    assert offer["price_type"] == "per_call" and offer["estimate_micro"] > 0
+    attempt = (await finish(clients, quote))["results"][0]
+    assert attempt["state"] == "hit" and attempt["output"]["status"] == "deliverable"
+    assert attempt["charged_micro"] == offer["estimate_micro"]
+    assert [call[1] for call in seen] == methods
+    async with session_maker() as db:
+        tasks = (await db.execute(select(AsyncTaskRecord))).scalars().all()
+    assert [task.status for task in tasks] == (["settled"] if len(answers) > 1 else [])
+    get_settings.cache_clear()
+
+
 async def test_wiza_arena_timeout_is_shown_as_pending_with_reservation(clients, monkeypatch):
     from treg.config import get_settings
 
@@ -1450,10 +1486,13 @@ async def test_national_phone_verification_preserves_provider_country(clients, e
             await asyncio.wait_for(asyncio.shield(arena._owners[final['id']]), 10)
             final = (await clients.get('/arena/runs/'+final['id'])).json()
     hit = final['results'][0]
-    assert hit['output']['phone'] == phone, 'Keep the provider value as returned'
+    # A US national number gains its +1 (`with_country_code`); anything else stays as returned.
+    shown = '+14155550100' if country == 'US' else phone
+    assert hit['output']['phone'] == shown, 'Keep the provider value as returned'
     if country in ('US','GB'):
         assert hit['verification']['state'] == 'hit'
-        assert seen[1][2] == {'phone':phone.replace(' ','').replace('-',''), 'country_code':country}
+        sent = {'phone':shown} if country == 'US' else {'phone':phone.replace(' ',''), 'country_code':country}
+        assert seen[1][2] == sent, 'an international number needs no country context'
         assert len(seen) == 2
     else:
         assert len(seen) == 1, 'Do not guess US or dispatch an uncheckable number'

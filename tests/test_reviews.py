@@ -166,7 +166,7 @@ async def test_mcp_review_schema():
         assert tool.input_schema['required'] == ['call_id', 'usefulness']
         assert tool.annotations.read_only_hint is False
         assert tool.annotations.destructive_hint is False
-        assert tool.annotations.open_world_hint is False
+        assert tool.annotations.open_world_hint is (server is mcp)
         assert tool.annotations.idempotent_hint is False
 
 

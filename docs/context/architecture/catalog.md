@@ -160,10 +160,12 @@ sources:
   - src/treg/infra/catalog_observations.py
   - src/treg/application/catalog_stats.py
   - src/treg/alembic/versions/0038_endpoint_day_stats.py
+  - src/treg/alembic/versions/0066_endpointdaystat_verdicts.py
   - src/treg/routers/catalog.py
   - tests/test_aigc_pr_b.py
   - tests/test_catalog_api.py
   - tests/test_catalog_validate.py
+  - tests/test_call_verdict.py
 related:
   - architecture/money.md
   - architecture/proxy-model.md
@@ -684,7 +686,9 @@ billing rule (a failed generation is not charged), not the display unit.
 The validator checks the effective descriptor. Dotted JSON paths are syntactically valid; success
 is non-empty; failure may be empty only when optional, non-empty `billed_failure` supplies the
 terminal failure values; optional `progress` names expected non-terminal values so the CLI can
-distinguish them from a new undocumented provider state; all status lists are pairwise disjoint. `interval` is positive; poll has exactly one of `endpoint`
+distinguish them from a new undocumented provider state; all status lists are pairwise disjoint. A
+descriptor with `max_age` may omit failure words altogether, because its task always ends. `interval`
+is positive; poll has exactly one of `endpoint`
 or `url_from`; result has exactly one of `path` or `fetch`; every descriptor block rejects unknown
 keys. Status values are compared after string coercion on both sides; a missing or unrecognized value
 means still in progress, in both the CLI awaiter and the settlement worker, but the CLI warns once
@@ -697,10 +701,25 @@ so a terminal field such as MiniMax's `file_id` is not confused with the utility
 The named path/query input must exist on the target endpoint. Body-mode polling is deliberately
 outside the frozen contract because no surveyed provider uses it and the generic client could not
 faithfully execute it. Dynamic URLs require a non-empty `url_hosts` allow-list. Any endpoint with
-`async:` must use `cost.type: per_success`. The descriptor is metadata
+`async:` must use `cost.type: per_success` or `per_call`. The descriptor is metadata
 beside the faithful relay: it never changes provider-native parameters or response bodies. The call
 router serializes the effective descriptor into `X-Treg-Async` before the response stream starts;
 it does not inspect or buffer the upstream body.
+
+Three optional keys cover a provider that usually answers at once and only sometimes hands back a
+task (BounceBan's single verification answers `verifying` for a greylisted mailbox):
+
+- `terminal_on_submission: true`: when the submission's own status is already a success word, the
+  call is finished. It settles on the response like a synchronous call: no wait, no poll, no
+  pending task. The direct call path, the routed bridge, Enrich Arena and `treg call --await` all
+  read it through `domain.asynctasks.finished_on_submission`.
+- `max_age` (seconds, at most a day): the provider's polling window. The worker stops polling at it
+  and times the task out; the routed and Arena waits and the CLI awaiter never wait past it.
+- `interval` also paces the CLI awaiter, so one caller plus the worker stays near a provider's
+  per-task poll limit. treg does not count polls across pollers.
+
+`terminal_on_submission` asks for `terminal_example_response` like any routed async tool; for a row
+whose finished answer is its usual first answer, both examples may be the same file.
 
 Older async pairs that settle on their existing request paths use `resource_ownership` alongside
 the deferred-settlement design. `produces` maps response JSON paths to provider-local resource
@@ -1598,10 +1617,15 @@ expired, and again from cold after each deploy: on a large audit table that is t
 pass, each pass evicting the pages the money path needs. The worker instead
 walks the audit table by primary key from a persisted cursor (`EndpointStatCursor`) and folds each
 row into one `EndpointDayStat` bucket per endpoint per UTC day: counts, the newest success, the
-`hit`/per-success tallies, and a uniform reservoir of at most `stats.LATENCY_SAMPLE` successful
-durations. Rows younger than sixty seconds wait for the next run so an audit insert that commits
+`hit`/per-success tallies, the count of each verdict word (`verdicts`, a JSON object; NULL on a
+bucket folded before revision `0066`, read as empty), and a uniform reservoir of at most
+`stats.LATENCY_SAMPLE` successful durations. Rows younger than sixty seconds wait for the next run so an audit insert that commits
 late is never skipped; a plain tool call (no `endpoint_id`) and a treg refusal (`refused_by`) are
-not evidence and are not folded, exactly as the live query excludes them. The first run bisects the
+not evidence and are not folded, exactly as the live query excludes them. An entry may declare
+`observed_from: YYYY-MM-DD` when its provider replaced the service behind it: the folded reader
+(`PostgresEndpointObservationReader.get_many`) then drops that endpoint's day buckets before the
+date, so its published reliability describes only the current service. The YAML line carries the
+reason as a comment; the live fallback query does not apply it. The first run bisects the
 primary key to the first row inside the window rather than reading older pages, consumes at most
 `--max-rows` per run, and the reader keeps computing the live aggregate until a run reports it
 has caught up (`caught_up_at`), so a deployment that never schedules the worker behaves as before.
@@ -1843,8 +1867,34 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   the same team's 79-address bounce list (2026-09-08) was 73 unverified Hunter domain-search rows
   and agent-guessed `info@` addresses that one verify call each would have caught. The
   `hunter.companies.emails` catalog summary carries the same warning for direct `/call/` users,
-  whose body is relayed verbatim. A suggestion only: treg never chains the verify call, which
-  would double every hit's price and change what the find bills. `routed: false` declares an
+  whose body is relayed verbatim. By default the advice is a suggestion only: treg does not chain
+  the verify call, which would add a price to every hit. `check` (`people.email.find`:
+  `{endpoint: treg.people.email.verify, field: email, prefer: [bounceban]}`) is the opt-in: with
+  `X-Treg-Route-Verify` the router runs that call after a hit (`_run_check`), as an ordinary
+  linked child `:v` through `execute_call`, with the hit's `field` as its identity. A routed check
+  runs its own waterfall and closes its own holds; `prefer` reaches that call only, below the
+  team's own key in `rank`. A direct (non-routed) check is built by its adapter and leaves its hold
+  in the find's `pending`. The find's holds stay open during the check, so cancellation releases
+  both. The check gets the cost ceiling the find left; one that does not fit, is refused, or fails
+  never fails the find: `_treg.verification` says `checked: false` with a `reason` and costs 0
+  (`no_hit` when the find missed, which is never checked).
+  Its `verdict` is `results.verdict` on the serving child, the same word `CallRecord.verdict`
+  stores. `X-Treg-Cost-Micro` and `_treg.charged_micro` are find plus check; a check still pending
+  after the routed async wait reports its hold and `pending: true`, settled later by the worker. A
+  hit's advice is dropped once a check ran. The header on a contract without `check` is a 422
+  before anything is planned. `people.phone.find`'s check is direct: `hlrlookup.people.phone.verify`
+  under its own `people.phone.live` contract (`live` / `dead` / `unknown`; the format check stays
+  `people.phone.verify`), `routed: false` because it has one provider, and its adapter
+  `route: false` so the arena never picks it. A check's `when` (an expression over `{field: value}`)
+  and `skip_reason` skip a hit before any call: a phone not written internationally
+  (`e164_digits`) is `not_international`, because HLR reads a national number's first digits as a
+  country code. The check's `skip_advice` then replaces the find's advice, which would ask for
+  the header the caller already sent; the words live in `contracts.yaml`. The adapter sends `usa_status` only for `+1` numbers and never reads a cache.
+  A finder that sends bare national digits plus a country field can add the code in its `out`:
+  `with_country_code(phone, country)` turns a 10-digit US or Canadian number (spaces, `-`, `.`
+  and parentheses aside) into `+1…` and
+  leaves every other value as it came (QuickEnrich). `raw` is never touched.
+  `routed: false` declares an
   admission-only contract: its adapters verify like any other (which is what the archive's
   `has_result_rules` reads), but no `treg.<capability>` row is ever generated from it. For a
   capability whose "children" are one provider's price tiers, not a choice treg should make.
@@ -1853,6 +1903,13 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   the plan with the reason, not ranked down like an ignored filter: a title-only search asked for
   one company's CEO returns title-matched strangers for any company and bills them as a hit. The
   rule is per candidate, so `{q, company_domain}` also drops the `q`-only providers.
+  `verdict` declares the per-call verdict word stored on `CallRecord.verdict`: `from` names the
+  output field it is read from, `words` the closed list a call may be stored with, and `map` the
+  values that become one (`people.email.find`: `verified: true` is `verified`). A verdict is read
+  only from an answer that fills the contract's required output, so a find that found nothing
+  stores none; it is independent of `miss` (ZeroBounce's `unknown` is a routing miss and still the
+  word `unknown`). `people.email.verify` keeps `catch_all` apart from `risky` so catch-all answers
+  can be counted on their own.
   `prefer` is the contract's default provider order, used when the caller sends no
   `X-Treg-Route-Prefer` (a caller's header replaces it). Cost per hit ignores time:
   `ai-search.perplexity.answer` sets `prefer: [dataforseo]` because cost per hit ranked the cheaper
@@ -1864,12 +1921,21 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
 - **Adapters** — `adapters.yaml`, one per endpoint: `accepts` (identity variants), `in` (contract
   field → `queryParams.x` / `body.x`), `const` (fixed provider params), `out` (core field →
   expression over the body), `miss`, and `route: false` for an adapter that only judges hit/miss
-  evidence (results, stats, cache admission) and never joins routing or the arena. The expression language (`domain/catalog/routing/paths.py`)
+  evidence (results, stats, cache admission) and never joins routing or the arena. Where the
+  contract records a verdict, `verdicts` maps the provider's own words (normalized: lower case,
+  spaces and hyphens to `_`) to the contract's (`ok: valid`, `accept_all: catch_all`); a word that
+  is already the contract's maps to itself. `verdict` is an optional expression that reads the
+  provider's word when the contract's `from` field cannot (BounceBan and LimaData report a
+  catch-all domain as a flag next to `risky`). `results.verdict` reads the word at the call's
+  audit step and the async finalizer reads it from the terminal answer; a word the adapter does
+  not map is stored as NULL and logged, and `tests/test_call_verdict.py` holds every verifier's
+  example answer to a mapped word. The expression language (`domain/catalog/routing/paths.py`)
   is deliberately tiny: dotted paths with `[i]` (root `[0]`, `.` = the whole body), `coalesce`
   (first non-empty argument, else the last one),
   `/ N`, `==`/`!=` against literals, and named transforms (`split_first`, `split_last`, `join`,
   `has_type`, `len`, `list`, `obj`, `fmt`, `csv`, `lower`/`upper`, `at_least`, `at_most`, `null_if`, `choose`, `linkedin_handle`/
-  `linkedin_url`, `email_domain`, `host`, `dfs_location`, `seranking_source`, `tca_filter`).
+  `linkedin_url`, `email_domain`, `host`, `dfs_location`, `seranking_source`, `tca_filter`,
+  `e164_digits`, `starts_with`, `with_country_code`).
   `values` reads rows from object-keyed or list responses; `get` applies dotted/indexed lookup
   to another expression result (for example, the first company in a domain-keyed response).
   These are generic helpers, not provider-specific rewrites.
@@ -1893,7 +1959,10 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   `treg.<capability>` (`store.load` skips a `routed: false` contract) (`provider: treg`, `kind: routed`, `POST /<capability>`, `input` = the
   contract, `cost` = the children's range, `routed_children`, `miss_billed_by` = the children priced
   per call or per result, whose provider bills an answer treg judges a miss: the caller pays those
-  too, and the cost note says so). Never hand-written; not in any
+  too, and the cost note says so). When `miss_billed_by` is non-empty the cost carries `varies:
+  true` and `advertised_usd` quotes `usd_per_call: null`: the $0 floor of the range read as "free"
+  to an agent that then paid for hundreds of billed misses. The note leads with "NOT free" and
+  carries the range. Never hand-written; not in any
   provider file.
   `catalog_get` on it returns the contract and the ranked **plan** (the quote) —
   nothing is reserved.
@@ -1979,6 +2048,13 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   routed child. The poll response does not wait for that best-effort write. A
   confirmed terminal failure counts as a miss; pending and timed-out jobs remain undecided. Its
   `AsyncTaskRecord.hit` keeps the verdict if polling beats the background audit insert.
+  `CallRecord.verdict` (the contract's verdict word, above) travels the same path beside it. The
+  worker folds its counts into `EndpointDayStat.verdicts` (calls per word, e.g. `{"valid": 31,
+  "catch_all": 4, "unknown": 2}`; `unknown` is a word like the others, never folded into a miss),
+  but `stats.publish` does not show them yet: the observation an agent reads carries no verdict
+  counts until the word mappings are proven. Showing them means publishing them under the hit
+  floor and, like `hit`, reading async endpoints live, since an async word can land after the
+  fold cursor has passed its submission.
   Async endpoints read their `CallRecord` observations live: the daily fold may consume a
   submission before its terminal poll changes the hit, and its one-way cursor cannot revise it.
   `stats.observed` publishes `hit_rate`/`hit_samples` (floor 20) and, for synchronous
@@ -2005,7 +2081,9 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   Francisco — reported as a hit, $0.0025, no signal to the caller. `ignored_filters()` is pure and
   computed at PLANNING time (`routing/plan.py`), so the ranking and the per-attempt report read the
   same set. The provider stays reachable: it still wins when nothing better is callable, and price
-  still decides among candidates that ignore equally much.
+  still decides among candidates that ignore equally much. `limit` never counts: it is a page size,
+  not a narrowing filter, and the contract defaults it, so counting it demoted every limit-less
+  child (a free-on-miss role finder fell behind a search that bills its empty pages).
   **Coverage caveat**: of 16 `people.search` children, only icypeas maps geo today, so the rule
   currently floats one provider. lusha, crustdata, companyenrich and leadmagic all filter on
   location upstream — their adapters just do not map it. Until they do, the rule is doing more work

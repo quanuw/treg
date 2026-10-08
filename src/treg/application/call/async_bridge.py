@@ -50,6 +50,8 @@ async def await_terminal(
     except (UnicodeDecodeError, json.JSONDecodeError, asynctasks.ExtractionError) as exc:
         return AsyncResult("error", "", detail=str(exc))
 
+    # A provider that asks callers to stop polling sooner (`max_age`) bounds every waiter.
+    timeout_s = min(timeout_s, asynctasks.max_age(descriptor).total_seconds())
     deadline = time.monotonic() + max(0.0, timeout_s)
     interval = max(0.05, float(descriptor.get("interval") or 2))
     attempt = 0

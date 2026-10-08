@@ -171,6 +171,58 @@ async def test_adyntel_connect_collects_both_credentials_before_provisioning(cli
     ]
 
 
+async def test_hlrlookup_connect_defers_the_key_until_the_secret_is_added(clients, monkeypatch):
+    def probe(request):
+        assert request.method == "POST"
+        assert request.url.path == "/apiv2/balance"
+        assert json.loads(request.content) == {"api_key": "own-key"}
+        # Live: the key alone answers 400 BAD_REQUEST whether it is valid or not.
+        return httpx.Response(400, json={"error": "BAD_REQUEST", "message": "Invalid parameters"})
+
+    async with AsyncClient(transport=httpx.MockTransport(probe)) as upstream:
+        monkeypatch.setattr(app.state, "http", upstream)
+        first = await clients.post(
+            "/connections/token", json={"provider": "hlrlookup", "token": "own-key"},
+        )
+        assert first.status_code == 200, first.text
+        connection = first.json()
+        assert connection["health"] == "unknown"
+        ready = await clients.post(
+            f"/connections/{connection['id']}/extra-credential", json={"value": "own-secret"},
+        )
+        assert ready.status_code == 200, ready.text
+
+    tool = next(t for t in (await clients.get("/tools")).json() if t["name"] == "hlrlookup")
+    assert [(b["location"], b["name"]) for b in tool["bindings"]] == [
+        ("json", "api_key"), ("json", "api_secret"),
+    ]
+
+
+async def test_hlrlookup_connect_rejects_a_wrong_pair(clients, monkeypatch):
+    def probe(request):
+        return httpx.Response(401, json={"error": "UNAUTHORIZED",
+                                         "message": "Invalid api_key or api_secret"})
+
+    async with AsyncClient(transport=httpx.MockTransport(probe)) as upstream:
+        monkeypatch.setattr(app.state, "http", upstream)
+        bad = await clients.post(
+            "/connections/token", json={"provider": "hlrlookup", "token": "bad-key"},
+        )
+    assert bad.status_code == 422, bad.text
+    assert "rejected" in bad.text
+
+
+def test_hlrlookup_platform_bindings_match_the_byok_pair():
+    provider = P.get("hlrlookup")
+    assert provider is not None
+    assert P.platform_bindings(provider) == [
+        {"platform_setting": "platform_key_hlrlookup", "injector": "env",
+         "location": "json", "name": "api_key", "format": "{secret}"},
+        {"platform_setting": "platform_key_hlrlookup_secret", "injector": "env",
+         "location": "json", "name": "api_secret", "format": "{secret}"},
+    ]
+
+
 def test_paid_key_verification_probe_is_typed_and_unique():
     paid = {p.service: p.probe_cost_micro for p in P.REGISTRY.values() if p.probe_cost_micro}
     assert paid == {"keenable": 4_000, "trestleiq": 15_000}

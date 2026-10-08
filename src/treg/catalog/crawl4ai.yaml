@@ -72,7 +72,7 @@ endpoints:
     path: /scrape
     body_allowlist: true
     name: Scrape or crawl a web page to clean Markdown for LLMs
-    summary: "Scrape one URL into clean, LLM-ready Markdown and/or HTML. Crawl4AI picks the cheapest engine that works (archive, plain fetch, real browser that renders JavaScript), with optional links, media, metadata and tables; proxies for sites that block datacenters."
+    summary: "Scrape one URL, a web page or a PDF, into clean, LLM-ready Markdown text and/or HTML. Crawl4AI picks the cheapest engine that works (archive, plain fetch, real browser that renders JavaScript), with optional links, media, metadata and tables; proxies for sites that block datacenters."
     input:
       bodyType: json
       body:
@@ -81,19 +81,19 @@ endpoints:
         proxy: {type: string, required: false, enum: [none, isp, residential], default: none, note: "exit network for sites that block datacenters"}
         country: {type: string, required: false, note: "two-letter exit country for isp/residential, e.g. us"}
         parse: {type: object, required: false, note: "true for all, or pick {links, media, metadata, tables}"}
-      note: "Most pages answer in 1-2 s; a page that needs a real browser takes 10-60 s, up to 90 s. Blocked (403), unreachable (502) and fleet-busy (503) answers are free; retry a 503 after a few seconds."
+      note: "Most pages answer in 1-2 s; a page that needs a real browser takes 10-30 s, and a failed page ends within about 55 s. A PDF URL returns the PDF's text as Markdown. Images and other binary files answer 422 binary-body within about a second, free. Blocked (403), unreachable (502) and fleet-busy (503) answers are free; retry a 503 after a few seconds."
     test_request: {body: {url: "https://example.com", format: md}}
     cost:
       type: per_success
-      value: 2
+      value: 0.15
       currency: credit
       per: 1
       unit: page
       source: observed
       source_url: https://api.crawl4ai.com/v1/prices
-      checked: '2026-10-05'
+      checked: '2026-10-08'
       confidence: verified
-      note: "0.5 credit base times the page's effort (x0.5 archived, x1, x2 browser, x4 hard). The 2-credit hold is the hardest page; the x-c4-cost header settles the actual charge (an archived example.com cost 0.25 live)."
+      note: "treg's account price: a flat 0.15 credits per page at every effort (archived, plain, PDF, browser, hard); failures free. The x-c4-cost header settles the charge (0.150 observed live 2026-10-08 at efforts 0, 1, 2 and 3)."
     verified: '2026-10-05'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.scrape.json
@@ -206,27 +206,67 @@ endpoints:
     scope: any_account
     method: GET
     path: /answer
-    name: Answer a question from the web (experimental)
-    summary: "A direct answer generated from the web's current top results, with the sources it drew on; answered is false when there is none yet. Experimental: the shape may change."
+    # The answer service was rebuilt on 2026-10-07; calls before that measured the old one.
+    observed_from: '2026-10-08'
+    name: "Answer a question from the web, prose or JSON"
+    summary: "Answers a question or a whole agent prompt (up to 4,000 characters) from the web's current top results, with the pages it drew on. Ask for JSON in the question, or pass a JSON Schema, and the answer is JSON of that shape. answer.source says whether the text is Google's own answer (google_ai_mode, google_ai_overview) or written from the pages (crawl4ai). answered is false, and free, when the pages hold no answer. Experimental: fields may be added."
     input:
       queryParams:
-        q: {type: string, required: true, note: "max 512 characters", example: "why is the sky blue"}
-        deep: {type: integer, required: false, enum: [0, 1], default: 1, note: "0 answers only when an answer is directly available"}
-    test_request: {queryParams: {q: "why is the sky blue"}}
+        q: {type: string, required: true, note: "the question or prompt, up to 4,000 characters; say the shape you want inside it, e.g. 'answer with JSON only: {...}'", example: "who founded stripe"}
+        schema: {type: string, required: false, note: "a JSON Schema object as a JSON string, up to 4,000 bytes; the answer is then JSON of exactly that shape (parse answer.text)"}
+        deep: {type: integer, required: false, enum: [0, 1], default: 1, note: "1 reads pages and writes an answer when the web has none; 0 returns only the web's own direct answer, else answered false"}
+        gl: {type: string, required: false, note: "search country, e.g. us"}
+        hl: {type: string, required: false, note: "search language, e.g. en"}
+        nocache: {type: integer, required: false, enum: [1], note: "1 skips every cache"}
+    test_request: {queryParams: {q: "who founded stripe"}}
     cost:
       type: per_success
-      value: 4
+      value: 3
       currency: credit
       per: 1
       unit: call
       source: observed
       source_url: https://api.crawl4ai.com/v1/prices
-      checked: '2026-10-05'
+      checked: '2026-10-07'
       confidence: verified
-      note: "1 credit base times the effort; a deep answer cost 2 live. The 4-credit hold is the hardest effort; the x-c4-cost header settles the actual charge."
-    verified: '2026-10-05'
+      note: "1 credit for the web's own answer (source google_ai_*), 3 for a written answer (prose or JSON, with or without a schema), 0.5 cached; no answer, a 400 or a 503 is free. The 3-credit hold is a written answer; the x-c4-cost header settles the actual charge (1, 3, 0.5 and 0 observed live 2026-10-07)."
+    verified: '2026-10-07'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.answer.json
+
+  - id: crawl4ai.google.serp.ai_mode
+    async: false
+    capability: google.serp.ai_mode
+    platform: google
+    domain: serp
+    scope: any_account
+    method: GET
+    path: /answer
+    name: "Google AI Mode answer for a question (text only)"
+    summary: "Google's own AI Mode / AI Overview answer for a question, word for word, with answer.source naming which. deep must be 0, so the text is never written by another model; answered is false, and free, when Google shows no direct answer. Text only: no product, place or ad cards."
+    strict_query: true
+    input:
+      queryParams:
+        q: {type: string, required: true, note: "the question, up to 4,000 characters", example: "what is a stock split"}
+        deep: {type: string, required: true, enum: ["0"], note: "must be 0: only Google's own answer"}
+        gl: {type: string, required: false, note: "search country, e.g. us"}
+        hl: {type: string, required: false, note: "search language, e.g. en"}
+        nocache: {type: string, required: false, enum: ["1"], note: "1 skips every cache"}
+    test_request: {queryParams: {q: "what is a stock split", deep: "0"}}
+    cost:
+      type: per_success
+      value: 1
+      currency: credit
+      per: 1
+      unit: call
+      source: observed
+      source_url: https://api.crawl4ai.com/v1/prices
+      checked: '2026-10-07'
+      confidence: verified
+      note: "1 credit for Google's answer, 0.5 cached, 0 when there is none; the x-c4-cost header settles the charge (1 and 0 observed live 2026-10-07)."
+    verified: '2026-10-07'
+    docs_url: https://crawl4ai.com/llms.txt
+    example_response: examples/crawl4ai.google.serp.ai_mode.json
 
   # --- Many URLs ---------------------------------------------------------------------------------
   - id: crawl4ai.web.extract.batch
@@ -251,8 +291,8 @@ endpoints:
     test_request: {body: {urls: ["https://example.com"], format: md}}
     cost:
       type: per_success
-      value: 50
-      fallback: {value: 50, note: "25 URLs at the hardest effort, when the stream ends without its summary line."}
+      value: 3.75
+      fallback: {value: 3.75, note: "25 URLs at the flat page price, when the stream ends without its summary line."}
       currency: credit
       unit: call
       settle: usage
@@ -261,7 +301,7 @@ endpoints:
       source_url: https://api.crawl4ai.com/v1/prices
       checked: '2026-10-05'
       confidence: verified
-      note: "Each URL costs like a scrape (0.25 to 2 credits) and its line carries that cost; the closing summary line carries the total, which settles the call. The 50-credit hold is 25 URLs at the hardest effort. A live two-URL batch cost 0.25 per archived URL."
+      note: "Each URL costs like a scrape (a flat 0.15 credits on treg's account) and its line carries that cost; the closing summary line carries the total, which settles the call. The 3.75-credit hold is 25 URLs at that price."
     verified: '2026-10-05'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.extract.batch.json
@@ -287,8 +327,8 @@ endpoints:
     test_request: {body: {urls: ["https://example.com"]}}
     cost:
       type: per_success
-      value: 1000
-      fallback: {value: 1000, note: "500 URLs at the hardest effort, when the finished job reports no usage.cost."}
+      value: 75
+      fallback: {value: 75, note: "500 URLs at the job's flat 0.15 credits per URL, when the finished job reports no usage.cost."}
       currency: credit
       unit: call
       settle: usage
@@ -297,7 +337,7 @@ endpoints:
       source_url: https://api.crawl4ai.com/v1/prices
       checked: '2026-10-05'
       confidence: verified
-      note: "Each URL costs like a scrape; the finished job's usage.cost (credits, after refunds for failed URLs) settles the call. The 1,000-credit hold is 500 URLs at the hardest effort."
+      note: "A job costs a flat 0.15 credits per URL on treg's account (usage.unit_cost 0.150, observed 2026-10-08); the finished job's usage.cost (after refunds for failed URLs) settles the call. The 75-credit hold is 500 URLs. Job ids may name their region (j_sin-…) and can be read from any region."
     verified: '2026-10-05'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.scrape.job.start.json

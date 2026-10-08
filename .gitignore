@@ -49,6 +49,9 @@ skills-lock.json
 
 # Local planning / handoffs — private, never committed.
 .context/
+# Agent-skill specs and plans default to docs/superpowers/; they are working notes, not the design
+# record, and belong in .context/ like any other plan.
+docs/superpowers/
 
 # Working docs that are plans/audits, not the shipped design record — they go stale the day
 # after they are written and read as commitments they are not.

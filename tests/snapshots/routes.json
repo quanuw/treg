@@ -2372,6 +2372,15 @@
       "GET",
       "HEAD"
     ],
+    "name": "admin_share",
+    "path": "/admin/share"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
     "name": "admin_calls",
     "path": "/admin/calls"
   },

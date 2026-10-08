@@ -448,9 +448,11 @@ setEpTab(e, tab){
       // A duration-priced table (video models) is quoted per second, the way the model is sold.
       if(c.rate_unit && typeof c.rate_usd==='number'){
         const lo=c.rate_usd_min, hi=c.rate_usd;
-        return (typeof lo==='number' && lo<hi ? '$'+this.usdNum(lo)+'-$'+this.usdNum(hi) : '$'+this.usdNum(hi))+'/'+c.rate_unit; }
+        return (typeof lo==='number' && lo<hi ? '$'+this.usdNum(lo)+'-\u200b$'+this.usdNum(hi) : '$'+this.usdNum(hi))+'/'+c.rate_unit; }
       // Any other price table (image models) is a range: cheapest row up to the validated ceiling.
-      if(typeof c.usd_min==='number' && c.usd_min<c.usd) return '$'+this.usdNum(c.usd_min)+'-$'+this.usdNum(c.usd)+'/'+unit;
+      // The zero-width space after the dash is the range's only break point: "$0.0066-$0.013/success"
+      // is otherwise one word, and a phone-width price cell cannot hold it.
+      if(typeof c.usd_min==='number' && c.usd_min<c.usd) return '$'+this.usdNum(c.usd_min)+'-\u200b$'+this.usdNum(c.usd)+'/'+unit;
       return '$'+this.usdNum(c.usd)+'/'+unit; },
 costTitle(c){ if(!c) return 'The catalog has no price for this endpoint';
       if(c.display_unit) return this.costLabel(c)+(c.note ? ' — '+c.note : '');

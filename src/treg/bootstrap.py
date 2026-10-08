@@ -347,6 +347,7 @@ _CONTROL_ROUTE_KEYS: frozenset[RouteKey] = frozenset({
     ('/admin/hub/updates', ('GET',), 'admin_hub_updates'),
     ('/admin/hub/updates/{tool_id}', ('POST',), 'admin_hub_update_decide'),
     ('/admin/calls', ('GET',), 'admin_calls'),
+    ('/admin/share', ('GET',), 'admin_share'),
     ('/admin/errors', ('GET',), 'admin_errors'),
     ('/admin/health', ('GET',), 'admin_health'),
     ('/admin/kv', ('GET',), 'admin_kv'),
@@ -657,7 +658,6 @@ def _lifespan(role: AppRole):
                 # what a provider sees when no caller header says otherwise, never python-httpx/x
                 headers={"User-Agent": TREG_USER_AGENT},
             )
-            first_run.use_http(app.state.http)
             ads_task = (
                 asyncio.create_task(adsconv.worker(background_session_maker, app.state.http))
                 if ROLE_BACKGROUND_TASKS[role] and adsconv.enabled()

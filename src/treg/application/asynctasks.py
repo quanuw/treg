@@ -18,7 +18,7 @@ from ..domain.governance.access import pinned_tag_predicates
 from ..domain import asynctasks
 from ..domain import money as ledger
 from ..domain.catalog import store as catalog_store
-from ..domain.catalog.results import classify, has_result_rules
+from ..domain.catalog.results import classify, has_result_rules, verdict
 from ..domain.money import settlement
 from ..infra.db import session_maker
 from ..infra.upstream.relay import relay
@@ -51,7 +51,7 @@ async def defer_submission(mk, body: bytes, org_id: int, *, tags: dict | None = 
     # (`_submission_accepted`); a failure here is a programming error and surfaces as one.
     extracted = asynctasks.extract_submission(mk.async_descriptor or {}, json.loads(body))
     task_id, poll_url, error = extracted.task_id, extracted.poll_url, ""
-    due = now + timedelta(seconds=60)
+    due = now + min(timedelta(seconds=60), asynctasks.max_age(mk.async_descriptor))
     async with session_maker() as db:
         hold = await db.get(Hold, mk.call_id)
         if hold is None:
@@ -308,13 +308,15 @@ async def _poll(row: AsyncTaskRecord, client: httpx.AsyncClient) -> tuple[int, b
 
 async def _finish(call_id: str, outcome: str, document: object | None, now, *,
                   require_usage: bool = False, expected_attempt: int | None = None,
-                  terminal_hit: bool | None = None) -> str:
+                  terminal_hit: bool | None = None, terminal_verdict: str | None = None) -> str:
     async with session_maker() as db:
         row = await db.get(AsyncTaskRecord, call_id, with_for_update=True)
         if row is None or row.status != asynctasks.PENDING:
             return "noop"
         if expected_attempt is not None and row.attempts != expected_attempt:
             return "noop"
+        # The 24-hour bound, not a descriptor's shorter `max_age`: that one only ends polling. A
+        # finished answer seen while the row is still pending is a delivered answer and settles.
         if outcome in ("success", "failure", "billed_failure") and asynctasks.expired(row.created_at, now):
             outcome = "timed_out"
         if outcome in ("success", "failure", "billed_failure", "timed_out") \
@@ -355,6 +357,7 @@ async def _finish(call_id: str, outcome: str, document: object | None, now, *,
             })
             row.status = asynctasks.SETTLED
             row.hit = terminal_hit
+            row.verdict = terminal_verdict
             if outcome == "billed_failure" and not row.error:
                 row.error = "provider reported a billable terminal failure"
         elif outcome == "failure":
@@ -364,17 +367,18 @@ async def _finish(call_id: str, outcome: str, document: object | None, now, *,
             row.status = asynctasks.RELEASED
             row.hit = terminal_hit
         elif outcome == "timed_out":
-            # No terminal state in 24 hours means treg does not know whether the caller got
-            # anything. The platform absorbs that uncertainty: the hold goes back to the team in
-            # full, the upstream charge (if any) is treg's, and the row is flagged for a human.
+            # No terminal state within the task's window (24 hours, or the descriptor's `max_age`)
+            # means treg does not know whether the caller got anything. The platform absorbs that
+            # uncertainty: the hold goes back to the team in full, the upstream charge (if any) is
+            # treg's, and the row is flagged for a human.
             # Charging the reserve here would bill a customer for an outcome nobody observed.
             await ledger.release_in_transaction(db, row.call_id, reason="async_task_timed_out",
                                                 meta={"provider": row.provider, "async_task": True,
                                                       "reconcile_review": True})
             row.settled_micro = 0
             row.status = asynctasks.TIMED_OUT
-            row.error = "terminal state not observed within 24 hours; hold released, platform absorbs"
-            log.error("ASYNC TASK TIMED OUT: call %s on %s (%s) had no terminal state in 24h; "
+            row.error = "terminal state not observed within the polling window; hold released, platform absorbs"
+            log.error("ASYNC TASK TIMED OUT: call %s on %s (%s) had no terminal state in its window; "
                       "released %d micro-USD to the team, platform absorbs the upstream charge - "
                       "check whether the provider changed its status field",
                       row.call_id, row.provider, row.endpoint_id, row.reserved_micro)
@@ -382,7 +386,7 @@ async def _finish(call_id: str, outcome: str, document: object | None, now, *,
             row.consecutive_failures = row.consecutive_failures + 1 if outcome == "poll_error" else 0
             due = (asynctasks.next_failure_check(now, row.consecutive_failures)
                    if row.consecutive_failures else asynctasks.next_check(now, row.attempts))
-            row.next_check_at = min(due, row.created_at + asynctasks.MAX_AGE)
+            row.next_check_at = min(due, row.created_at + asynctasks.max_age(row.descriptor))
             await db.commit()
             return "backed_off"
         row.completed_at = now
@@ -399,13 +403,17 @@ async def _finish_terminal(snapshot: AsyncTaskRecord, outcome: str, document: ob
     terminal_hit = (classify(snapshot.endpoint_id, status_code, body).hit
                     if outcome == "success" else
                     False if has_result_rules(snapshot.endpoint_id) else None)
+    # Only a finished answer carries a verdict word; a failure has nothing to judge.
+    terminal_verdict = verdict(snapshot.endpoint_id, status_code, body) if outcome == "success" else None
     result = await _finish(snapshot.call_id, outcome, document, now, require_usage=require_usage,
-                           expected_attempt=expected_attempt, terminal_hit=terminal_hit)
+                           expected_attempt=expected_attempt, terminal_hit=terminal_hit,
+                           terminal_verdict=terminal_verdict)
     expected = asynctasks.SETTLED if outcome in ("success", "billed_failure") else asynctasks.RELEASED
     if result == expected:
         if terminal_hit is not None:
             audit.record_async_call_hit(
-                snapshot.call_id, snapshot.endpoint_id, snapshot.org_id, terminal_hit)
+                snapshot.call_id, snapshot.endpoint_id, snapshot.org_id, terminal_hit,
+                verdict=terminal_verdict)
         # Only the winning finalizer records evidence; a late poll cannot replace the result
         # whose usage was charged. Archive failure cannot undo the committed money transaction.
         try:
@@ -423,10 +431,10 @@ async def _process(call_id: str, client: httpx.AsyncClient, attempt: int) -> str
         if row is None or row.status != asynctasks.PENDING or row.attempts != attempt:
             return "noop"
         if row.error:
-            if not asynctasks.expired(row.created_at, now):
+            if not asynctasks.expired(row.created_at, now, row.descriptor):
                 return "backed_off"
         snapshot = row.model_copy()
-    if asynctasks.expired(snapshot.created_at, now):
+    if asynctasks.expired(snapshot.created_at, now, snapshot.descriptor):
         return await _finish(call_id, "timed_out", None, now, expected_attempt=attempt)
     try:
         async with asyncio.timeout(POLL_TIMEOUT_S):

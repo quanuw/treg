@@ -133,6 +133,9 @@ def test_every_shipped_adapter_round_trips_its_fixture():
     ep = cat.by_id[ROUTED]
     assert ep["kind"] == "routed" and ep["provider"] == "treg" and len(ep["routed_children"]) >= 8
     assert cat.platform_eligible(ep) and ep["cost_range_usd"][0] < ep["cost_range_usd"][1]
+    # children bill misses, so no single quote: a $0 floor read as "free"
+    people = cat.by_id["treg.people.search"]
+    assert people["miss_billed_by"] and cat.advertised_usd(cat.cost_view(people["cost"], "treg")) is None
     # a hand-verified round trip on the plan's worked example
     ad = cat.adapters["leadsforge.people.email.find"]
     q, b = ad.to_upstream({"first_name": "Patrick", "last_name": "Collison", "domain": "stripe.com", "full_name": "Patrick Collison"})
@@ -1047,6 +1050,10 @@ def test_a_provider_that_cannot_express_a_supplied_filter_ranks_last_among_equal
     assert "country" in ignored_filters(cat.adapters["aviato.people.search"], contract, ident)
     assert ignored_filters(cat.adapters["icypeas.people.search"], contract, ident) == (), \
         "icypeas is the only people.search adapter that maps geo — the rule must float it to the top"
+    # `limit` is a page size, not a looser question: a role finder without one must not rank below
+    # a search that bills its empty pages
+    assert ignored_filters(cat.adapters["leadmagic.x.role-finder"], contract,
+                           {"company_domain": "acme.com", "title": "CEO", "limit": 10}) == ()
     # the full_name variant has exactly two candidates and neither mapped `country` — so a GT search
     # went to New York and was billed (voice-ai-outbound, 2026-09-03). aviato's simple search takes
     # country NAMES (live 2026-09-04: `Guatemala` → 84,145 rows, `GT` → 0), hence country_name().

@@ -307,7 +307,22 @@ async def _relay_answer(request: Request, context, upstream: UpstreamResponse, r
             _capture_hint(request, context, kind)
     except Exception:
         pass  # A fault here can only lose the header; the answer is already built.
+    if routed := _routed_alternative(context, response.status_code):
+        response.headers["X-Treg-Routed-Tool"] = routed
     return response
+
+
+def _routed_alternative(context, status: int) -> str | None:
+    """The routed `treg.<capability>` tool for a successful direct call to one provider's endpoint
+    of that capability, so the surfaces can point an agent to the tool that picks the provider and
+    falls back. Never on a routed call itself."""
+    marketplace = context.marketplace
+    if marketplace is None or not 200 <= status < 300 or marketplace.endpoint_id.startswith("treg."):
+        return None
+    by_id = catalog_store.load().by_id
+    capability = (by_id.get(marketplace.endpoint_id) or {}).get("capability")
+    routed = f"treg.{capability}" if capability else None
+    return routed if routed in by_id else None
 
 
 async def run_call_surface(rest: str, request: Request, caller: Caller, *, prefix: str, finish,

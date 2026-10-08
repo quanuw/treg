@@ -279,3 +279,88 @@ def _error_response_evidence(
                            headers.get("content-type", "")),
         secrets, _ERROR_RESPONSE_MAX)
     return evidence or "<no response body or headers>"
+
+
+# ---- caller-facing response redaction --------------------------------------------------------
+# Masks injected credentials out of an error body BEFORE it reaches the caller. The admin evidence
+# redaction above reads an 8 KiB slice; this reads every byte the caller is about to receive.
+#
+# Exact masking only. The pattern nets above (`_QUERY_CRED_RE`, `_EVIDENCE_SECRET_RE`) are right for an
+# admin log and wrong here: they rewrite ordinary fields (`"key": "uniqueId"`, `"monkey": …`) in an
+# answer that is otherwise relayed faithfully. treg protects what it injected, and that it knows
+# exactly; the case-insensitive, decoded re-check below is the backstop for a transform we missed.
+
+# Largest (decompressed) error body this scans. A bigger one, or one in an encoding the stdlib cannot
+# decode (br, zstd), cannot be proven clean, so on a credentialed call it is replaced, not relayed.
+_ERROR_SCAN_MAX = 8 * 1024 * 1024
+_REDACTED_BODY = (b'{"error":"response_redacted",'
+                  b'"message":"upstream response may have contained credentials and was redacted"}')
+UNSCANNABLE_ERROR_BODY = (b'{"error":"response_redacted",'
+                          b'"message":"upstream error response could not be scanned for credentials"}')
+
+
+def _decompress_for_scan(raw: bytes, content_encoding: str) -> bytes | None:
+    """The identity bytes of `raw`, or None when they cannot be had whole within `_ERROR_SCAN_MAX`.
+
+    Own-key calls mirror the caller's `Accept-Encoding`, so a caller asking for gzip gets the
+    provider's error gzipped, and a credential inside it is invisible until decoded.
+    """
+    enc = content_encoding.strip().lower()
+    if enc in ("", "identity"):
+        return raw
+    if enc not in ("gzip", "x-gzip", "deflate"):
+        return None
+    # 32+MAX_WBITS auto-detects a gzip or zlib header; raw deflate is the other "deflate" in the wild.
+    for wbits in (32 + zlib.MAX_WBITS, -zlib.MAX_WBITS):
+        d = zlib.decompressobj(wbits)
+        try:
+            out = d.decompress(raw, _ERROR_SCAN_MAX + 1)
+        except zlib.error:
+            continue
+        # Bounded output (a bomb stops here), and the WHOLE input: a second gzip member is unscanned.
+        if len(out) > _ERROR_SCAN_MAX or d.unconsumed_tail or d.unused_data or not d.eof:
+            return None
+        return out
+    return None
+
+
+def _redact_caller_response(body: bytes, secrets: list[str]) -> tuple[bytes, bool]:
+    """Mask every spelling of an injected credential in `body`. Returns (body, was_redacted).
+
+    `surrogateescape` round-trips any byte that is not UTF-8, so masking never rewrites the bytes
+    around a credential. If a credential still survives in a normalised (percent-decoded,
+    JSON-unescaped, lowercased) copy, the whole body is replaced: fail closed rather than leak.
+    """
+    if not body or not secrets:
+        return body, False
+    text = body.decode("utf-8", "surrogateescape")
+    masked = text
+    for secret in secrets:  # longest first (see `_secret_renderings`)
+        masked = masked.replace(secret, "***")
+    probe = unquote(masked.replace("\\/", "/")).lower()
+    if any(s.lower() in probe for s in secrets):
+        return _REDACTED_BODY, True
+    if masked == text:
+        return body, False
+    return masked.encode("utf-8", "surrogateescape"), True
+
+
+def redact_error_response(
+    body: bytes, tool: Tool, secrets: dict[int, Secret], *, content_encoding: str = "",
+) -> tuple[bytes, bool]:
+    """Redact injected credentials from a whole error body before it reaches the caller.
+
+    Returns (body, was_redacted). An unchanged body comes back as the original bytes, still in
+    its original encoding. A redacted one is always identity-encoded: the caller must drop
+    `Content-Encoding` and recompute `Content-Length`.
+    """
+    if not body:
+        return body, False
+    renderings = _safe_secret_renderings(tool, secrets)
+    if renderings is None:
+        return UNSCANNABLE_ERROR_BODY, True
+    plain = _decompress_for_scan(body, content_encoding)
+    if plain is None:
+        return (UNSCANNABLE_ERROR_BODY, True) if renderings else (body, False)
+    redacted, masked = _redact_caller_response(plain, renderings)
+    return (redacted, True) if masked else (body, False)

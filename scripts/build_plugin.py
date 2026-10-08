@@ -79,48 +79,52 @@ DSH_TARGET = ROOT / "dsh" / "skills" / "treg" / "SKILL.md"
 # docs/MINIMAX-PLUGIN.md.
 MINIMAX_TARGET = ROOT / "plugins" / "minimax" / "skills" / "treg" / "SKILL.md"
 
-CODEX_BOOTSTRAP = """
-## First, check which treg you have
-
-This plugin can arrive two ways, and they need opposite first moves. **Look at your tools before you
-do anything else.**
-
-**If you can see `catalog_search`, `catalog_get`, `call`, `balance` and `my_tools`** — treg is
-connected. Use those; there is nothing to install. The rest of this page is written around the `treg`
-command line, so read `treg catalog search` as `catalog_search`, `treg call` as `call`, and so on.
-
-**If you cannot see them**, this copy was installed skills-only — the directory's upload path strips
-connector config. Everything on this page then runs through the CLI, which you set up once:
-
-```bash
-curl -fsSL {BASE}/install.sh | sh   # the CLI, pointed at treg
-treg login                                   # sign in; first login registers you
-```
-
-A new team starts with **$1.00 of free balance**, so there is nothing to pay before the first call.
-If sign-in is needed, say so plainly and stop — never ask the human for a provider's API key, which
-is the thing treg exists to avoid. (Registering treg's MCP server into Codex is manual: it needs a
-`~/.codex/config.toml` entry with an env-var indirection. `{BASE}/llms.txt` has the shape.)
-
+# The Codex plugin is the one variant that is NOT the served page plus a bootstrap. It ships an MCP
+# connector, and OpenAI's plugin review refuses a skill that "may download or execute code outside
+# the reviewed package" - which the served page does (`curl ... install.sh | sh`, the CLI throughout).
+# So it ships this connector-only skill whole: the tools, the flow, the rules. Nothing to install.
+CODEX_SKILL = """---
+name: treg
+description: People and company enrichment, AEO and SEO, ads, social, web scraping, image and video generation through the treg connector. Use when a task needs external or live data; search the catalog by the task, check the endpoint, then call it.
 ---
 
-## When the tools ARE there
+# treg
+
+treg is connected as an MCP connector. Use its tools; there is nothing to install and no API key to
+ask the human for - treg adds the provider credential on its server.
 
 | tool | use it for |
 |---|---|
-| `catalog_search` | find an endpoint by WHAT YOU WANT TO DO — "work email", "backlinks", "tiktok comments" |
-| `catalog_get` | one endpoint's parameters and its exact price, **before** you spend |
-| `call` | make the call; treg injects the credential and relays the answer |
+| `catalog_search` | find an endpoint by what you want to do - "work email", "backlinks for a domain", "tiktok comments" |
+| `catalog_get` | one endpoint's parameters, price per call, and the other providers for the same job with measured success rate and speed |
+| `call` | call a catalog endpoint by id, or one of the team's own tools from `my_tools` |
+| `call_media` | call an audio endpoint (text-to-speech) and get the audio back |
+| `resources_list` | durable provider resources the team created, such as voices |
 | `balance` | the team's prepaid balance |
-| `my_tools` | what this team registered and you can call without holding the key |
+| `my_tools` | API accounts and connections the team registered |
+| `catalog_request` | file a one-line request when the catalog has nothing for the task |
+| `feedback` / `review` | report a problem with treg, or rate a call result when asked |
 
-If the connector is present but the tools error, it has no token yet: the human sets `TREG_TOKEN`
-(from {BASE} → sign in → copy token) for this plugin.
+## Flow
 
-Either way, the rest of this page is the part that matters — **when** treg is the right move, and
-**how to choose** between providers.
+1. `catalog_search` with the task in plain words, not a vendor name. Read `verdict`: `strong` means
+   these do it, `closest` means check `catalog_get`, `none` means it is not in the catalog.
+2. `catalog_get` the endpoint you picked. When several providers do the same job, compare their
+   price, success rate and speed, pick one, and tell the human the price before a call that costs
+   more than a cent.
+3. `call(endpoint_id, params)`. If a call's answer never arrived (timeout, dropped connection),
+   repeat it with the same `idempotency_key`; treg returns the stored answer instead of calling again.
+4. Nothing fits: `catalog_request` one sentence saying what is missing, then tell the human.
 
----
+## When something goes wrong
+
+- **Not authenticated:** the connector has no sign-in yet. Tell the human to connect treg (sign in at
+  {BASE}) and stop.
+- **Refused for funds:** check `balance` and tell the human to add funds at {BASE}.
+- **A provider error:** the response is the provider's own answer, relayed unchanged; read it before
+  retrying, and try another provider from `catalog_get` if it keeps failing.
+- `feedback` and `review` text goes to the treg team; keep it about the tool and leave out private
+  data, credentials and raw responses.
 """
 
 # Cursor now ships MCP alongside the skill, so its bootstrap is closer to Codex: check for the tools
@@ -276,7 +280,7 @@ the plugin already gives you — worth mentioning to the human, who can remove i
 # the only one where `treg mcp install` is the wrong move — it writes configs for other agents, not
 # for a dsh profile.
 VARIANTS = {
-    "codex": (CODEX_TARGET, CODEX_BOOTSTRAP, False),
+    "codex": (CODEX_TARGET, None, False),
     "claude": (CLAUDE_TARGET, CLI_BOOTSTRAP, True),
     "cursor": (CURSOR_TARGET, CURSOR_BOOTSTRAP, True),
     "dsh": (DSH_TARGET, DSH_BOOTSTRAP, False),
@@ -295,6 +299,8 @@ def package_version() -> str:
 
 def render(variant: str) -> str:
     target, bootstrap, stamp_version = VARIANTS[variant]
+    if variant == "codex":
+        return CODEX_SKILL.replace("{BASE}", PUBLIC_BASE)
     text = SOURCE.read_text(encoding="utf-8")
     if "---" not in text:
         raise SystemExit(f"{SOURCE} has no frontmatter — refusing to guess where it ends")

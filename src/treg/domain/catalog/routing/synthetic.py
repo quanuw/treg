@@ -68,11 +68,18 @@ def routed_endpoint(contract: Contract, children: list[dict], adapters: dict[str
                            f"(default ${contract.default_max_cost_usd or 1.00:g} per call; misses on per-success providers are free). Options ride as "
                            "headers, never in the body: X-Treg-Route-Waterfall: 0 (stop at the first miss), "
                            "X-Treg-Route-Max-Cost: <usd>, X-Treg-Route-Prefer / X-Treg-Route-Exclude: <provider>. The "
-                           "response is {output, raw, _treg: {served_by, tried}}; X-Treg-Served-By names the child.")},
+                           "response is {output, raw, _treg: {served_by, tried}}; X-Treg-Served-By names the child."
+                           + (f" X-Treg-Route-Verify: true checks a hit with {contract.check.endpoint} in the same call, "
+                              "at that call's own price, and reports it in _treg.verification "
+                              "{verdict, checked, served_by, cost_micro}." if contract.check else ""))},
         "test_request": {"body": {k: _EXAMPLE_VALUES.get(k, "…") for k in _best_variant(contract, kids, adapters)}} if contract.identity else {},
         "cost": {"type": "per_success", "value": lo, "currency": "USD", "per": 1, "unit": "call",
                  "source": "inferred", "confidence": "documented", "checked": None,
-                 "note": ((f"the children's range ${lo:g}–${hi:g} per hit, 0% markup; you pay the child that served "
+                 # No single quote is honest when children bill their misses: an agent read the
+                 # $0 floor as "free" and ran hundreds of billed searches. Quote nothing.
+                 **({"varies": True} if billed_miss else {}),
+                 "note": (((f"NOT free: misses are billed too. " if billed_miss else "")
+                           + f"the children's range ${lo:g}–${hi:g} per hit, 0% markup; you pay the child that served "
                            f"AND every child tried before it that bills a miss ({len(billed_miss)} of {len(kids)} do), "
                            f"up to X-Treg-Route-Max-Cost (default ${max_usd:g} a call). X-Treg-Route-Exclude them, or "
                            "X-Treg-Route-Waterfall: 0, to pay for one provider only")

@@ -298,7 +298,8 @@ async def test_admin_calls_reads_new_rows_after_a_cursor_by_provider(c):
             s.add(CallRecord(org_id=1, user_email="u@example.com", tool_name=f"{prov}.web.scrape", method="POST",
                              path="/call/x", status_code=ok, endpoint_id=f"{prov}.web.scrape", provider=prov,
                              credential_tier="platform", cost_charged_micro=250 * (i + 1), duration_ms=100 + i,
-                             upstream_ms=90 + i, call_ref=f"ref{i}:r0"))
+                             upstream_ms=90 + i, call_ref=f"ref{i}:r0",
+                             error_response='[502] {"ok": false, "reason": "no-answer:dns-failed"}' if ok == 502 else None))
         await s.commit()
     first = (await c.get("/admin/calls?limit=1", headers=_a())).json()
     assert len(first) == 1 and first[0]["provider"] == "crawl4ai" and first[0]["charged_micro"] == 1000
@@ -307,4 +308,26 @@ async def test_admin_calls_reads_new_rows_after_a_cursor_by_provider(c):
     assert [r["status"] for r in rows] == [200, 502, 200]
     assert [r["id"] for r in rows] == sorted(r["id"] for r in rows)
     assert rows[0]["duration_ms"] == 100 and rows[0]["upstream_ms"] == 90 and rows[0]["tier"] == "platform"
+    assert [r["error_reason"] for r in rows] == [None, "no-answer:dns-failed", None]
     assert (await c.get("/admin/calls?provider=crawl4ai", headers=_a())).status_code == 422
+
+
+async def test_admin_share_counts_requests_per_job_and_answers_per_provider(c):
+    """A routed call counts once as a request, and its successful attempt credits the provider that
+    answered; a direct call credits its own provider; a failed attempt credits nobody."""
+    from treg.models import CallRecord
+    async with session_maker() as s:
+        def add(ep, prov, status, ref):
+            s.add(CallRecord(org_id=1, user_email="u@example.com", tool_name=ep, method="POST", path="/call/x",
+                             status_code=status, endpoint_id=ep, provider=prov, call_ref=ref))
+        add("treg.web.extract", "treg", 200, "p1")
+        add("crawl4ai.web.scrape", "crawl4ai", 502, "p1:r0")
+        add("tinyfish.web.fetch", "tinyfish", 200, "p1:r1")
+        add("treg.web.extract", "treg", 200, "p2")
+        add("crawl4ai.web.scrape", "crawl4ai", 200, "p2:r0")
+        add("crawl4ai.web.scrape", "crawl4ai", 200, "d1")
+        await s.commit()
+    body = (await c.get("/admin/share?minutes=60", headers=_a())).json()
+    job = next(j for j in body["jobs"] if j["capability"] == "web.extract")
+    assert job["requests"] == 3 and job["answered"] == 3
+    assert job["by_provider"] == {"crawl4ai": 2, "tinyfish": 1}

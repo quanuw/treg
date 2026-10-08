@@ -277,6 +277,7 @@ capabilities:
   people.search.filters: "List the accepted values for a people-search filter"
   people.email.find.personal: "Find a person's personal email address"
   people.phone.verify: "Validate and format a phone number"
+  people.phone.live: "Check whether a phone number is live on its network"
   linkedin.profile.from_email: "Find a person's LinkedIn profile from their email address"
   creators.socials.connected: "List a creator's accounts on other platforms"
 

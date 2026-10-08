@@ -83,6 +83,11 @@ Notes:
   `treg catalog get` for its fields, parameters and price before choosing. If you need a provider's
   catch-all, disposable, role-address or SMTP field, call that provider's endpoint: the routed
   `treg.people.email.verify` contract defines only `valid`, `status` and `score`.
+- To find AND check an email in one call, send `--header "X-Treg-Route-Verify: true"` on
+  `treg.people.email.find`. The check is its own small charge. Read `_treg.verification.verdict`
+  (`valid`, `invalid`, `catch_all`, `risky`, `unknown`); `checked: false` means no check ran.
+  The same header on `treg.people.phone.find` checks the line live: `live`, `dead` or `unknown`.
+  Never call a phone "verified": a live line is not proof it is this person's number.
 - A catalog endpoint can use a verified public route with no provider key. Such a call is free when
   the caller does not send a provider credential. The team tool or stored provider key still wins.
 - Discovery jobs usually have TWO shapes in the catalog — a structured one (filters: title, location,
@@ -162,10 +167,18 @@ Notes:
     registry these ids answer 404: fall back to the routed endpoints below.
 <!--/hub-->
 <!--routed-->
+  - **For a common job, call the routed tool, not a provider you remember.** Scraping a page
+    (`treg.web.extract`), web search (`treg.web.search`), Google results (`treg.google.serp.organic`,
+    `treg.google.serp.maps`), finding or verifying an email (`treg.people.email.find`,
+    `treg.people.email.verify`) and most social profiles have a `treg.<capability>` tool. treg picks
+    the provider (your own key first), falls back when one fails or misses, and charges only the
+    answer it returns. A provider you used last week may not be the best choice today: prices and
+    reliability change. Name a provider only when you need fields or options that only it has.
   - **Routed endpoints** (`treg.<capability>`, e.g. `treg.people.email.find`) are where you can
     ask treg to choose: POST the identity (`{full_name, domain}` | `{first_name, last_name, domain}` |
     `{linkedin_url}`); treg runs the best child (own keys first, then cheapest per hit), falls back
-    on errors AND misses (cheapest first, within `X-Treg-Route-Max-Cost`, default $1), and returns
+    on errors AND misses (cheapest first, within `X-Treg-Route-Max-Cost`, default $1; a miss can be
+    billed, so a routed row quotes `usd_per_call: null`, not $0 — set the header for bulk runs), and returns
     `{output, raw, _treg.served_by, _treg.tried}` + `X-Treg-Served-By`. `X-Treg-Route-Waterfall: 0`
     stops at the first miss. A filter a provider cannot apply (`country` on a name-only search) is
     still sent to the others, and the answer names it in `X-Treg-Ignored-Filters` / `_treg.ignored_filters`
@@ -231,6 +244,10 @@ How it works:
   task id, a resumable `treg call …` command (Ctrl-C loses the wait, never the task or the money),
   progress, and the result URL. Exit 0 = done, 2 = the provider failed the task, 3 = timed out
   (resume with the printed command).
+- **Some async tools usually answer at once** (an email verification): when the first response is
+  already finished, it is the answer and is charged as one; `--await` prints it without polling. If
+  it says "still working", poll no faster than the descriptor's `interval` and stop at its `max_age`
+  seconds; a task with no answer by then is refunded.
 - **Reference media (a face image, a voice clip, a first frame) must be a public URL the vendor
   can fetch.** Do not reach for a paste host: they fail vendor probes at random (catbox, tmpfiles,
   uguu all did). `treg host face.jpg` prints a public URL (30 MB, 7 days, free) that drops straight

@@ -318,7 +318,9 @@ any response. `has_result_rules` enables result-aware behavior only for endpoint
 verified adapter and a nonempty hit/miss expression. Those endpoints reuse `Adapter.is_miss`.
 An adapter verifies only against a contract, so a capability that must never be routed can still
 opt in through a `routed: false` contract (catalog.md, Routing); the influencers.club enrich
-tiers are the first.
+tiers are the first. `results.verdict`, beside it, reads the contract's verdict word for the audit
+row (catalog.md, Hit rate); it plays no part in admission, and the strict validators below do not
+change it.
 Strict result validators cover `hunter.companies.emails`, `leadmagic.x.employee-finder`,
 `seranking.google.keywords.volume`, `leadsforge.people.email.find`, `hunter.people.email.find`,
 and `findymail.search.name`. The last two require a shaped email string inside `data` or `contact`;
@@ -462,7 +464,9 @@ later for the timers; it complements `/admin/reconcile/repeats`, which prices wh
 
 Hooked in `call_tool` immediately after `_buffer_response` — the one line where "metered platform
 call, body already in memory" is a fact, which IS eligibility gate 3. Metered 2xx only, and never a 2xx the capacity
-signature table reads as our own account running dry (Icypeas' 200 "insufficient credits"); the
+signature table reads as our own account running dry (Icypeas' 200 "insufficient credits"), nor a
+"still working" submission on an async row whose first answer may be finished
+(`terminal_on_submission`): that is a task id, not an answer to replay; the
 serve path already emits `X-Treg-Cache: hit`. The call context also carries `cached` from
 `served_hit`, so review invitations can exclude archive hits independently of response headers. `archive.record()` is fire-and-forget with
 audit's discipline: bounded pending set (512), failures swallowed but logged at **ERROR** (a lost

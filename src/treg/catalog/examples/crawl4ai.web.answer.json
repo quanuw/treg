@@ -1,20 +1,24 @@
 {
   "answer": {
-    "text": "AI Mode replied:The sky is blue because gases in Earth's atmosphere scatter short-wavelength blue light from the sun in all directions more than other colors. NASA Space Place (.gov) +1How Sunlight WorksWhite light from the sun is actually made up of all the colors of the rainbow combined.Different colors travel in waves of different lengths.Red and yellow light travel in long, lazy waves.Blue and violet light travel in short, choppy waves. National Geographic Kids +1The Role of the AtmosphereGas molecules like nitrogen and oxygen fill Earth's clean air.Rayleigh scatteringNASA Space Place (.gov)Why Is the Sky Blue? | NASA Space Place – NASA Science for KidsIt's easy to see that the sky is blue. Have you ever wondered why? Sunlight reaches Earth's atmosphere and is scattered in all dir...National Environmental Satellite, Data, and Information Service (.gov)Why Is the Sky Blue? | NESDIS | National Environmental Satellite, Data, and Information ServiceMechanism: Gases and particles in Earth's atmosphere scatter sunlight in all directions; white sunlight contains all rainbow color...Show all"
+    "source": "crawl4ai",
+    "sources": [
+      {
+        "title": "Ollama — Inference Engine",
+        "url": "https://www.local-llm.net/tools/ollama/"
+      },
+      {
+        "title": "The Complete Guide to Ollama: Local LLM Inference Made ...",
+        "url": "https://read.theaimerge.com/p/the-complete-guide-to-ollama-local"
+      }
+    ],
+    "text": "Ollama is an open-source inference framework and command-line tool designed to simplify running large language models (LLMs) locally on macOS, Linux, and Windows. It functions as a user-friendly wrapper that uses `llama.cpp` under the hood to manage model weights, configurations, and hardware acceleration.\n\nKey features and characteristics include:\n\n*   **Simplified Management:** It uses a single command-line interface to pull, run, and manage a library of pre-quantized models.\n*   **Hardware Integration:** It automatically detects and utilizes NVIDIA, AMD, and Apple Silicon GPUs, falling back to CPU inference when necessary.\n*   **API Compatibility:** It exposes a REST API on port 11434 that mirrors the OpenAI chat completions format, allowing it to integrate with tools like Open WebUI, LangChain, and LlamaIndex.\n*   **Customization:** The \"Modelfile\" system allows users to create custom model variants with specific system prompts, temperature settings, and adapter layers.\n*   **Deployment:** It supports Docker-native deployment, making it suitable for home servers, Kubernetes clusters, and CI/CD pipelines.\n\nWhile Ollama is ideal for low-friction local development and hobbyist use, it is generally recommended to use engines like vLLM for production environments that require high-concurrency serving."
   },
   "answered": true,
   "cached": false,
   "experimental": true,
-  "ms": 1327,
+  "ms": 4233,
+  "query": "what is the Ollama inference engine",
   "usage": {
-    "boxes": [
-      "search"
-    ],
-    "remaining_before": {
-      "concurrent": 9,
-      "requests": 29,
-      "search": 120
-    },
     "units": 1
   }
 }

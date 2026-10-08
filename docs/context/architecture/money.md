@@ -229,7 +229,7 @@ stale holds is paid by the caller who benefits from it, and an org that never ca
 balance to strand. Each stale release commits independently before the new balance gate. A later 402
 rolls back only the failed reservation, never a refund the reaper already made durable.
 Pending `AsyncTaskRecord` holds are excluded from this short request reaper. Their worker has a separate
-24-hour deadline and always closes the hold by settle or release.
+24-hour deadline (or the descriptor's shorter `max_age`) and always closes the hold by settle or release.
 
 ## Deferred asynchronous settlement
 
@@ -240,6 +240,13 @@ the field's declared `min`/`max` (finite and always positive, whatever minimum i
 matches no row and prices at the fallback, so a caller can neither reserve zero nor bill past the
 validated ceiling. Both the normal response path and the async worker
 use it. Provider differences remain in catalog YAML; there are no provider billing adapters.
+An async row settles at the terminal answer when its price is a table, a `usage` meter, or a plain
+`per_call` price (`observed` amount, the fixed price as fallback): a provider that bills every
+finished answer is charged for each one, a finished answer with no result included. Async
+`per_success` rows without a table keep settling on the submission response.
+
+A submission whose own status is already a success word, on a descriptor with
+`terminal_on_submission`, is not deferred: it settles on the response through the ordinary path.
 
 For a tier-4 endpoint carrying `async`, a successful submission keeps its hold and writes an
 `AsyncTaskRecord` whose `settlement_basis` freezes the whole price rule with the request it was
@@ -254,6 +261,8 @@ a confirmed terminal failure stores `false` when the endpoint has verified hit r
 pending and timed-out tasks remain undecided. This counts failed attempts in routing's hit rate.
 The audit path copies the verdict to the original submission row whether that row was inserted
 before or after the terminal poll. The submission ticket itself supplies no hit verdict.
+A successful task also stores the contract's verdict word (`AsyncTaskRecord.verdict`), copied the
+same way; a failure carries none. Neither moves money.
 An async status declared as `billed_failure` is still presented as failure by the CLI, but the
 worker settles its usage evidence and records the terminal outcome; this covers cancellation after
 billable work without manufacturing a successful result.
@@ -278,8 +287,10 @@ other non-2xx, the same rule the CLI applies). Valid nonterminal responses reset
 failures and use the normal interval, capped at 60 seconds. HTTP errors, invalid JSON and timeouts
 increase a persisted failure counter with 2/4/8/15-minute backoff, capped at the task deadline.
 These are eligibility delays; the two-minute cron cadence determines the actual next check.
-There is no provider-wide circuit breaker. **At the 24-hour
-deadline it releases the hold in full**, marks the row `timed_out` with `reconcile_review`, and logs
+There is no provider-wide circuit breaker. A descriptor's `max_age` caps the polling window below 24
+hours; a terminal answer that a caller poll still sees while the row is pending settles normally,
+because the 24-hour bound alone overrides a terminal outcome. **At the deadline (24 hours or
+`max_age`) it releases the hold in full**, marks the row `timed_out` with `reconcile_review`, and logs
 an ERROR-level alert: an outcome nobody observed is the platform's cost, never the customer's, and a
 provider that silently changed its status field shows up as absorbed timeouts in
 `reconcile.async_task_settlement` (`absorbed_timeouts`) rather than as a quiet overcharge.
@@ -562,6 +573,7 @@ Provider-specific calculation stays outside the faithful relay.
 | CompanyEnrich people search | Rows in `items[]`, floored at 1 (the documented 2-credit minimum on an empty page); each row is 2 credits (`_rows_billed_micro` scales `unit_micro` by the row's `cost.value`), capped at the reserved `pageSize` |
 | Icypeas bulk (`profile.url.bulk`, `people.identity.resolve.bulk`, `scrape.bulk`) | Rows in `data[]` whose `status` is `FOUND`; a company scrape (`type: "company"` in the request body) bills at 0.5 credit a hit, other bulk rows at 1 credit; `NOT_FOUND` rows are free |
 | Serpstat | An `error` envelope (bad token, exhausted limit, "Data not found") is free; otherwise rows in `result.data[]`, or `result.data.top[]` for `getKeywordTop`, floored at the documented 1-credit minimum on an empty list; any other response shape settles at the estimate |
+| SpyFu | Rows in `results[]` at the per-row price, capped at the hold; an empty list is free and any other shape settles at the estimate |
 | TheCompaniesAPI companies search | `simplified=true` is free on endpoints that declare it in `input.queryParams`; otherwise one credit per company in `companies[]`, capped at the requested `size` |
 | Findymail employee search | One finder credit per contact in the returned list (`_rows_billed_micro`); an empty list is a free miss where the estimate used to bill the hold |
 | You.com Contents | Reserve for each requested URL, then count objects in the returned bare array at the frozen per-page price, capped at the hold. An unreadable response keeps the estimate. Search modes that may trigger live page fetches stay BYOK because the response does not identify the billed pages |
@@ -576,7 +588,7 @@ Multiplying it by `unit_micro` billed a 30-credit Datagma phone lookup as 900 cr
 
 The row-count signal for that estimate (`resolve._LIMIT_PARAMS` / `_body_limit`) reads the caller's
 `limit`/`count`/`size`/`per_page`… in the query or body, the camelCase spellings (`pageSize`,
-`numResults`, `perPage`, `maxResults`, lusha's per-company `contactsLimit`), a nested `pagination.{size,…}`, and — for providers that
+`numResults`, `perPage`, `maxResults`, lusha's per-company `contactsLimit`, SpyFu's one-row-per-month `pastNMonths`), a nested `pagination.{size,…}`, and — for providers that
 bill one row per listed item — the length of `targets`/`keywords`/`domains`/`urls`/`lookups`/
 `emails`. Each of those was a live overcharge first (2026-08-28: companyenrich `pageSize: 2`
 settled 20 rows, moz's one `targets` entry settled 20 quota rows; 2026-09-02: lusha decision-makers,
@@ -922,7 +934,9 @@ resolution - and both are listed in the dataplane write allowlist on their own
 `MarketplaceCall.max_cost_micro` carries the caller's remaining ceiling. `_platform_reserve`
 checks the actual reservation estimate with margin before opening its transaction or creating a
 hold. Direct calls only set it when the caller supplies `X-Treg-Route-Max-Cost`; routed children
-always inherit their route's remaining ceiling, including its default. A refusal is a 402
+always inherit their route's remaining ceiling, including its default. A routed find's opt-in
+check (`X-Treg-Route-Verify`, catalog.md) is one more such child: it gets what the find left, and
+its refusal leaves the find charged and the check unrun. A refusal is a 402
 `route_max_cost` and moves no money for that attempt. Overflow inherits the same field via its
 child snapshot and checks its own estimate; a preceding direct charge reduces the remainder.
 This is a pre-reservation guard, not a rewrite of provider-reported settlement evidence.

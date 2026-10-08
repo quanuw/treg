@@ -301,7 +301,8 @@ async def test_v2_shared_catalog_details_balance_and_guidance_work_end_to_end(cl
         }, token)
         balance = await _call_tool(client, "balance", {}, token)
 
-    assert search["results"] and search["results"][0].get("usd_per_call") is not None
+    # a routed row whose children bill misses quotes no single price; its children do
+    assert search["results"] and any(r.get("usd_per_call") is not None for r in search["results"])
     assert "catalog_call_read" in search["next"]
     assert "catalog_call_write" in search["next"]
     assert "then call(...)" not in search["next"]

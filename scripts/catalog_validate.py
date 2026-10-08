@@ -19,7 +19,8 @@ Checks (the success criteria from docs/context/architecture/catalog.md):
   - `cost.table` rows reference safe input fields, linear `times` fields have a maximum, and the
     explicit fallback covers every row's maximum computable price
   - merged provider/endpoint `async` descriptors have exactly one poll mode and result mode,
-    same-provider endpoint references, a dynamic-URL host allow-list, and per-success billing
+    same-provider endpoint references, a dynamic-URL host allow-list, and per-success or per-call
+    billing
   - a `verified` endpoint must have an existing example_response file
   - an extended endpoint a verification run has touched claims exactly one non-empty state
     (verified | unverified | untestable | skipped), and an `untestable` one carries no
@@ -538,7 +539,8 @@ def check_async_descriptor(descriptor: object, where: str, provider: str,
     if not isinstance(descriptor, dict):
         fail(errors, where, "async must be a mapping")
         return
-    extra = set(descriptor) - {"id_from", "poll", "status", "result", "interval"}
+    extra = set(descriptor) - {"id_from", "poll", "status", "result", "interval", "max_age",
+                               "terminal_on_submission"}
     if extra:
         fail(errors, where, f"async has unknown keys: {sorted(extra)}")
     if not isinstance(descriptor.get("id_from"), str) or not JSON_PATH.fullmatch(descriptor["id_from"]):
@@ -605,20 +607,24 @@ def check_async_descriptor(descriptor: object, where: str, provider: str,
                     or any(not isinstance(host, str) or not HOST.fullmatch(host) for host in hosts)):
                 fail(errors, where, "async.poll.url_from requires non-empty url_hosts")
 
+    # A task bounded by `max_age` always ends, so it may have no failure word.
+    bounded = "max_age" in descriptor
     status = descriptor.get("status")
     if not isinstance(status, dict):
         fail(errors, where, "async.status must be a mapping")
     else:
         if set(status) - {"path", "progress", "success", "failure", "billed_failure"} \
-                or not {"path", "success", "failure"}.issubset(status):
-            fail(errors, where, "async.status requires path, success, failure, and optionally progress and billed_failure")
+                or not ({"path", "success"} | (set() if bounded else {"failure"})).issubset(status):
+            fail(errors, where, "async.status requires path, success, failure (optional with max_age), "
+                                "and optionally progress and billed_failure")
         if not isinstance(status.get("path"), str) or not JSON_PATH.fullmatch(status["path"]):
             fail(errors, where, "async.status.path must be a dotted JSON path")
         success, failure = status.get("success"), status.get("failure")
         progress, billed_failure = status.get("progress"), status.get("billed_failure")
         for name, values in (("progress", progress), ("success", success), ("failure", failure),
                              ("billed_failure", billed_failure)):
-            if name in {"progress", "billed_failure"} and values is None:
+            if values is None and (name in {"progress", "billed_failure"}
+                                   or (name == "failure" and bounded)):
                 continue
             if not isinstance(values, list) or (name == "success" and not values) \
                     or (name in {"progress", "billed_failure"} and not values):
@@ -631,8 +637,9 @@ def check_async_descriptor(descriptor: object, where: str, provider: str,
         if sum(len({str(value) for value in values}) for values in groups) != \
                 len(set().union(*({str(value) for value in values} for values in groups))):
             fail(errors, where, "async.status groups must not overlap")
-        if isinstance(failure, list) and not failure and not billed_failure:
-            fail(errors, where, "async.status needs failure or billed_failure terminal values")
+        if not failure and not billed_failure and not bounded:
+            fail(errors, where, "async.status needs failure or billed_failure terminal values, "
+                                "or max_age to end the task")
 
     result = descriptor.get("result")
     if not isinstance(result, dict):
@@ -660,8 +667,14 @@ def check_async_descriptor(descriptor: object, where: str, provider: str,
     interval = descriptor.get("interval")
     if not _finite_number(interval) or interval <= 0:
         fail(errors, where, "async.interval must be a positive finite number of seconds")
-    if not isinstance(cost, dict) or cost.get("type") != "per_success":
-        fail(errors, where, "an endpoint with async must have cost.type per_success")
+    if "max_age" in descriptor and (not _finite_number(descriptor["max_age"])
+                                    or not 0 < descriptor["max_age"] <= 86400):
+        fail(errors, where, "async.max_age must be a positive number of seconds, at most 86400")
+    if "terminal_on_submission" in descriptor and descriptor["terminal_on_submission"] is not True:
+        fail(errors, where, "async.terminal_on_submission must be true when present")
+    # per_call: the provider bills every finished answer, so treg settles one on each.
+    if not isinstance(cost, dict) or cost.get("type") not in ("per_success", "per_call"):
+        fail(errors, where, "an endpoint with async must have cost.type per_success or per_call")
 
 
 def check_spooled_response(ep: dict, effective_async: object, where: str,
@@ -1269,6 +1282,8 @@ def main(argv: list[str]) -> int:
             check_status_marker(ep, where, endpoint_status, errors)
             inp = ep.get("input") or {}
             check_strict_query(ep, where, errors)
+            if "observed_from" in ep and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(ep["observed_from"])):
+                fail(errors, where, "observed_from must be a YYYY-MM-DD date")
             check_strict_body(ep, where, errors)
             check_body_allowlist(ep, where, errors)
             check_platform_auth(ep, where, errors)

@@ -95,6 +95,15 @@ the connect dialog renders the warning from that field, and provisioning deliber
 the tool health check so later health runs cannot spend the team's provider wallet.
 `TREG_PLATFORM_KEY_TRESTLEIQ` supplies the optional shared binding; a team's own key still wins.
 
+`HLRLOOKUP` reuses the Adyntel pattern: `api_key` and `api_secret` are both `location: json`
+bindings, and the relay has no HLR Lookup branch. HLR Lookup does not sign or hash the raw body, so
+JSON re-serialization is safe. The free `POST /apiv2/balance` probe answers 401 when either half of
+the pair is wrong, but 400 to a key sent alone, valid or not. The first connect step therefore
+stores a team key unchecked (declared `probe_deferred_statuses=(400,)`), and adding the secret does
+not re-probe the pair: a wrong team pair surfaces as the provider's unbilled 401 on the first call.
+Tier 4 reads `TREG_PLATFORM_KEY_HLRLOOKUP` and `TREG_PLATFORM_KEY_HLRLOOKUP_SECRET`
+(`platform_extra_setting`), so a team's own pair never rides with treg's secret.
+
 `LIMADATA` uses a pasted raw `x-api-key` header. Its free connection probe sends an invalid empty
 web-search body: the assigned key returns HTTP 400 and a bogus key returns 401. The real local
 connection flow accepted the former and rejected the latter. `TREG_PLATFORM_KEY_LIMADATA` is the

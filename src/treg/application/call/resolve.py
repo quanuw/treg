@@ -387,7 +387,8 @@ _PLATFORM_PAGE_DEFAULT = 20
 _PLATFORM_PAGE_MAX = 100
 _LIMIT_PARAMS = ("limit", "count", "depth", "page_size", "per_page", "num", "max_results", "size",
                  "pageSize", "perPage", "numResults", "maxResults",
-                 "contactsLimit")  # camelCase: companyenrich, exa, lusha; contactsLimit: lusha buying-group
+                 "contactsLimit",  # camelCase: companyenrich, exa, lusha; contactsLimit: lusha buying-group
+                 "pastNMonths")  # spyfu domain stats: one row per month
 
 
 # Units that name an INPUT entity rather than a returned row: the caller pays per thing they asked
@@ -2197,13 +2198,14 @@ async def _resolve_marketplace_call(
         return MarketplaceCall(tool=chosen_tool, tier="tool", **common)
 
     if not methods:
-        try:  # tier 1 - the org registered this provider: their tool, their bindings, their ACLs
-            target = await resolve_call(upstream, caller, db)
-            return MarketplaceCall(
-                tool=target.tool, tier="tool", **{**common, "upstream": target.upstream})
-        except ResolutionFailed as exc:
-            if exc.status_code != 404:  # 403 (ACL) / 409 (ambiguous) are real answers, not fall-through
-                raise
+        for candidate in provider.tool_lookup_urls(upstream):
+            try:  # tier 1 - the org registered this provider: their tool, their bindings, their ACLs
+                target = await resolve_call(candidate, caller, db)
+                return MarketplaceCall(
+                    tool=target.tool, tier="tool", **{**common, "upstream": target.upstream})
+            except ResolutionFailed as exc:
+                if exc.status_code != 404:  # 403 (ACL) / 409 (ambiguous) are real answers, not fall-through
+                    raise
 
     secret = chosen_secret or await _marketplace_secret(service, caller.org_id, db)  # tier 2
     if secret is not None:

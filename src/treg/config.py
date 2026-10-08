@@ -264,6 +264,8 @@ class Settings(BaseSettings):
     platform_key_tomba: str = ""          # the API key (ta_…); X-Tomba-Key header
     platform_key_tomba_secret: str = ""   # the API secret (ts_…); X-Tomba-Secret — BOTH must be set
     platform_key_trestleiq: str = ""       # raw key; exact lowercase x-api-key header
+    platform_key_hlrlookup: str = ""         # JSON body api_key; prepaid lookup credits, 1 per mobile lookup
+    platform_key_hlrlookup_secret: str = ""  # JSON body api_secret paired with it — BOTH must be set
     # (tomba's data routes need the header pair; TOMBA.platform_extra_setting names this second slot)
     platform_key_influencersclub: str = ""  # Bearer key (dashboard JWT); creator discovery + enrichment, fx.yaml $0.598/credit (our $299/500 plan)
     platform_key_crustdata: str = ""  # Bearer key; every call also needs the pinned x-api-version header
@@ -372,7 +374,7 @@ class Settings(BaseSettings):
     onboarding_v2: bool = False
     # Off for everyone else, on for these: comma-separated addresses or `@domain`s.
     onboarding_v2_emails: str = ""
-    # The experiment: a new user with a work address (onboard.work_email) is offered to the
+    # The experiment: a new user whose address is not free, ISP, alias or school mail is offered to the
     # dashboard's PostHog flag `onboarding-v2`, whose `test` arm gets this flow and `control` the
     # team-name modal. Off = nobody outside the two settings above sees the flow.
     onboarding_v2_experiment: bool = False

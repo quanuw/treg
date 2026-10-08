@@ -47,7 +47,11 @@ contract's enum and description with MCP. It validates the reference and trimmed
 posts to `/reviews`, prints a receipt, and emits structured errors without echoing rejected input.
 A transport failure explicitly leaves the outcome unconfirmed. `_show_hint_line`, beside the
 charge line, prints the server's invitation (`X-Treg-Hint: review|feedback`; the older
-`X-Treg-Review: requested` still means review) as one stderr line per kind. Call responses
+`X-Treg-Review: requested` still means review) as one stderr line per kind. When a successful
+call to one provider's endpoint carries `X-Treg-Routed-Tool` (set by `routers/call.py`
+`_routed_alternative`: the routed `treg.<capability>` tool for the same job), it prints one more
+line pointing to that tool; `--json` puts it in `_treg.routed_tool`, and MCP returns `routed_tool`
+with a `suggestion` sentence beside the result, leaving the invitation `hint` slot alone. Call responses
 retain the existing `_show` formatting on stdout, including pretty-printed JSON.
 
 ## Pasted-key connect
@@ -334,7 +338,9 @@ Bare **`treg connections`** now lists (the subparser is `required=False` with a 
   lifetime) and its RUN IT template ends in `--await --timeout 900`. `--await [--timeout 900]`
   reads `X-Treg-Async`; without the header it is a no-op. Descriptor semantics come from `treg.domain.asynctasks` (stdlib-only, see
   the import-boundaries fragment), not a CLI-side copy. With the header it prints the task id and a resumable `treg call` command to
-  stderr, polls static catalog ids or allow-listed dynamic URLs through `/call/`, retries network/5xx
+  stderr, polls static catalog ids or allow-listed dynamic URLs through `/call/` every descriptor
+  `interval` and never past its `max_age`, prints a submission that is already finished
+  (`terminal_on_submission`) without polling, retries network/5xx
   failures with backoff up to five consecutive failures, and keeps waiting on unknown status values
   after one warning. Stdout contains only the terminal polling response bytes. Exit codes are 0 for
   success, 2 for a provider terminal failure, 3 for timeout/interruption/recoverable polling failure,

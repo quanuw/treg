@@ -740,7 +740,7 @@ AGENTS["claude-code"] = {
              "<p>A related, broader run on 23 Sep took 50 companies (48 with a usable domain) to 27 "
              "that passed the check and 20 verified deliverable contacts, for $2.33 metered "
              "including news lookups and opener scoring: $0.12 per deliverable lead. The 21 "
-             "companies that failed the check never reached a paid step. The receipt is at "
+             "companies that failed the check never reached a paid lookup. The receipt is at "
              "<a href=\"/workflows/find-and-verify-a-lead-list\">find and verify a lead list</a>, and "
              "the whole method, from ICP to rollout, is the "
              "<a href=\"/gtm-engineering\">GTM engineering playbook</a>.</p>")},
@@ -762,8 +762,8 @@ AGENTS["claude-code"] = {
          "h2": "Cost per correct work email, against the tools you would otherwise use",
          "html": (
              "<p>On the same 292 people (16 Sep 2026), cost per correct work email: treg.to "
-             "$0.0056, Monid $0.0257, Clay $0.0395, Freckle $0.0427, Deepline $0.0924. Exact match: "
-             "90.4%, 79.8%, 89.7%, 90.1% and 86.6%. Each column is an aggregator, not one provider. "
+             "$0.0056, Clay $0.0395, Freckle $0.0427, Deepline $0.0924. Exact match: "
+             "90.4%, 89.7%, 90.1% and 86.6%. Each column is an aggregator, not one provider. "
              "The method and every row are in the "
              "<a href=\"/blog/work-email-finding-bench\">work email finding bench</a>.</p>")},
     ],
@@ -4649,14 +4649,25 @@ USE_CASE_PAGES["keyword-volume-cpc-and-competition"] = {
 WORKFLOWS: dict[str, dict] = {}
 
 WORKFLOWS["find-and-verify-a-lead-list"] = {
-    "sentence": "AI lead generation: a Jev-qualified, verified lead list from one prompt",
-    "title": "AI lead generation: Jev-qualified lead list in {n} calls | treg.to",
+    # The title keeps the measured head term ("ai lead generation") and adds the phrasing people now
+    # use with an agent ("claude lead generation"), whose results page is held by small sites. Jev is
+    # two of the seven steps, so it lives in the lede, the steps and the FAQ rather than the title.
+    "sentence": "AI lead generation in Claude: a verified B2B lead list from one prompt",
+    "title": "AI lead generation in Claude: a verified B2B lead list | treg.to",
+    # Hand-written: the generated one ("<sentence>. 7 steps through one treg.to key, ...") ran past
+    # the snippet length and was cut mid-word.
+    "description": (
+        "A verified B2B lead list in Claude from one prompt, with Jev dropping poor fits first. "
+        "Recorded run: 50 companies, 20 verified contacts, $0.12 each."),
+    # The example agent on this page; the use-case pages keep agent_pages.DEFAULT_AGENT.
+    "agent": "claude-code",
     "lede": (
         "Give your agent one prompt and get back a lead list with a named person, a verified work "
         "email and a scored reason to write, for every company that fits. {steps} steps through one "
-        "treg.to key: jev judges each company on the free list fields before the paid steps run, "
+        "treg.to key: jev judges each company on the fields the list already returned, before the paid person, email and news lookups, "
         "and scores the opener at the end. The price is printed before the agent spends it, and "
-        "the numbers on this page come from running it, not from a rate card."),
+        "the numbers on this page come from running it, not from a rate card. Once treg.to is connected, "
+        "the prompt adapts to Codex, Cursor, Hermes or OpenClaw."),
     "prompt": (
         "Using treg, build me a lead list: 50 US software companies with 51 to 200 staff that raised "
         "a Series A. Before you find anyone, have jev judge each company against my ICP (B2B "
@@ -4686,7 +4697,7 @@ WORKFLOWS["find-and-verify-a-lead-list"] = {
          "does this company fit the ICP closely enough to pay for a person and an email; keep it at 50% or more",
          "typesafe.jev",
          "Apollo's list page carries the domain, NAICS and SIC codes, printed revenue and headcount growth for nothing extra. "
-         "jev reads those and returns a probability, so a company that fails never reaches the paid steps."),
+         "jev reads those and returns a probability, so a company that fails never reaches the paid lookups."),
         ("Find the person", "people.search",
          "the VP or Head of Marketing, or Head of Growth, at each company",
          "findymail.search.employees",
@@ -4714,7 +4725,7 @@ WORKFLOWS["find-and-verify-a-lead-list"] = {
         "receipt": [
             ("Companies matched", "958 on Apollo; the first page of 50 taken, one charge of $0.026"),
             ("Rows with a usable domain", "48 of 50"),
-            ("Passed the jev gate", "27 of 48 at 50% or more; 21 dropped before any paid step; 14 would have passed at 60%"),
+            ("Passed the jev gate", "27 of 48 at 50% or more; 21 dropped before any paid lookup; 14 would have passed at 60%"),
             ("A named marketing lead found", "27 of 27 (20 by Findymail, 7 by LeadMagic's role finder)"),
             ("Work email found", "21 of 27 (18 by Hunter, 3 by Kitt on Hunter's misses; Tomba out of capacity, see below)"),
             ("Verified deliverable", "20 of 21; 1 unknown; 0 invalid"),
@@ -4731,7 +4742,7 @@ WORKFLOWS["find-and-verify-a-lead-list"] = {
             "rate-card estimate. The gate is the change from the first run of this workflow on "
             "2026-08-26, which spent $3.62 on the same filter with no gate and delivered 27 leads, "
             "$0.13 each. This run spent $2.33 and delivered 20, $0.12 each, with 21 of the 48 "
-            "companies never reaching a paid step. Whether those 21 held good leads is the one "
+            "companies never reaching a paid lookup. Whether those 21 held good leads is the one "
             "thing the run cannot say, because nothing was spent on them; at this run's $0.085 per "
             "passed row they would have added about $1.79 to the bill.",
             "What jev had to read was thin. Apollo's list page carries the domain, NAICS and SIC "
@@ -4751,7 +4762,7 @@ WORKFLOWS["find-and-verify-a-lead-list"] = {
             "cheapest per-hit email finder, answered all 27 calls with a capacity error on treg.to's "
             "own key at no charge, so Hunter served at $0.44 for 18 hits and 9 free misses, and Kitt "
             "found 3 of those 9 for $0.015. Verification was $0.13, with the one unknown free. News "
-            "was the dearest step again at $0.84, PredictLeads at $0.04 a call. jev's own bill for "
+            "was the largest single provider bill again at $0.84, PredictLeads at $0.04 a call. jev's own bill for "
             "67 verdicts was $0.0023 at its list price on the team's own key.",
             "The opener scores are the honest part of the tail. Of the 19 companies with a news "
             "event, jev rated 4 as a decent or strong first line, most of them a funding round or "
@@ -4762,6 +4773,29 @@ WORKFLOWS["find-and-verify-a-lead-list"] = {
             "for this run.",
         ],
     },
+    # Extra hand-written sections, rendered after the receipt. Trusted static HTML.
+    "sections": [
+        {"id": "tested", "seclab": "Tested",
+         "h2": "What lead generation in Claude costs: recorded data costs",
+         "html": (
+             "<p>Two measured numbers, and what they do not cover. Both are the metered API and data calls; "
+             "your Claude plan is separate.</p>"
+             "<div class=\"tablewrap\"><table><thead><tr><th>What was measured</th><th>Result</th></tr></thead><tbody>"
+             "<tr><td>This workflow, 23 Sep 2026, 50 companies in</td><td><b>$0.12</b> per verified contact "
+             "($2.33 metered, 20 contacts)</td></tr>"
+             "<tr><td>The same filter without the jev gate, 26 Aug 2026</td><td>$0.13 per lead ($3.62, 27 leads)</td></tr>"
+             "</tbody></table></div>"
+             "<p>The email step on its own, 292 people on 16 Sep 2026, cost per correct work email:</p>"
+             "<div class=\"tablewrap\"><table><thead><tr><th>Tool</th><th>Per correct email</th><th>Exact match</th></tr></thead><tbody>"
+             "<tr><td><b>treg.to</b></td><td><b>$0.0056</b></td><td>90.4%</td></tr>"
+             "<tr><td>Clay</td><td>$0.0395</td><td>89.7%</td></tr>"
+             "<tr><td>Freckle</td><td>$0.0427</td><td>90.1%</td></tr>"
+             "<tr><td>Deepline</td><td>$0.0924</td><td>86.6%</td></tr>"
+             "</tbody></table></div>"
+             "<p>Not compared: the whole flow in another tool. The bench covers the email step only, and each "
+             "column is an aggregator rather than one provider. The method and every row are in the "
+             "<a href=\"/blog/work-email-finding-bench\">work email finding bench</a>.</p>")},
+    ],
     "failure_modes": [
         ("The gate has too little to read",
          "jev judges what it is given. Apollo's list fields say nothing about what a company sells, so no probability in this run rose above 67% and a question about the buyer's title returned the same answer for all 48 companies. Ask only what the state can answer, set the threshold where the probabilities actually spread, and read the drops by name before you trust the gate on a new filter."),
@@ -4779,10 +4813,14 @@ WORKFLOWS["find-and-verify-a-lead-list"] = {
          "Most email finders return addresses without verifying them. An address that passes SMTP can still be recycled, role-based, or stale. Verify as a distinct call at send time to catch addresses that would pass find but fail send."),
     ],
     "faq": [
-        ("How much does the whole workflow cost?",
-         "The receipt on this page prints the real total for a 50-company run, next to the first run of the same filter without the gate. Per-call rates are the provider's own with $0.000 added by treg.to. A miss on a per-success step is free at the provider's rate card; the receipt shows where that held and where it did not."),
+        ("Can Claude do lead generation?",
+         "Yes, once it has a data layer. On its own Claude cannot look up a company, a person or an email. Connected to treg.to, Claude Code (or Claude with the MCP connector) runs the prompt on this page: it builds the list, has jev judge each company, finds the person and their work email, verifies it and writes the CSV. Once treg.to is connected, the prompt adapts to Codex, Cursor, Hermes or OpenClaw."),
+        ("How much does lead generation with Claude cost?",
+         "The data is the bill, not the model: your Claude plan is separate. The 23 Sep run came to $2.33 metered for 50 companies, $0.12 per verified contact; news cost $0.84 and finding the people $0.88 including the fallback. The receipt on this page prints the real total for a 50-company run, next to the first run of the same filter without the gate. Per-call rates are the provider's own with $0.000 added by treg.to. A miss on a per-success step is free at the provider's rate card; the receipt shows where that held and where it did not."),
+        ("Do I need a jev key?",
+         "No. jev ran on the team's own TypeSafe key in this run and was not metered by treg.to. Without one, leave out the two judging steps: the first run of this workflow had no gate and cost $3.62 for 27 leads, $0.13 each, against $0.12 with it."),
         ("What does jev decide, and what does it cost?",
-         "Two things. Before the paid steps it reads each company's list fields and returns the probability that it fits your ICP; the agent keeps the rows at or above the threshold you name. After the news step it picks which event to lead with and scores how usable it is as a first line. jev is priced on input tokens only, and the two steps together cost a fraction of a cent for the whole run. You need a jev key of your own, or the agent can make the same judgements itself behind the same interface, slower and dearer, until you have one."),
+         "Two things. Before the paid lookups it reads each company's list fields and returns the probability that it fits your ICP; the agent keeps the rows at or above the threshold you name. After the news step it picks which event to lead with and scores how usable it is as a first line. jev is priced on input tokens only, and the two steps together cost a fraction of a cent for the whole run. You need a jev key of your own, or the agent can make the same judgements itself behind the same interface, slower and dearer, until you have one."),
         ("Does treg.to pick the providers?",
          "No. treg.to shows the agent every provider for each step with its price and measured success rate; the agent picks, or you tell it which one. There is no automatic failover. jev is the same kind of choice: it is the agent's judge, not treg.to's router."),
         ("What comes back at the end?",

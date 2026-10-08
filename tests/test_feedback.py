@@ -174,7 +174,7 @@ async def test_mcp_exposes_the_small_category_enum():
         assert tool.input_schema["required"] == ["category", "message"]
         assert tool.annotations.read_only_hint is False
         assert tool.annotations.destructive_hint is False
-        assert tool.annotations.open_world_hint is False
+        assert tool.annotations.open_world_hint is (server is mcp)
 
 
 async def test_deleting_a_team_removes_its_feedback(clients):

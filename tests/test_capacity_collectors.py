@@ -6,6 +6,7 @@ Each test mocks the upstream API response and verifies that the collector return
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import timedelta
 
@@ -165,6 +166,35 @@ async def test_search1api_capacity_rejects_invalid_balance(balance):
             lambda _: httpx.Response(200, json={"usage": balance}))) as client:
         with pytest.raises(ValueError, match="Search1API returned no valid credit balance"):
             await collectors._search1api(client, "test")
+
+
+async def test_hlrlookup_capacity_sends_the_pair_to_the_free_balance_route(monkeypatch):
+    monkeypatch.setenv("TREG_PLATFORM_KEY_HLRLOOKUP_SECRET", "test-secret")
+    collectors.get_settings.cache_clear()
+
+    def probe(request):
+        assert request.method == "POST"
+        assert request.url == "https://api.hlrlookup.com/apiv2/balance"
+        assert json.loads(request.content) == {"api_key": "test", "api_secret": "test-secret"}
+        return httpx.Response(200, json={"Status": "OK", "Credits": 2499.5})
+
+    try:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(probe)) as client:
+            row = await collectors._hlrlookup(client, "test")
+    finally:
+        collectors.get_settings.cache_clear()
+    assert row == {"value": 2499.5, "unit": "credits", "note": ""}
+
+
+@pytest.mark.parametrize("payload", [
+    {"Status": "OK", "Credits": -1}, {"Status": "OK", "Credits": True},
+    {"Status": "OK", "Credits": "NaN"}, {"Status": "OK"}, {"Status": "ERROR", "Credits": 10},
+])
+async def test_hlrlookup_capacity_rejects_uncertain_balances(payload):
+    async with httpx.AsyncClient(transport=httpx.MockTransport(
+            lambda _: httpx.Response(200, json=payload))) as client:
+        with pytest.raises(ValueError, match="HLR Lookup balance"):
+            await collectors._hlrlookup(client, "test")
 
 
 async def test_serper_capacity_uses_free_account_balance():
@@ -708,20 +738,6 @@ async def test_getleadsio_balance_collector_uses_fair_use_credits(remaining, exp
             assert row["value"] == expected
             assert row["unit"] == "credits"
             assert "Live Leads wallet is not included" in row["note"]
-
-
-@pytest.mark.parametrize('remaining,expected', [(300, 300), (0, 0), (None, None), (-1, None), ('unlimited', None), (True, None)])
-async def test_quickenrich_subscription_allowance_from_free_discovery(remaining, expected):
-    def reply(request):
-        import json
-        assert request.method == 'POST' and request.url.path == '/api/employees/contact-finder'
-        assert request.headers['authorization'] == 'Bearer private-test-key'
-        assert json.loads(request.content)['per_page'] == 1
-        return httpx.Response(200, json={'success': True, 'data': [], 'meta': {'credits_used': 0, 'remaining_credits': remaining}})
-    async with httpx.AsyncClient(transport=httpx.MockTransport(reply)) as client:
-        row = await collectors._quickenrich(client, 'private-test-key')
-    assert row['value'] == expected
-    assert 'private-test-key' not in str(row)
 
 
 @pytest.mark.parametrize('balance',[0,9.992])

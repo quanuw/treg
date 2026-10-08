@@ -157,6 +157,14 @@ Portal-only and does not spend a validation query to read it. The policy records
 auto recharge, manually verified as enabled in the portal, and a documented 10 requests/second
 shared-key pace. treg does not read or change the vendor's auto-top-up setting.
 
+HLR Lookup's collector posts the platform key and secret to the free `/apiv2/balance` route and
+accepts only `Status: OK` with a finite nonnegative `Credits`, which can be fractional because
+cache hits and portability lookups cost half a credit. The policy is `credits / manual / api`:
+bundles are bought by hand and expire 18 months after purchase. The vendor caps concurrency at 210
+requests and throttles per telephone network, so shared-key smoothing uses a conservative 50
+requests per second. An empty balance arrives as a per-result `INSUFFICIENT_CREDIT` inside HTTP 200,
+not a 4xx; it was not forced, so no exhaustion signature or overflow route is claimed.
+
 Adyntel publishes no free balance or usage API. `NO_BALANCE_API` therefore reports PAYG credits as
 dashboard-only instead of the ambiguous "no fetcher written yet" state. `_KNOWN` classifies the
 wallet as manually funded credits, and `_RATE_LIMITS` smooths treg's shared key at the documented
@@ -241,21 +249,13 @@ account's empty-credit response before adding a signature or enabling overflow.
 
 ## QuickEnrich subscriptions
 
-`collectors._quickenrich` reads `meta.remaining_credits` from a free Contact Finder miss;
-there is no account/balance endpoint to list. Default policy is `monthly_quota` / `quota_reset`,
-with auto-funding disabled. The API does not report the renewal timestamp, so no calendar reset
-is guessed. Subsequent sweeps discover replenished credits. Do not model this as prepaid packs
-or auto-top-up. Hunter also uses renewal quotas: monthly plans reset monthly, yearly plans
-annually ([Hunter reset rules](https://help.hunter.io/en/articles/1911597-when-do-credits-reset)).
-
-Free, Starter and Growth use the API-reported remaining allowance. No manual plan setting
-can override that value. A reported zero means exhausted; missing, negative or non-numeric
-balance data means unknown, not unlimited. The unlimited-plan API response has not been
-verified. Inspect its actual status and balance fields before adding common unlimited-plan
-support. Per-call billing remains separate: use `meta.credits_used` at the treg list rate.
-
-Exhaustion behavior is acknowledged as unrecorded in the existing shared signature guard;
-we did not exhaust the trial to manufacture evidence. No overflow route is claimed.
+QuickEnrich is on `NO_BALANCE_API`. Its docs show `meta.remaining_credits` on every response, but
+the live API returns a meta without it on a free Contact Finder miss or hit and no meta at all on
+a billed employee search, so no free or billed call can read the allowance. The policy stays
+`monthly_quota` / `quota_reset` with `source: none` and auto-funding disabled: the subscription
+allowance is read in the vendor dashboard, and a reported zero there means exhausted. Per-call
+billing is separate and unchanged. Exhaustion behavior is unrecorded; the trial was not spent to
+manufacture it, and no overflow route is claimed.
 
 
 ## Dropleads credits

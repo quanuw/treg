@@ -140,15 +140,17 @@ async def test_wiza_routed_email_waits_for_terminal_result_and_settles_exact_usa
             CallRecord.call_ref == task.call_id,
             CallRecord.endpoint_id == "wiza.people.email.find"))).scalar_one()
         assert child.hit is True
+        assert child.verdict == task.verdict == "verified"
 
 
-@pytest.mark.parametrize("endpoint,level,terminal,expected_hit", [
+# A finder's verdict is its own claim: Wiza's `risky` is a found address it did not confirm.
+@pytest.mark.parametrize("endpoint,level,terminal,expected_hit,expected_verdict", [
     ("wiza.people.email.find", "partial",
-     {"email": "person@sample.example", "email_status": "risky"}, True),
-    ("wiza.people.phone.find", "phone", {"phone_status": "unfound"}, False),
+     {"email": "person@sample.example", "email_status": "risky"}, True, "unverified"),
+    ("wiza.people.phone.find", "phone", {"phone_status": "unfound"}, False, None),
 ])
 async def test_wiza_direct_hit_waits_for_terminal_result(
-    clients, monkeypatch, wiza_platform_on, endpoint, level, terminal, expected_hit,
+    clients, monkeypatch, wiza_platform_on, endpoint, level, terminal, expected_hit, expected_verdict,
 ):
     await audit.drain()
     polls = 0
@@ -187,7 +189,7 @@ async def test_wiza_direct_hit_waits_for_terminal_result(
     async with session_maker() as db:
         original = (await db.execute(select(CallRecord).where(
             CallRecord.call_ref == call_ref, CallRecord.endpoint_id == endpoint))).scalar_one()
-        assert original.hit is None
+        assert original.hit is None and original.verdict is None
 
     first = await clients.get("/call/wiza.people.reveal.get", params={"id": 4321})
     second = await clients.get("/call/wiza.people.reveal.get", params={"id": 4321})
@@ -200,6 +202,7 @@ async def test_wiza_direct_hit_waits_for_terminal_result(
         task = await db.get(AsyncTaskRecord, call_ref)
         assert original.hit is expected_hit
         assert task.hit is expected_hit
+        assert original.verdict == task.verdict == expected_verdict
         assert task.status == "settled" and task.settled_micro == 0
     assert await _balance(clients) == before
 
@@ -247,6 +250,7 @@ async def test_wiza_terminal_hit_precedes_audit_insert(clients, monkeypatch, wiz
             CallRecord.call_ref == call_ref,
             CallRecord.endpoint_id == "wiza.people.email.find"))).scalar_one()
         assert original.hit is True
+        assert original.verdict == "unverified"
 
 
 async def test_wiza_terminal_poll_does_not_wait_for_audit_writer(
@@ -305,6 +309,7 @@ async def test_wiza_terminal_poll_does_not_wait_for_audit_writer(
             CallRecord.call_ref == call_ref,
             CallRecord.endpoint_id == "wiza.people.email.find"))).scalar_one()
         assert original.hit is True
+        assert original.verdict == "unverified"
 
 
 @pytest.mark.parametrize("capability,terminal,expected_hit", [

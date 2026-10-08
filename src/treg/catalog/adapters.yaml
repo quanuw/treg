@@ -367,6 +367,23 @@ adapters:
     out: {valid: data.valid, phone: data.e164_format, country_code: data.country_code, line_type: data.line_type, carrier: data.carrier}
     miss: "data.valid == null"
 
+  # ---- people.phone.live --------------------------------------------------------------------
+  hlrlookup.people.phone.verify:
+    route: false
+    accepts: [[phone]]
+    in_expr: {body.telephone_number: "e164_digits(phone)",
+              body.usa_status: "choose(starts_with(e164_digits(phone), '1'), 'YES', 'NO')"}
+    const: {body.save_to_cache: PRIVATE, body.cache_days_global: 0, body.cache_days_private: 0}
+    test_identity: {phone: "+447540822872"}
+    out: {live_status: "results[0].live_status", phone: "results[0].detected_telephone_number",
+          line_type: "results[0].telephone_number_type", current_network: "results[0].current_network_details.name",
+          ported: "results[0].is_ported == 'YES'"}
+    # A per-result error is free and says nothing about the line.
+    miss: "at_least(results[0].error != 'NONE', coalesce(results[0].live_status) == null)"
+    # Only LIVE and DEAD are answers about the line; the rest say HLR could not tell.
+    verdicts: {absent_subscriber: unknown, no_teleservice_provisioned: unknown, not_available_network_only: unknown,
+               no_coverage: unknown, inconclusive: unknown, not_applicable: unknown}
+
   # ---- people.email.verify ------------------------------------------------------------------
   dropleads.people.email.verify:
     accepts: [[email]]
@@ -387,12 +404,14 @@ adapters:
     # unknown as uncharged; treating it as a miss lets the existing generic success settlement
     # release the hold and lets a routed waterfall continue.
     miss: "coalesce(status, 'unknown') == 'unknown'"
+    verdicts: {spamtrap: invalid, abuse: risky, do_not_mail: risky}
   trykitt.people.email.verify:
     accepts: [[email]]
     in: {email: body.email}
     const: {body.realtime: true}
     out: {valid: "validity == 'valid'", status: validity}
     miss: "validity == null"
+    verdicts: {catchall: catch_all}
   contactout.people.email.verify:
     accepts: [[email]]
     in: {email: queryParams.email}
@@ -401,19 +420,24 @@ adapters:
     # Require both a successful envelope and a nonempty verdict, using existing expressions.
     # at_least takes the maximum of the two predicates (0/1): either failure is a miss.
     miss: "at_least(status_code != 200, coalesce(data.status) == null)"
+    verdicts: {accept_all: catch_all}
   millionverifier.people.email.verify:
     accepts: [[email]]
     in:  {email: queryParams.email}
     out: {valid: "result == 'ok'", status: result}
     # Like peer verifiers, risky/invalid verdicts are answers; API errors omit quality.
     miss: "quality == null"
+    verdicts: {ok: valid, disposable: risky, unverified: unknown}
   bounceban.people.email.verify:
     accepts: [[email]]
     in: {email: queryParams.email}
     out: {valid: "result == 'deliverable'", status: result, score: score}
-    # A standard submission can return status=verifying before the verdict exists. It was billed,
-    # but it is not a routed answer yet, so the existing waterfall may continue.
+    # A status=verifying submission is waited for (the endpoint's `async` block) and judged on
+    # its finished answer, so this rule sees only finished answers: one without a verdict is a miss.
     miss: "result == null"
+    # BounceBan reports a catch-all domain as a flag next to `risky`.
+    verdict: "choose(is_accept_all == true, choose(result == 'risky', 'catch_all', result), result)"
+    verdicts: {deliverable: valid, undeliverable: invalid}
   leadmagic.people.email.verify:
     accepts: [[email]]
     in:  {email: body.email}
@@ -424,16 +448,20 @@ adapters:
     in:  {email: queryParams.email}
     out: {valid: "data.email.status == 'valid'", status: data.email.status, score: data.email.score}
     miss: "data.email.status == null"
+    verdicts: {accept_all: catch_all}
   hunter.people.email.verify:
     accepts: [[email]]
     in:  {email: queryParams.email}
     out: {valid: "data.status == 'valid'", status: data.status, score: data.score}
     miss: "data.status == null"
+    verdicts: {accept_all: catch_all, webmail: unknown, disposable: risky}
   limadata.people.email.verify:
     accepts: [[email]]
     in: {email: body.email}
     out: {valid: "result == 'Valid'", status: result, score: score}
     miss: "result == null"
+    # LimaData reports a catch-all domain as a flag next to `Risky`.
+    verdict: "choose(is_catch_all == true, choose(result == 'Risky', 'catch_all', result), result)"
 
   # ---- people.enrich ------------------------------------------------------------------------
   dropleads.people.enrich:
@@ -470,6 +498,12 @@ adapters:
     out: {full_name: data.full_name, first_name: data.first_name, last_name: data.last_name, title: data.position,
           company: data.company, company_domain: data.website_url, linkedin_url: data.linkedin, location: data.country}
     miss: "data.full_name == null"
+  oceanio.people.enrich:
+    accepts: [[linkedin_url], [full_name, domain]]
+    in: {linkedin_url: body.person.linkedin, full_name: body.person.name, domain: body.company.domain}
+    out: {full_name: name, first_name: firstName, last_name: lastName, title: jobTitle,
+          company_domain: domain, linkedin_url: linkedinUrl, location: location}
+    miss: "name == null"
   hunter.people.enrich:
     accepts: [[email], [linkedin_handle]]
     in:  {email: queryParams.email, linkedin_handle: queryParams.linkedin_handle}
@@ -672,6 +706,15 @@ adapters:
     const: {body.page: 1, body.pageSize: 10}
     out: {companies: items, count: totalItems}
     miss: "items == []"
+  oceanio.companies.lookalike:
+    accepts: [[domain]]
+    in: {domain: body.companiesFilters.lookalikeDomains}
+    in_expr: {body.companiesFilters.lookalikeDomains: "list(domain)"}
+    # The shared key requires an explicit size of 1-100, and size is the whole price.
+    const: {body.size: 10}
+    cost_units: "10"
+    out: {companies: companies, count: total}
+    miss: "companies == []"
 
   # ---- people.search ------------------------------------------------------------------------
   dropleads.people.search:
@@ -756,6 +799,14 @@ adapters:
     in_expr: {body.filters.contacts.include.jobTitles: "list(title)", body.pagination.size: "at_least(limit, 10)", body.pagination.page: "0"}
     out: {people: results, count: pagination.total}
     miss: "results == []"
+  oceanio.people.search:
+    accepts: [[company_domain]]
+    in: {company_domain: body.companiesFilters.includeDomains}
+    in_expr: {body.companiesFilters.includeDomains: "list(company_domain)",
+              body.size: "at_most(limit, 100)"}
+    cost_units: "at_most(limit, 100)"
+    out: {people: people, count: total, next_cursor: searchAfter}
+    miss: "people == []"
 
   apollo.people.enrich:
     accepts: [[email], [linkedin_url], [full_name, domain]]
@@ -1056,6 +1107,15 @@ adapters:
     const: {body.category: company}
     out: {companies: results, count: "len(results)"}
     miss: "results == []"
+  oceanio.companies.search:
+    # Domain only: industries take Ocean.io's exact vocabulary (free text is a false miss) and
+    # technologies is an object, not a list.
+    accepts: [[domain]]
+    in: {domain: body.companiesFilters.includeDomains}
+    in_expr: {body.companiesFilters.includeDomains: "list(domain)", body.size: "at_most(limit, 100)"}
+    cost_units: "at_most(limit, 100)"
+    out: {companies: companies, count: total, next_cursor: searchAfter}
+    miss: "companies == []"
   hunter.x.discover-companies:
     accepts: [[q]]
     in:  {q: body.query}
@@ -2396,10 +2456,11 @@ adapters:
     out: {email: "null_if(data.email, '', 'n/a', 'null', 'none')", first_name: data.first_name, last_name: data.last_name}
     miss: "null_if(data.email, '', 'n/a', 'null', 'none') == null"
   # country_code is the provider's company-context country, not proof of the phone owner's location.
+  # A bare 10-digit number with country US or CA gets its +1, so the routed live check can read it.
   quickenrich.people.phone.find:
     accepts: [[linkedin_url], [first_name, last_name, domain]]
     in: {linkedin_url: queryParams.linkedin_url, first_name: queryParams.first_name, last_name: queryParams.last_name, domain: queryParams.company_url}
-    out: {phone: "null_if(data.employee_phone, '', 'n/a', 'null', 'none')", line_type: "null_if(data.employee_phone_type, '', 'n/a', 'null', 'none')", country_code: "null_if(data.country_code, '', 'n/a', 'null', 'none')"}
+    out: {phone: "with_country_code(null_if(data.employee_phone, '', 'n/a', 'null', 'none'), data.country_code)", line_type: "null_if(data.employee_phone_type, '', 'n/a', 'null', 'none')", country_code: "null_if(data.country_code, '', 'n/a', 'null', 'none')"}
     miss: "null_if(data.employee_phone, '', 'n/a', 'null', 'none') == null"
   quickenrich.people.enrich:
     accepts: [[email]]
