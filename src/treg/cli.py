@@ -6084,21 +6084,28 @@ def _pasted_key_provider(cfg, service: str) -> dict | None:
 def _connect_pasted_key(args, cfg, provider: dict) -> None:
     """A pasted-key provider has no consent screen: read the key without echoing it, or from stdin
     with --key-stdin (agents/CI, so it never lands on the command line), and let the server verify
-    and store it. Unattended, stdin is read only on request: an idle pipe would otherwise hang."""
+    and store it. Unattended, stdin is read only on request: an idle pipe would otherwise hang.
+    A provider signing with a pair (Tomba's key + secret) reads both before anything is sent; piped,
+    the key is the first line and the second credential the next."""
     label = provider.get("token_label") or "API key"
     display = provider.get("display_name") or provider["service"]
+    extra_label = provider.get("extra_credential_label") if provider.get("needs_extra_credential") else None
     if args.name or args.capability or args.client_secret or args.scopes:
         sys.exit(f"{display} is connected with a pasted {label}; a name, --capability, "
                  "--client-secret and --scopes don't apply")
     if args.key_stdin:
         if sys.stdin.isatty():
             sys.exit(f"--key-stdin reads a piped {label}; at a terminal, drop it to get a hidden prompt")
-        key = sys.stdin.read()
+        piped = sys.stdin.read()
+        lines = [line.strip() for line in piped.splitlines() if line.strip()]
+        key, extra = (lines[0] if lines else "", lines[1] if len(lines) > 1 else "") if extra_label \
+            else (piped, "")
     elif sys.stdin.isatty():
         if provider.get("setup_url"):
             print(f"Get your {label}: {provider['setup_url']}")
         try:
             key = getpass.getpass(f"Paste your {display} {label} (input hidden): ")
+            extra = getpass.getpass(f"Paste your {display} {extra_label} (input hidden): ") if extra_label else ""
         except (EOFError, KeyboardInterrupt):
             sys.exit("\ncancelled — nothing was connected")
     else:
@@ -6106,8 +6113,15 @@ def _connect_pasted_key(args, cfg, provider: dict) -> None:
                  f"`pbpaste | treg connections connect --provider {provider['service']} --key-stdin`")
     if not key.strip():
         sys.exit(f"no {label} given — nothing was connected")
+    if extra_label and not extra.strip():
+        sys.exit(f"{display} also needs your {extra_label}"
+                 + (f": pipe it as the second line after the {label}" if args.key_stdin else "")
+                 + " — nothing was connected")
     with _client(cfg) as c:
         r = c.post("/connections/token", json={"provider": provider["service"], "token": key.strip()})
+        if r.status_code == 200 and extra_label:
+            secret_id = r.json().get("id")
+            r = c.post(f"/connections/{secret_id}/extra-credential", json={"value": extra.strip()})
     if r.status_code != 200:
         _show(r)
         sys.exit(1)  # `_show` exits only on >= 400; any other non-200 still connected nothing

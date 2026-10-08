@@ -483,7 +483,9 @@ def test_oauth_connect_prints_provider_guidance_from_the_api(monkeypatch, capsys
 
 _MOZ = {"service": "moz", "display_name": "Moz", "auth_kind": "key",
         "token_label": "AccessID:SecretKey", "setup_url": "https://moz.com/api/dashboard"}
-_LISTING = [_MOZ, {"service": "google-search-console", "auth_kind": "oauth"}]
+_TOMBA = {"service": "tomba", "display_name": "Tomba", "auth_kind": "key", "token_label": "API key",
+          "needs_extra_credential": True, "extra_credential_label": "API secret"}
+_LISTING = [_MOZ, _TOMBA, {"service": "google-search-console", "auth_kind": "oauth"}]
 
 
 def _registry(monkeypatch, *, providers=None, connect_status=200, connect_body=None):
@@ -500,6 +502,8 @@ def _registry(monkeypatch, *, providers=None, connect_status=200, connect_body=N
             return providers or httpx.Response(200, json=_LISTING)
         if request.url.path == "/connections/token":
             return httpx.Response(connect_status, json=connect_body or {"id": 12, "name": "moz"})
+        if request.url.path == "/connections/12/extra-credential":
+            return httpx.Response(200, json={"id": 12, "name": "tomba", "ready": True})
         if request.url.path == "/oauth/start":
             return httpx.Response(422, json={"detail": "the server's own answer"})
         return httpx.Response(500, json={"detail": f"unexpected {request.url.path}"})
@@ -586,6 +590,37 @@ def test_bad_connect_input_is_refused_before_anything_is_sent(monkeypatch, argv,
     monkeypatch.setattr(cli.sys, "stdin", stdin)
     with pytest.raises(SystemExit):
         _connect(*argv)
+    assert not _posted(seen)
+
+
+def test_a_paired_key_provider_sends_both_halves(monkeypatch, capsys):
+    """Tomba signs with key + secret; connecting only the key left a tool that could not be called."""
+    seen = _registry(monkeypatch)
+    monkeypatch.setattr(cli.sys, "stdin", io.StringIO("ta_key\n ts_secret \n"))
+    _connect("--provider", "tomba", "--key-stdin")
+    assert _posted(seen) == ["/connections/token", "/connections/12/extra-credential"]
+    assert json.loads(seen[-2].content) == {"provider": "tomba", "token": "ta_key"}
+    assert json.loads(seen[-1].content) == {"value": "ts_secret"}
+    assert "Connected Tomba" in capsys.readouterr().out
+
+
+def test_a_paired_key_provider_prompts_for_both_at_a_terminal(monkeypatch):
+    seen = _registry(monkeypatch)
+    monkeypatch.setattr(cli.sys, "stdin", _Tty())
+    answers = iter(["ta_key", "ts_secret"])
+    prompts = []
+    monkeypatch.setattr(cli.getpass, "getpass", lambda prompt: prompts.append(prompt) or next(answers))
+    _connect("--provider", "tomba")
+    assert prompts == ["Paste your Tomba API key (input hidden): ",
+                       "Paste your Tomba API secret (input hidden): "]
+    assert json.loads(seen[-1].content) == {"value": "ts_secret"}
+
+
+def test_a_paired_key_provider_without_its_second_half_sends_nothing(monkeypatch):
+    seen = _registry(monkeypatch)
+    monkeypatch.setattr(cli.sys, "stdin", io.StringIO("ta_key\n"))
+    with pytest.raises(SystemExit, match="second line"):
+        _connect("--provider", "tomba", "--key-stdin")
     assert not _posted(seen)
 
 
