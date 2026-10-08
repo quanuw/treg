@@ -50,6 +50,20 @@ charge line, prints the server's invitation (`X-Treg-Hint: review|feedback`; the
 `X-Treg-Review: requested` still means review) as one stderr line per kind. Call responses
 retain the existing `_show` formatting on stdout, including pretty-printed JSON.
 
+## Pasted-key connect
+
+`treg connections connect --provider <service>` (and the hidden `oauth connect`) first reads
+`GET /oauth/providers`. A provider whose `auth_kind` is `key` or `token` has no consent screen, so
+`_connect_pasted_key` reads the key with `getpass` at a terminal, or all of stdin with
+`--key-stdin`, which keeps it off the command line and out of shell history, and posts it to
+`POST /connections/token`; the server verifies it against the provider before storing it. Without
+a terminal and without `--key-stdin` it exits with that instruction rather than reading stdin: an
+agent's idle pipe would otherwise hang the read, the same intent rule `upload` follows for
+credentials. A `name`, `--capability`, `--client-secret` or `--scopes` is refused locally, because a
+pasted key is one per team. An unreadable listing (an older server, an error, a proxy page) falls
+back to `POST /oauth/start`, which itself refuses a pasted-key provider and names this path; every
+other provider takes the consent flow there.
+
 ## Instagram grants
 
 `TREG_OAUTH_REVIEW_PENDING` and provider-registry metadata control the CLI's effective default and
