@@ -19,7 +19,9 @@ import json
 import math
 import re
 import shlex
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -748,6 +750,8 @@ def _normalize(raw: dict, provider: str, directory: Path) -> dict:
         # Enforce this for core and generated extended rows without changing their public kind.
         "cache": "forbidden" if platform in {"image-gen", "video-gen", "voice-gen", "music-gen"} else raw.get("cache"),
         "verified": str(verified) if verified else None,
+        # the UTC day this tool reached main (catalog.md "`added`"); every provider row carries one
+        "added": str(raw.get("added") or "") or None,
         # {status, means} — a status the provider uses for "asked and answered: no result" (PDL
         # 404s a person it has no record of). Only endpoints with evidenced miss semantics carry
         # it; for everything else an error status means what it says.
@@ -849,6 +853,8 @@ def endpoint_view(ep: dict, provider_display: str, cat: Catalog | None = None) -
         "status_note": ep.get("status_note") or None,
         "superseded_by": ep.get("superseded_by") or None,
         "verified": ep["verified"],
+        # the UTC day the tool reached main; None on a generated routed row (see `added_keep`)
+        "added": ep.get("added") or None,
         "docs_url": ep["docs_url"],
         "has_example": bool(ep["example_file"]),
         # the request schema, split by location (pathParams/queryParams/body + notes) — without it
@@ -1186,7 +1192,8 @@ def _match(query: str, cat: Catalog):
 
 
 def search(query: str, cat: Catalog, limit: int = 25,
-           platform: str | None = None) -> tuple[list[tuple[dict, float]], int]:
+           platform: str | None = None, keep: Callable[[dict], bool] | None = None,
+           ) -> tuple[list[tuple[dict, float]], int]:
     """`(ranked [(endpoint, score)], total_matches)` for a free-text query.
 
     MOST tokens must match — a query is a refinement, so "tiktok comments" must not return every
@@ -1204,7 +1211,8 @@ def search(query: str, cat: Catalog, limit: int = 25,
     break to core-before-extended, then verified-before-not, then id — total and stable.
 
     `platform` keeps one shelf's rows only; the idf stays the whole catalog's, so a row scores the
-    same scoped or not.
+    same scoped or not. `keep` (the `added` window, `added_keep`) works the same way: it drops rows,
+    never rescores them, and a routed parent rides in only if it passes it too.
     """
     m = _match(query, cat)
     if m is None:
@@ -1214,8 +1222,11 @@ def search(query: str, cat: Catalog, limit: int = 25,
     for (ep, _), per_tok in zip(rows, best):
         if sum(1 for i in required if per_tok[i]) < need or (platform and ep["platform"] != platform):
             continue
+        if keep is not None and not keep(ep):
+            continue
         scored.append((ep, round(sum(w * idf[i] for i, w in enumerate(per_tok)), 4)))
-    scored = [r for r in with_routed_parents(scored, cat) if not platform or r[0]["platform"] == platform]
+    scored = [r for r in with_routed_parents(scored, cat)
+              if (not platform or r[0]["platform"] == platform) and (keep is None or keep(r[0]))]
     scored.sort(key=lambda row: (-row[1], row[0]["tier"] != "core", not row[0]["verified"], row[0]["id"]))
     return scored[:max(limit, 0)], len(scored)
 
@@ -1335,8 +1346,8 @@ def near_misses(query: str, cat: Catalog, limit: int = 3) -> list[dict]:
 RERANK_BAND = 250
 
 
-def rank_band(query: str, cat: Catalog, limit: int,
-              platform: str | None = None) -> tuple[list[tuple[dict, float]], int, bool]:
+def rank_band(query: str, cat: Catalog, limit: int, platform: str | None = None,
+              keep: Callable[[dict], bool] | None = None) -> tuple[list[tuple[dict, float]], int, bool]:
     """`(rows, total_matches, tie_truncated)` — the candidates the evidence sort gets to reorder.
 
     Takes `limit` rows, then keeps taking while the score stays equal to the last one kept: a cut
@@ -1344,7 +1355,7 @@ def rank_band(query: str, cat: Catalog, limit: int,
     already dropped the best-measured row cannot put it back. `tie_truncated` is true when the group
     ran past `RERANK_BAND` and the evidence therefore did not get to see all of it.
     """
-    rows, total = search(query, cat, max(limit, 0), platform)
+    rows, total = search(query, cat, max(limit, 0), platform, keep)
     if not rows or len(rows) >= total:
         return rows, total, False
     # One row PAST the ceiling, so "was the group actually cut?" is observed rather than inferred.
@@ -1355,11 +1366,80 @@ def rank_band(query: str, cat: Catalog, limit: int,
     # caller asked for. (Shipped surfaces clamp to 100 and 25, so this was unreachable in
     # production — but a helper that silently under-delivers is a trap for the next call site.)
     ceiling = max(limit, RERANK_BAND)
-    wider, _ = search(query, cat, ceiling + 1, platform)
+    wider, _ = search(query, cat, ceiling + 1, platform, keep)
     edge = rows[-1][1]
     group = [r for r in wider if r[1] >= edge]
     kept = group[:ceiling]
     return kept, total, len(group) > len(kept)
+
+
+# ---- recently added tools -------------------------------------------------------------------
+# Two optional search options, the same on every surface (catalog.md "`added`"): a window of the
+# last N days and a newest-first sort. Without them search is exactly what it was.
+ADDED_DAYS_MAX = 365        # a longer window is capped here and the answer says so
+SORTS = ("best", "newest")  # best match is the default sort
+
+
+class AddedOptionError(ValueError):
+    """A search option the caller must fix (a window below one day, an unknown sort)."""
+
+
+@dataclass(frozen=True)
+class AddedOptions:
+    days: int | None = None      # the window actually applied, after the cap
+    newest: bool = False
+    capped: bool = False         # the caller asked for more than ADDED_DAYS_MAX
+
+    @property
+    def active(self) -> bool:
+        return self.days is not None or self.newest
+
+
+def added_options(days: int | None, sort: str | None) -> AddedOptions:
+    """Read the two options. Below one day is the caller's error; above the maximum is capped."""
+    sort = (sort or "best").strip().lower()
+    if sort not in SORTS:
+        raise AddedOptionError(f"sort must be one of {', '.join(SORTS)}, not {sort!r}")
+    if days is not None and days < 1:
+        raise AddedOptionError("added_within_days must be at least 1")
+    capped = days is not None and days > ADDED_DAYS_MAX
+    return AddedOptions(days=min(days, ADDED_DAYS_MAX) if days is not None else None,
+                        newest=sort == "newest", capped=capped)
+
+
+def utc_today() -> date:
+    return datetime.now(UTC).date()
+
+
+def added_keep(opts: AddedOptions) -> Callable[[dict], bool] | None:
+    """The row filter for an active option set: a row with an `added` day inside the window (today,
+    UTC, and the N days before it). A routed row has no `added`: a `treg.<capability>` row is a
+    choice among tools, not a tool that arrived on a day, so new-tool lists hold concrete tools
+    only. None when no option is active, so the ranker runs exactly as before."""
+    if not opts.active:
+        return None
+    if opts.days is None:
+        return lambda ep: bool(ep.get("added"))
+    since = (utc_today() - timedelta(days=opts.days)).isoformat()
+    return lambda ep: bool(ep.get("added")) and str(ep["added"]) >= since
+
+
+def newest_first(rows: list[tuple[dict, float]]) -> list[tuple[dict, float]]:
+    """Newest `added` first; a stable sort, so one day's tools keep the order they came in."""
+    return sorted(rows, key=lambda row: str(row[0].get("added") or ""), reverse=True)
+
+
+def added_rows(query: str, cat: Catalog, opts: AddedOptions) -> tuple[list[tuple[dict, float]], int]:
+    """Every row an active option set admits, best match first (newest first with no words or
+    with `newest`): the whole match set, not a band, because a newest-first page must see the
+    newest match wherever it ranked."""
+    keep = added_keep(opts)
+    if query.strip():
+        rows, total = search(query, cat, len(cat.endpoints), keep=keep)
+    else:
+        rows = [(ep, 0.0) for ep in cat.endpoints if keep(ep)]
+        total = len(rows)
+    return (newest_first(rows) if opts.newest or not query.strip() else rows), total
 
 
 def rerank(rows: list[tuple[dict, float]], stats: dict[str, dict],

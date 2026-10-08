@@ -34,6 +34,7 @@ endpoints:
     cost: {type: per_success, value: 0.1, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.tiktok.user.profile.json
     docs_url: https://docs.justoneapi.com/en/api/tiktok/user-profile-v1
 
@@ -55,6 +56,7 @@ endpoints:
     cost: {type: per_success, value: 0.1, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.tiktok.user.videos.json
     docs_url: https://docs.justoneapi.com/en/api/tiktok/user-published-posts-v1
 
@@ -74,6 +76,7 @@ endpoints:
     cost: {type: per_success, value: 0.1, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.tiktok.video.detail.json
     docs_url: https://docs.justoneapi.com/en/api/tiktok/post-details-v1
 
@@ -95,6 +98,7 @@ endpoints:
     cost: {type: per_success, value: 0.1, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.tiktok.video.comments.json
     docs_url: https://docs.justoneapi.com/en/api/tiktok/post-comments-v1
 
@@ -118,6 +122,7 @@ endpoints:
     cost: {type: per_success, value: 0.1, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.tiktok.search.videos.json
     docs_url: https://docs.justoneapi.com/en/api/tiktok/post-search-v1
 
@@ -143,6 +148,7 @@ endpoints:
     cost: {type: per_success, value: 0.2, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.xiaohongshu.search.notes.json
     docs_url: https://docs.justoneapi.com/en/api/xiaohongshu-rednote/note-search-v4
 
@@ -163,6 +169,7 @@ endpoints:
     cost: {type: per_success, value: 0.15, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.xiaohongshu.note.detail.json
     docs_url: https://docs.justoneapi.com/en/api/xiaohongshu-rednote/note-details-v1
 
@@ -183,6 +190,7 @@ endpoints:
     cost: {type: per_success, value: 0.15, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.xiaohongshu.user.notes.json
     docs_url: https://docs.justoneapi.com/en/api/xiaohongshu-rednote/user-published-notes-v4
 
@@ -202,6 +210,7 @@ endpoints:
     cost: {type: per_success, value: 0.1, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.instagram.user.profile.json
     docs_url: https://docs.justoneapi.com/en/api/instagram/user-profile-v2
 
@@ -222,6 +231,7 @@ endpoints:
     cost: {type: per_success, value: 0.1, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.instagram.user.posts.json
     docs_url: https://docs.justoneapi.com/en/api/instagram/user-published-posts-v1
 
@@ -241,6 +251,7 @@ endpoints:
     cost: {type: per_success, value: 0.1, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.youtube.video.detail.json
     docs_url: https://docs.justoneapi.com/en/api/youtube/video-details-v1
 
@@ -260,5 +271,6 @@ endpoints:
     cost: {type: per_success, value: 0.1, currency: CNY, per: 1, unit: call, source: rate_card_api, source_url: 'https://www.justoneapi.com/', checked: '2026-07-28', confidence: documented, note: billed only on success (code 0); errors free — dashboard price export 2026-07-28}
     expect: {json_path: code, equals: 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/justoneapi.weibo.user.profile.json
     docs_url: https://docs.justoneapi.com/en/api/weibo/user-profile-v3

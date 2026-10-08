@@ -71,6 +71,7 @@ endpoints:
       confidence: verified
       note: "rate card says 1 credit per VALID email found; /v1/logs reported cost=1 for the live call and cost=0 for the identical replay (duplicates are free within the month)"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.people.email.find.json
     docs_url: https://docs.tomba.io/api/finder
 
@@ -102,6 +103,7 @@ endpoints:
       confidence: verified
       note: "rate card: 1 credit per valid email from LinkedIn; /v1/logs reported cost=1 for the live call"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.people.email.find.linkedin.json
     docs_url: https://docs.tomba.io/cli/linkedin
 
@@ -132,6 +134,7 @@ endpoints:
       confidence: documented
       note: "rate card: 1 credit per valid author email found. Both live test URLs returned an empty record (no author resolved) and billed nothing, so the charged case was not observed"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.people.email.find.author.json
     docs_url: https://docs.tomba.io/cli/author
 
@@ -161,6 +164,7 @@ endpoints:
       confidence: verified
       note: "1 credit per verification; the Growth plan grants 5,000 verification credits on top of the 5,000 finder credits, so verification is effectively bundled. /v1/logs reported cost=1"
     verified: '2026-09-08'
+    added: '2026-08-20'
     example_response: examples/tomba.people.email.verify.json
     docs_url: https://docs.tomba.io/api/verifier
 
@@ -190,6 +194,7 @@ endpoints:
       confidence: verified
       note: "rate card: 1 credit per email enriched; /v1/logs reported cost=1 (route enrich-finder)"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.people.enrich.json
     docs_url: https://docs.tomba.io/api/enrichment
 
@@ -220,6 +225,7 @@ endpoints:
       confidence: verified
       note: "/v1/logs reported cost=1 (route enrich-email, type 'Person Enrichment')"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.people.enrich.profile.json
     docs_url: https://docs.tomba.io/migration/clearbit/person-api
 
@@ -249,6 +255,7 @@ endpoints:
       confidence: verified
       note: "rate card: 1 credit per company enriched (and 'free included with domain search'); /v1/logs reported cost=1 (route enrich-company)"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.companies.enrich.json
     docs_url: https://docs.tomba.io/migration/clearbit/company-api
 
@@ -278,6 +285,7 @@ endpoints:
       confidence: documented
       note: "priced as the person (1) + company (1) enrichments it performs. The live call logged cost=0 under route 'enrich-combined', but only because the same person and company had been enriched minutes earlier and duplicates are free within the month — so the observed 0 is NOT the first-call price"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.people.enrich.combined.json
     docs_url: https://docs.tomba.io/migration/clearbit/combined-api
 
@@ -310,6 +318,7 @@ endpoints:
       confidence: verified
       note: "rate card: 5 credits per phone lookup; /v1/logs reported cost=5 for the live call"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.people.phone.find.json
     docs_url: https://docs.tomba.io/cli/phone-finder
 
@@ -340,6 +349,7 @@ endpoints:
       confidence: verified
       note: "rate card: 1 credit per phone validated; /v1/logs reported cost=1"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.people.phone.verify.json
     docs_url: https://docs.tomba.io/cli/phone-validator
 
@@ -374,6 +384,7 @@ endpoints:
       confidence: verified
       note: "Base price for a non-empty page of up to 10 requested slots. Larger pages cost ceil(limit/10) credits, based on page size rather than returned email count. Empty pages are free. Upstream duplicate requests may be free, but treg does not detect that discount. Verified against /v1/logs with public test domains."
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.companies.emails.list.json
     docs_url: https://docs.tomba.io/cli/search
 
@@ -403,6 +414,7 @@ endpoints:
       confidence: inferred
       note: "the published rate card does not list this route, and no /v1/logs row was raised for it. Treated as free on that evidence — re-check if a bill disagrees"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.companies.emails.count.json
     docs_url: https://docs.tomba.io/cli/count
 
@@ -433,6 +445,7 @@ endpoints:
       confidence: verified
       note: "not on the published rate card, but /v1/logs recorded cost=1 for the first call of the day and cost=0 for the two replays (duplicates free within the month)"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.companies.email_pattern.json
     docs_url: https://docs.tomba.io/attributes/format
 
@@ -462,6 +475,7 @@ endpoints:
       confidence: verified
       note: "/v1/logs recorded the call under route 'location' with cost=0 on its FIRST invocation, so this is free rather than deduplicated"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.companies.emails.locations.json
     docs_url: https://docs.tomba.io/attributes/location
 
@@ -491,6 +505,7 @@ endpoints:
       confidence: unknown
       note: "not on the published rate card and no /v1/logs row was raised for it; the pricing page bundles 'emails enriched with sources URL' into the domain-search line, which does not settle the standalone route's price. Left honestly unpriced"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.people.email.sources.json
     docs_url: https://docs.tomba.io/attributes/sources
 
@@ -520,6 +535,7 @@ endpoints:
       confidence: documented
       note: "rate card: 'Technology Lookup — 1 credit per technology lookup'. No /v1/logs row was observed for the live call, so the charge was not confirmed"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.companies.tech_stack.json
     docs_url: https://docs.tomba.io/attributes/technology
 
@@ -549,6 +565,7 @@ endpoints:
       confidence: verified
       note: "rate card: 1 credit per similar-domain lookup; /v1/logs reported cost=1"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.companies.similar.json
     docs_url: https://docs.tomba.io/attributes/similar
 
@@ -578,6 +595,7 @@ endpoints:
       confidence: documented
       note: "rate card: 'Domain Suggestions — 1 credit'. No /v1/logs row was observed for the live call"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.companies.search.suggestions.json
     docs_url: https://docs.tomba.io/api/domain-suggestions
 
@@ -611,6 +629,7 @@ endpoints:
       confidence: documented
       note: "rate card: '1 credit reveals up to 50 companies'. /v1/logs reported cost=1 for the first live call and cost=0 for the replay"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.companies.search.reveal.json
     docs_url: https://docs.tomba.io/api/reveal
 
@@ -639,6 +658,7 @@ endpoints:
       confidence: inferred
       note: "not on the published rate card and no /v1/logs row was raised for the live call; treated as free on that evidence"
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.web.domain.disposable.json
     docs_url: https://docs.tomba.io/cli/status
 
@@ -658,6 +678,7 @@ endpoints:
       queryParams: {}
     cost: {type: free, value: 0, currency: USD, unit: call, source: observed, source_url: "https://tomba.io/pricing", checked: '2026-08-20', confidence: verified, note: "account route; raises no /v1/logs row and consumes no credits"}
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.account.usage.json
     docs_url: https://docs.tomba.io/usage-and-quotas
 
@@ -677,6 +698,7 @@ endpoints:
       queryParams: {}
     cost: {type: free, value: 0, currency: USD, unit: call, source: observed, source_url: "https://tomba.io/pricing", checked: '2026-08-20', confidence: verified, note: "account route; raises no /v1/logs row and consumes no credits"}
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.account.rate_limits.json
     docs_url: https://docs.tomba.io/rate-limits
 
@@ -698,5 +720,6 @@ endpoints:
       queryParams: {}
     cost: {type: free, value: 0, currency: USD, unit: call, source: observed, source_url: "https://tomba.io/pricing", checked: '2026-08-20', confidence: verified, note: "account route; raises no /v1/logs row and consumes no credits"}
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/tomba.account.logs.json
     docs_url: https://docs.tomba.io/cli/logs

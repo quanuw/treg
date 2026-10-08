@@ -143,6 +143,7 @@ management and creative, measurement.
 ```bash
 treg catalog                                    # every platform, busiest first
 treg catalog search "find a work email"         # by the job, not the vendor
+treg catalog search --new                       # tools added in the last 30 days, newest first
 treg catalog get hunter.people.email.find       # params, PRICE, example response
 treg call hunter.people.email.find --query domain=reddit.com --query full_name="Alexis Ohanian"
 ```

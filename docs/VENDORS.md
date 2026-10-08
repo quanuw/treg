@@ -179,6 +179,10 @@ uv run python scripts/catalog_validate.py     # must exit 0
 uv run --frozen python -m pytest -q
 ```
 
+Every endpoint row also carries `added:`, the UTC day it reached the catalog. Run
+`uv run python scripts/catalog_added.py` before opening the PR: it writes today's date on every
+row without one. An existing tool's date never changes.
+
 Endpoints that pass get a `verified:` date and a truncated, PII-scrubbed real example response
 committed to `src/treg/catalog/examples/` — that example is what convinces an agent choosing
 between providers, so passing verification is the listing's main asset.

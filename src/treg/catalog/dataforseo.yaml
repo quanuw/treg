@@ -97,6 +97,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_call, value: 0.024, currency: USD, per: 1, unit: call, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.024 per request + $0.000036 per returned row; confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price). The endpoint itself is unverified, but this price is not a guess'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.web.backlinks.summary.json
     docs_url: https://docs.dataforseo.com/v3/backlinks/summary/live/
 
@@ -128,6 +129,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_call, value: 0.024, currency: USD, per: 1, unit: call, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.024 per request + $0.000036 per returned row; confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price). The endpoint itself is unverified, but this price is not a guess'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.web.backlinks.list.json
     docs_url: https://docs.dataforseo.com/v3/backlinks/backlinks/live/
 
@@ -159,6 +161,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_call, value: 0.024, currency: USD, per: 1, unit: call, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.024 per request + $0.000036 per returned row; confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price). The endpoint itself is unverified, but this price is not a guess'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.web.linking_domains.list.json
     docs_url: https://docs.dataforseo.com/v3/backlinks/referring_domains/live/
 
@@ -189,6 +192,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_call, value: 0.024, currency: USD, per: 1, unit: call, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.024 per request + $0.000036 per returned row; confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price). The endpoint itself is unverified, but this price is not a guess'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.web.anchors.list.json
     docs_url: https://docs.dataforseo.com/v3/backlinks/anchors/live/
 
@@ -218,6 +222,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_call, value: 0.024, currency: USD, per: 1, unit: call, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.024 per request + $0.000036 per returned row; confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price). The endpoint itself is unverified, but this price is not a guess'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.web.url.metrics.json
     docs_url: https://docs.dataforseo.com/v3/backlinks/bulk_ranks/live/
 
@@ -247,6 +252,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_call, value: 0.024, currency: USD, per: 1, unit: call, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.024 per request + $0.000036 per returned row; confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price). The endpoint itself is unverified, but this price is not a guess'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.web.backlinks.competitors.json
     docs_url: https://docs.dataforseo.com/v3/backlinks/competitors/live/
 
@@ -283,6 +289,7 @@ endpoints:
     # trailing slash deliberately omitted: with it, the path is a 40-char run of [A-Za-z0-9/] and
     # catalog_validate.py's credential-leak regex false-positives on it. Both forms serve HTTP 200.
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.google.serp.organic.json
     docs_url: https://docs.dataforseo.com/v3/serp/google/organic/live/regular
 
@@ -313,6 +320,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_call, value: 0.09, currency: USD, per: 1, unit: call, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.09 flat per Live request, confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price). Note this is HIGHER than the $0.075 quoted on the public pricing page — trust the rate card. The price covers 1 or 1000 keywords alike, so always batch'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.google.keywords.volume.json
     docs_url: https://docs.dataforseo.com/v3/keywords_data/google_ads/search_volume/live/
 
@@ -345,6 +353,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_call, value: 0.012, currency: USD, per: 1, unit: call, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.012 per request + $0.00012 per returned keyword; confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price). include_clickstream_data doubles it'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.google.keywords.ideas.json
     docs_url: https://docs.dataforseo.com/v3/dataforseo_labs/google/related_keywords/live/
 
@@ -377,6 +386,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_call, value: 0.012, currency: USD, per: 1, unit: call, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.012 per request + $0.00012 per returned keyword; confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price)'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.google.domain.ranked_keywords.json
     docs_url: https://docs.dataforseo.com/v3/dataforseo_labs/google/ranked_keywords/live/
 
@@ -407,6 +417,7 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: per_result, value: 0.00015, currency: USD, per: 1, unit: page, source: rate_card_api, source_url: 'https://api.dataforseo.com/v3/appendix/user_data', checked: '2026-07-28', confidence: verified, note: '$0.00015 per crawled PAGE (the rate card lists it as per_result, not per_request); confirmed against the account''s own machine-readable rate card (GET /appendix/user_data -> result[0].price). enable_javascript raises it to ~$0.0015 (10x) and enable_browser_rendering to ~$0.0051 (34x)'}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.web.page.audit.json
     docs_url: https://docs.dataforseo.com/v3/on_page/instant_pages/
 
@@ -430,5 +441,6 @@ endpoints:
     expect: {json_path: tasks.0.status_code, equals: 20000}
     cost: {type: free, value: 0, currency: USD, unit: call, note: free — the response's own `cost` field is 0}
     verified: 2026-07-28
+    added: '2026-07-28'
     example_response: examples/dataforseo.account.usage.json
     docs_url: https://docs.dataforseo.com/v3/appendix/user_data/

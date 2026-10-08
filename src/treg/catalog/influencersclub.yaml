@@ -73,6 +73,7 @@ endpoints:
       reported_charge: {path: credits_cost, unit: credit}
       note: "0.01 credit per creator returned, 0 creators = 0 credits; 0.03 with return_filter_values=true. The response's credits_cost is the exact charge and settles the call, so the premium rider is billed as charged. OBSERVED 2026-08-21: limit=2 moved the meter 10.00 -> 9.98"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.search.json
     docs_url: https://docs.influencers.club/openapi/discovery-api/public_v1_discovery_create
 
@@ -108,6 +109,7 @@ endpoints:
       confidence: verified
       note: "0.01 credit per creator returned; nothing when none are. OBSERVED 2026-08-21: limit=2 moved the meter 9.98 -> 9.96"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.similar.json
     docs_url: https://docs.influencers.club/openapi/similar-creators/public_v1_discovery_creators_similar_create
 
@@ -139,6 +141,7 @@ endpoints:
       confidence: verified
       note: "1 credit per request regardless of creator count. OBSERVED 2026-08-21: credits_cost 1.0 in the body, meter 8.25 -> 7.25"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.audience.overlap.json
     docs_url: https://docs.influencers.club/openapi/audience-overlap/public_v1_creators_audience_overlap_create
 
@@ -166,6 +169,7 @@ endpoints:
       queryParams: {search: "London", limit: 3}
     cost: {type: free, value: 0, currency: USD, per: 1, unit: call, source: docs, source_url: https://docs.influencers.club/guides/usage-limits, checked: '2026-08-21', confidence: verified, note: "documented 0 credits and OBSERVED 2026-08-21 — meter unchanged"}
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.filters.locations.json
     docs_url: https://docs.influencers.club/openapi/dictionary/public_v1_discovery_classifier_locations_retrieve
 
@@ -185,6 +189,7 @@ endpoints:
       queryParams: {}
     cost: {type: free, value: 0, currency: USD, per: 1, unit: call, source: docs, source_url: https://docs.influencers.club/guides/usage-limits, checked: '2026-08-21', confidence: verified, note: "documented 0 credits and OBSERVED 2026-08-21 — meter unchanged"}
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.filters.languages.json
     docs_url: https://docs.influencers.club/openapi/dictionary/public_v1_discovery_classifier_languages_list
 
@@ -204,6 +209,7 @@ endpoints:
       queryParams: {}
     cost: {type: free, value: 0, currency: USD, per: 1, unit: call, source: docs, source_url: https://docs.influencers.club/guides/usage-limits, checked: '2026-08-21', confidence: verified, note: "documented 0 credits and OBSERVED 2026-08-21 — meter unchanged"}
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.filters.audience_interests.json
     docs_url: https://docs.influencers.club/openapi/dictionary/public_v1_discovery_classifier_audience_interests_list
 
@@ -239,6 +245,7 @@ endpoints:
       confidence: verified
       note: "0.03 credit per successful request; a creator_not_found miss is free. OBSERVED 2026-08-21 — and note the cold-call 504 on this route WAS charged 0.03 (see the file header)"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.enrich.raw.json
     docs_url: https://docs.influencers.club/openapi/enrich-by-handle-raw/public_v1_creators_enrich_handle_raw_create
 
@@ -274,6 +281,7 @@ endpoints:
       confidence: verified
       note: "0.2 credit per successful request. OBSERVED 2026-08-21: meter 9.75 -> 9.55"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.enrich.profile.json
     docs_url: https://docs.influencers.club/openapi/enrich-by-handle-profile/public_v1_creators_enrich_handle_profile_create
 
@@ -309,6 +317,7 @@ endpoints:
       confidence: verified
       note: "0.8 credit per successful request. OBSERVED 2026-08-21: meter 9.05 -> 8.25"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.enrich.analytics.json
     docs_url: https://docs.influencers.club/openapi/enrich-by-handle-analytics/public_v1_creators_enrich_handle_analytics_create
 
@@ -346,10 +355,12 @@ endpoints:
       confidence: verified
       note: "1 credit per successful request. OBSERVED 2026-08-21: meter 7.25 -> 6.25; the cold-call 504 that preceded it was NOT charged"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.enrich.full.json
     docs_url: https://docs.influencers.club/openapi/enrich-by-handle-full/public_v1_creators_enrich_handle_full_create
 
   - id: influencersclub.creators.enrich.email
+    added: '2026-08-21'
     cache:
       # `result.picture` is a rotating CDN URL: every change the archive observed on this endpoint
       # in its first month was that field alone
@@ -408,6 +419,7 @@ endpoints:
       confidence: verified
       note: "0.5 credit per successful request. OBSERVED 2026-08-21: meter 9.55 -> 9.05"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.socials.json
     docs_url: https://docs.influencers.club/openapi/connected-socials/public_v1_creators_socials_create
 
@@ -442,6 +454,7 @@ endpoints:
       confidence: verified
       note: "0.03 credit per successful request (a page, whatever its size); a creator_not_found miss was free. OBSERVED 2026-08-21: meter 9.84 -> 9.81; cold-call 504s on this route were also charged"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.posts.json
     docs_url: https://docs.influencers.club/openapi/creator-posts/public_v1_creators_content_posts_create
 
@@ -475,6 +488,7 @@ endpoints:
       confidence: verified
       note: "0.03 credit per successful request. OBSERVED 2026-08-21: meter 9.81 -> 9.78"
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.creators.post.details.json
     docs_url: https://docs.influencers.club/openapi/post-details/public_v1_creators_content_details_create
 
@@ -495,6 +509,7 @@ endpoints:
       queryParams: {}
     cost: {type: free, value: 0, currency: USD, per: 1, unit: call, source: docs, source_url: https://docs.influencers.club/guides/usage-limits, checked: '2026-08-21', confidence: verified, note: "documented 0 credits and OBSERVED 2026-08-21 across a dozen reads"}
     verified: '2026-08-21'
+    added: '2026-08-21'
     example_response: examples/influencersclub.account.usage.json
     docs_url: https://docs.influencers.club/openapi/account-credits-and-usage/account_credits_usage_retrieve
 

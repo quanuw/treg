@@ -44,6 +44,7 @@ endpoints:
       confidence: verified
       note: "One credit for a page with results; HTTP 204 misses are free."
     verified: '2026-09-22'
+    added: '2026-09-23'
     docs_url: https://docs.adyntel.com/ad-libraries/meta
 
   - id: adyntel.meta-ads.library.search
@@ -68,6 +69,7 @@ endpoints:
       <<: *one_credit
       source_url: https://docs.adyntel.com/ad-libraries/meta-ad-search
     verified: '2026-09-22'
+    added: '2026-09-23'
     docs_url: https://docs.adyntel.com/openapi-docs/existing-endpoints
 
   - id: adyntel.linkedin.search.ads.company
@@ -95,6 +97,7 @@ endpoints:
       <<: *one_credit
       source_url: https://docs.adyntel.com/ad-libraries/linkedin
     verified: '2026-09-22'
+    added: '2026-09-23'
     docs_url: https://docs.adyntel.com/ad-libraries/linkedin
 
   - id: adyntel.linkedin.search.ads.keyword
@@ -120,6 +123,7 @@ endpoints:
       <<: *one_credit
       source_url: https://docs.adyntel.com/openapi-docs/existing-endpoints
     verified: '2026-09-22'
+    added: '2026-09-23'
     docs_url: https://docs.adyntel.com/openapi-docs/existing-endpoints
 
   - id: adyntel.google.ads.transparency
@@ -148,6 +152,7 @@ endpoints:
         extract_text: {location: body, when: truthy, add_credits: 1}
       note: "One credit for a result page; extract_text=true costs one extra credit. HTTP 204 misses are free."
     verified: '2026-09-22'
+    added: '2026-09-23'
     docs_url: https://docs.adyntel.com/ad-libraries/google
 
   - id: adyntel.tiktok-ads.library.search.company
@@ -174,6 +179,7 @@ endpoints:
         influencer_ads: {location: body, when: truthy, add_credits: 1}
       note: "One credit for brand ads; influencer_ads=true costs one extra credit. HTTP 204 misses are free."
     verified: '2026-09-22'
+    added: '2026-09-23'
     docs_url: https://www.adyntel.com/tiktok-ads-scraper/
 
   - id: adyntel.google.domain.keywords.overview
@@ -200,4 +206,5 @@ endpoints:
       unit: call
       note: "A successful live call used two credits."
     verified: '2026-09-22'
+    added: '2026-09-23'
     docs_url: https://docs.adyntel.com/ad-libraries/paid-vs-organic-keywords

@@ -84,10 +84,12 @@ endpoints:
     confidence: documented
     note: $1.50 per 1000 records delivered, pay-per-success — the general Web Scraper API rate documented for this product family; some datasets carry different published rates, confirm on brightdata.com/pricing before volume use
   verified: '2026-07-30'
+  added: '2026-07-28'
   example_response: examples/brightdata.x.instagram-posts.json
   docs_url: https://docs.brightdata.com/datasets/scrapers/instagram/quickstart
   observed_time: 15.9
 - id: brightdata.x.instagram-comments
+  added: '2026-07-28'
   tier: extended
   capability: instagram.post.comments
   platform: instagram
@@ -133,6 +135,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.instagram-posts; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/instagram/quickstart
 - id: brightdata.x.instagram-reels
+  added: '2026-07-28'
   tier: extended
   platform: instagram
   scope: any_account
@@ -177,6 +180,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.instagram-posts; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/instagram/quickstart
 - id: brightdata.x.instagram-hashtag-info
+  added: '2026-07-28'
   tier: extended
   platform: instagram
   scope: any_account
@@ -270,10 +274,12 @@ endpoints:
     confidence: documented
     note: $1.50 per 1000 records delivered, pay-per-success — the general Web Scraper API rate documented for this product family; some datasets carry different published rates, confirm on brightdata.com/pricing before volume use
   verified: '2026-07-30'
+  added: '2026-07-28'
   example_response: examples/brightdata.x.tiktok-profiles.json
   docs_url: https://docs.brightdata.com/datasets/scrapers/tiktok/quickstart
   observed_time: 19.44
 - id: brightdata.x.tiktok-posts
+  added: '2026-07-28'
   tier: extended
   capability: tiktok.video.detail
   platform: tiktok
@@ -319,6 +325,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.tiktok-profiles; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/tiktok/quickstart
 - id: brightdata.x.tiktok-comments
+  added: '2026-07-28'
   tier: extended
   capability: tiktok.video.comments
   platform: tiktok
@@ -364,6 +371,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.tiktok-profiles; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/tiktok/quickstart
 - id: brightdata.x.tiktok-shop-products
+  added: '2026-07-28'
   tier: extended
   platform: tiktok-shop
   scope: any_account
@@ -408,6 +416,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.tiktok-profiles; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/tiktok-shop/quickstart
 - id: brightdata.x.linkedin-company-info
+  added: '2026-07-28'
   tier: extended
   capability: linkedin.company.profile
   platform: linkedin
@@ -453,6 +462,7 @@ endpoints:
   skipped: sibling verified via brightdata.linkedin.user.profile (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/linkedin/quickstart
 - id: brightdata.x.linkedin-posts
+  added: '2026-07-28'
   tier: extended
   capability: linkedin.post.detail
   platform: linkedin
@@ -498,6 +508,7 @@ endpoints:
   skipped: sibling verified via brightdata.linkedin.user.profile (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/linkedin/quickstart
 - id: brightdata.x.linkedin-jobs
+  added: '2026-07-28'
   tier: extended
   capability: linkedin.job.detail
   platform: linkedin
@@ -591,11 +602,13 @@ endpoints:
     confidence: documented
     note: $1.50 per 1000 records delivered, pay-per-success — the general Web Scraper API rate documented for this product family; some datasets carry different published rates, confirm on brightdata.com/pricing before volume use
   verified: '2026-07-30'
+  added: '2026-07-28'
   example_response: examples/brightdata.x.facebook-profiles.json
   docs_url: https://docs.brightdata.com/datasets/scrapers/facebook/quickstart
   capability: facebook.user.profile
   observed_time: 55.5
 - id: brightdata.x.facebook-posts-by-profile
+  added: '2026-07-28'
   tier: extended
   capability: facebook.user.posts
   platform: facebook
@@ -641,6 +654,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.facebook-profiles; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/facebook/quickstart
 - id: brightdata.x.facebook-posts-by-post-url
+  added: '2026-07-28'
   tier: extended
   platform: facebook
   scope: any_account
@@ -686,6 +700,7 @@ endpoints:
   docs_url: https://docs.brightdata.com/datasets/scrapers/facebook/quickstart
   capability: facebook.post.detail
 - id: brightdata.x.facebook-comments
+  added: '2026-07-28'
   tier: extended
   capability: facebook.post.comments
   platform: facebook
@@ -731,6 +746,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.facebook-profiles; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/facebook/quickstart
 - id: brightdata.x.facebook-marketplace
+  added: '2026-07-28'
   tier: extended
   platform: facebook
   scope: any_account
@@ -825,10 +841,12 @@ endpoints:
     confidence: documented
     note: $1.50 per 1000 records delivered, pay-per-success — the general Web Scraper API rate documented for this product family; some datasets carry different published rates, confirm on brightdata.com/pricing before volume use
   verified: '2026-07-30'
+  added: '2026-07-28'
   example_response: examples/brightdata.x.amazon-products.json
   docs_url: https://docs.brightdata.com/datasets/scrapers/amazon/quickstart
   observed_time: 1.73
 - id: brightdata.x.amazon-reviews
+  added: '2026-07-28'
   tier: extended
   platform: amazon
   scope: any_account
@@ -873,6 +891,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.amazon-products; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/amazon/quickstart
 - id: brightdata.x.amazon-best-sellers
+  added: '2026-07-28'
   tier: extended
   capability: amazon.bestsellers.list
   platform: amazon
@@ -918,6 +937,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.amazon-products; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/amazon/quickstart
 - id: brightdata.x.amazon-sellers-info
+  added: '2026-07-28'
   tier: extended
   platform: amazon
   scope: any_account
@@ -1011,10 +1031,12 @@ endpoints:
     confidence: documented
     note: $1.50 per 1000 records delivered, pay-per-success — the general Web Scraper API rate documented for this product family; some datasets carry different published rates, confirm on brightdata.com/pricing before volume use
   verified: '2026-07-30'
+  added: '2026-07-28'
   example_response: examples/brightdata.x.x-profiles.json
   docs_url: https://docs.brightdata.com/datasets/scrapers/x/quickstart
   observed_time: 3.22
 - id: brightdata.x.x-posts
+  added: '2026-07-28'
   tier: extended
   capability: x.post.detail
   platform: x
@@ -1109,10 +1131,12 @@ endpoints:
     confidence: documented
     note: $1.50 per 1000 records delivered, pay-per-success — the general Web Scraper API rate documented for this product family; some datasets carry different published rates, confirm on brightdata.com/pricing before volume use
   verified: '2026-07-30'
+  added: '2026-07-28'
   example_response: examples/brightdata.x.youtube-channels.json
   docs_url: https://docs.brightdata.com/datasets/scrapers/youtube/quickstart
   observed_time: 48.22
 - id: brightdata.x.youtube-videos
+  added: '2026-07-28'
   tier: extended
   capability: youtube.video.detail
   platform: youtube
@@ -1158,6 +1182,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.youtube-channels; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/youtube/quickstart
 - id: brightdata.x.youtube-comments
+  added: '2026-07-28'
   tier: extended
   capability: youtube.video.comments
   platform: youtube
@@ -1203,6 +1228,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.youtube-channels; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/youtube/quickstart
 - id: brightdata.x.reddit-posts
+  added: '2026-07-28'
   tier: extended
   capability: reddit.post.detail
   platform: reddit
@@ -1248,6 +1274,7 @@ endpoints:
   skipped: sibling verified via brightdata.web.scrape.structured (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/reddit/quickstart
 - id: brightdata.x.reddit-comments
+  added: '2026-07-28'
   tier: extended
   capability: reddit.post.comments
   platform: reddit
@@ -1293,6 +1320,7 @@ endpoints:
   skipped: sibling verified via brightdata.web.scrape.structured (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/reddit/quickstart
 - id: brightdata.x.walmart-products
+  added: '2026-07-28'
   tier: extended
   platform: walmart
   scope: any_account
@@ -1338,6 +1366,7 @@ endpoints:
   docs_url: https://docs.brightdata.com/datasets/scrapers/walmart/quickstart
   capability: walmart.product.detail
 - id: brightdata.x.walmart-reviews
+  added: '2026-07-28'
   tier: extended
   platform: walmart
   scope: any_account
@@ -1383,6 +1412,7 @@ endpoints:
   docs_url: https://docs.brightdata.com/datasets/scrapers/walmart/quickstart
   capability: walmart.product.reviews
 - id: brightdata.x.ebay-products
+  added: '2026-07-28'
   tier: extended
   platform: ebay
   scope: any_account
@@ -1428,6 +1458,7 @@ endpoints:
   docs_url: https://docs.brightdata.com/datasets/scrapers/ebay/quickstart
   capability: ebay.product.detail
 - id: brightdata.x.yelp-businesses
+  added: '2026-07-28'
   tier: extended
   platform: yelp
   scope: any_account
@@ -1473,6 +1504,7 @@ endpoints:
   docs_url: https://docs.brightdata.com/datasets/scrapers/yelp/quickstart
   capability: yelp.business.profile
 - id: brightdata.x.yelp-reviews
+  added: '2026-07-28'
   tier: extended
   platform: yelp
   scope: any_account
@@ -1518,6 +1550,7 @@ endpoints:
   docs_url: https://docs.brightdata.com/datasets/scrapers/yelp/quickstart
   capability: yelp.business.reviews
 - id: brightdata.x.tripadvisor-hotels
+  added: '2026-07-28'
   tier: extended
   platform: tripadvisor
   scope: any_account
@@ -1563,6 +1596,7 @@ endpoints:
   docs_url: https://docs.brightdata.com/datasets/scrapers/tripadvisor/quickstart
   capability: tripadvisor.hotel.detail
 - id: brightdata.x.trustpilot-reviews
+  added: '2026-07-28'
   tier: extended
   platform: trustpilot
   scope: any_account
@@ -1656,10 +1690,12 @@ endpoints:
     confidence: documented
     note: $1.50 per 1000 records delivered, pay-per-success — the general Web Scraper API rate documented for this product family; some datasets carry different published rates, confirm on brightdata.com/pricing before volume use
   verified: '2026-07-30'
+  added: '2026-07-28'
   example_response: examples/brightdata.x.google-play-apps.json
   docs_url: https://docs.brightdata.com/datasets/scrapers/google-play/quickstart
   observed_time: 13.05
 - id: brightdata.x.google-play-reviews
+  added: '2026-07-28'
   tier: extended
   platform: google-play
   scope: any_account
@@ -1704,6 +1740,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.google-play-apps; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/google-play/quickstart
 - id: brightdata.x.app-store-apps
+  added: '2026-07-28'
   tier: extended
   platform: app-store
   scope: any_account
@@ -1748,6 +1785,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.google-play-apps; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/app-store/quickstart
 - id: brightdata.x.app-store-reviews
+  added: '2026-07-28'
   tier: extended
   platform: app-store
   scope: any_account
@@ -1792,6 +1830,7 @@ endpoints:
   skipped: sibling verified via brightdata.x.google-play-apps; same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/app-store/quickstart
 - id: brightdata.x.imdb-media
+  added: '2026-07-28'
   tier: extended
   capability: imdb.title.detail
   platform: imdb
@@ -1837,6 +1876,7 @@ endpoints:
   skipped: sibling verified via brightdata.web.scrape.structured (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/imdb/quickstart
 - id: brightdata.x.xiaohongshu-posts
+  added: '2026-07-28'
   tier: extended
   capability: xiaohongshu.note.detail
   platform: xiaohongshu
@@ -1882,6 +1922,7 @@ endpoints:
   skipped: sibling verified via brightdata.web.scrape.structured (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/xiaohongshu/quickstart
 - id: brightdata.x.threads-profiles
+  added: '2026-07-28'
   tier: extended
   capability: threads.user.profile
   platform: threads
@@ -1927,6 +1968,7 @@ endpoints:
   skipped: sibling verified via brightdata.web.scrape.structured (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/threads/quickstart
 - id: brightdata.x.telegram-channels
+  added: '2026-07-28'
   tier: extended
   capability: telegram.channel.info
   platform: telegram
@@ -1972,6 +2014,7 @@ endpoints:
   skipped: sibling verified via brightdata.web.scrape.structured (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/telegram/quickstart
 - id: brightdata.x.companies-crunchbase
+  added: '2026-07-28'
   domain: companies
   tier: extended
   capability: companies.enrich
@@ -2018,6 +2061,7 @@ endpoints:
   skipped: sibling verified via brightdata.web.scrape.structured (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/companies/quickstart
 - id: brightdata.x.companies-glassdoor-info
+  added: '2026-07-28'
   domain: companies
   tier: extended
   platform: companies
@@ -2063,6 +2107,7 @@ endpoints:
   skipped: sibling verified via brightdata.web.scrape.structured (core); same generic POST /datasets/v3/scrape runner, only dataset_id differs, no per-endpoint logic to diverge on (see file header, 2026-07-28 verify pass). Not re-called to conserve budget.
   docs_url: https://docs.brightdata.com/datasets/scrapers/companies/quickstart
 - id: brightdata.x.companies-glassdoor-reviews
+  added: '2026-07-28'
   domain: other
   tier: extended
   capability: companies.reviews

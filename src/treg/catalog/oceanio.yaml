@@ -89,6 +89,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: the response body reported creditsUsed 0.1 and the standard-credit balance fell by exactly 0.1 (30.0 -> 29.9). Bulk lookup via /v2/lookup/companies is half the price per company (0.05) — prefer it whenever you are enriching by domain. Matches the published rate card: "Enrich Company — 0.1 credits / result".'
     docs_url: https://app.ocean.io/docs/enrichCompany
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.enrich.json
 
   - id: oceanio.companies.lookup_bulk
@@ -121,6 +122,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: one domain requested, one found, response creditsUsed 0.05 and balance fell 29.9 -> 29.85. The list length is the price dial. Matches the published rate card: "Lookup Companies — 0.05 credits / result".'
     docs_url: https://app.ocean.io/docs/lookupCompanies
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.lookup_bulk.json
 
   - id: oceanio.companies.enrich_bulk
@@ -154,6 +156,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: a one-company job debited 0.1 standard credit at submission time — the same rate as the synchronous single enrich, twice the bulk-lookup rate. Matches the published rate card: "Enrich Companies (Batch) — 0.1 credits / result". Only the accept was observed; the webhook delivery itself was not (no public endpoint available at curation time).'
     docs_url: https://app.ocean.io/docs/enrichCompanies
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.enrich_bulk.json
 
   - id: oceanio.companies.warmup
@@ -174,6 +177,7 @@ endpoints:
     cost: {type: free, value: 0, currency: USD, unit: call, note: "listed as Free on the published rate card and stated as credit-free in the route description; OBSERVED live 2026-08-20 — the balance was unchanged across the call"}
     docs_url: https://app.ocean.io/docs/warmupCompanies
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.warmup.json
 
   # ---------------------------------------------------------------- people enrichment ----------
@@ -209,6 +213,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: response creditsUsed 0.1, balance fell by 0.1. Matches the published rate card: "Enrich Person — 0.1 credits / result". Excludes email/phone reveals, which draw from the same pool at 1 and 10 credits per verified value.'
     docs_url: https://app.ocean.io/docs/enrichPerson
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.people.enrich.json
 
   - id: oceanio.people.lookup_bulk
@@ -241,6 +246,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: one handle requested, one found, response creditsUsed 0.05. Matches the published rate card: "Lookup People — 0.05 credits / result".'
     docs_url: https://app.ocean.io/docs/lookupPeople
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.people.lookup_bulk.json
 
   - id: oceanio.people.enrich_bulk
@@ -273,6 +279,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: a one-person job debited 0.1 credit at submission. Matches the published rate card: "Enrich People (Batch) — 0.1 credits / result". Only the accept was observed; the webhook delivery was not (no public endpoint available at curation time).'
     docs_url: https://app.ocean.io/docs/enrichPeople
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.people.enrich_bulk.json
 
   # ---------------------------------------------------------------- search / lookalike ---------
@@ -314,6 +321,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: size=2 returned creditsUsed 0.4 and the balance fell by 0.4 — 0.2 per company returned, four times the bulk-lookup rate. `size` is the whole price. Matches the published rate card: "Search Companies — 0.2 credits / result".'
     docs_url: https://app.ocean.io/docs/searchCompaniesV3
     verified: '2026-10-06'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.search.json
 
   - id: oceanio.companies.lookalike
@@ -354,6 +362,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20 on the same call as oceanio.companies.search: size=2 with lookalikeDomains=["stripe.com"] returned 15,286 total matches and creditsUsed 0.4. Matches the published rate card: "Search Companies — 0.2 credits / result".'
     docs_url: https://app.ocean.io/docs/searchCompaniesV3
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.lookalike.json
 
   - id: oceanio.people.search
@@ -396,6 +405,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: size=2 returned creditsUsed 0.4 and the balance fell 29.4 -> 29.0 — 0.2 per person returned. Matches the published rate card: "Search People — 0.2 credits / result".'
     docs_url: https://app.ocean.io/docs/searchPeopleV3
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.people.search.json
 
   # ---------------------------------------------------------------- contact reveal -------------
@@ -429,6 +439,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: a single-person reveal debited exactly 1 credit at submission, matching the published rate card ("Reveal Emails — 1 credit / email found"; nothing is charged for an address that cannot be found). Only the accept was observed; the webhook payload was not (no public endpoint available at curation time).'
     docs_url: https://app.ocean.io/docs/revealEmails
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.people.email.reveal.json
 
   - id: oceanio.people.phone.reveal
@@ -461,6 +472,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: a single-person phone reveal debited exactly 10 credits at submission (balance 28.4 -> 17.4 across one email reveal and one phone reveal), matching the published rate card ("Reveal Phones — 10 credits / phone found"). Only the accept was observed; the webhook payload was not.'
     docs_url: https://app.ocean.io/docs/revealPhones
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.people.phone.reveal.json
 
   # ---------------------------------------------------------------- ICP segmentation -----------
@@ -489,6 +501,7 @@ endpoints:
     cost: {type: free, value: 0, currency: USD, unit: call, note: "OBSERVED live 2026-08-20: a 5-domain segmentation left the balance unchanged. The provider does not publish a price for this route, so a very large domain list may behave differently"}
     docs_url: https://app.ocean.io/docs/createSegmentation
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.segment.create.json
 
   - id: oceanio.companies.segment.get
@@ -511,6 +524,7 @@ endpoints:
     cost: {type: free, value: 0, currency: USD, unit: call, note: "OBSERVED live 2026-08-20: polled six times, balance unchanged"}
     docs_url: https://app.ocean.io/docs/getSegmentation
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.segment.get.json
 
   - id: oceanio.companies.segment.mark_domains
@@ -537,9 +551,11 @@ endpoints:
     cost: {type: free, value: 0, currency: USD, unit: call, note: "OBSERVED live 2026-08-20: balance unchanged"}
     docs_url: https://app.ocean.io/docs/addMarkedDomains
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.segment.mark_domains.json
 
   - id: oceanio.companies.segment.attribute
+    added: '2026-08-20'
     domain: companies
     capability: companies.segment.attribute
     platform: companies
@@ -588,6 +604,7 @@ endpoints:
     cost: {type: free, value: 0, currency: USD, unit: call, note: "listed as Free on the published rate card; OBSERVED live 2026-08-20 — balance unchanged"}
     docs_url: https://app.ocean.io/docs/getDataFieldsPublic
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.data_fields.json
 
   - id: oceanio.companies.autocomplete
@@ -622,6 +639,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: not free despite carrying no creditsUsed field — five autocomplete calls moved the balance by exactly 0.5, and an isolated single call by 0.1. Matches the published rate card: "Autocomplete (all endpoints) — 0.1 credits / call".'
     docs_url: https://app.ocean.io/docs/autoCompleteCompany
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.autocomplete.json
 
   - id: oceanio.companies.autocomplete.keywords
@@ -654,6 +672,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: an isolated single call moved the balance by exactly 0.1 (28.5 -> 28.4). Matches the published rate card: "Autocomplete (all endpoints) — 0.1 credits / call".'
     docs_url: https://app.ocean.io/docs/autoCompleteKeywords
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.companies.autocomplete.keywords.json
 
   - id: oceanio.people.autocomplete.job_titles
@@ -686,6 +705,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: charged at the same 0.1 credit as the other autocomplete routes (measured across a batch of five, then isolated on one), which is also the published rate card figure for every autocomplete route.'
     docs_url: https://app.ocean.io/docs/autoCompleteJobTitles
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.people.autocomplete.job_titles.json
 
   - id: oceanio.people.autocomplete.locations
@@ -719,6 +739,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: charged at the same 0.1 credit as the other autocomplete routes, which is also the published rate card figure.'
     docs_url: https://app.ocean.io/docs/autoCompleteLocations
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.people.autocomplete.locations.json
 
   - id: oceanio.people.autocomplete.skills
@@ -751,6 +772,7 @@ endpoints:
       note: 'OBSERVED live 2026-08-20: charged at the same 0.1 credit as the other autocomplete routes, which is also the published rate card figure.'
     docs_url: https://app.ocean.io/docs/autoCompleteSkills
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.people.autocomplete.skills.json
 
   # ---------------------------------------------------------------- account --------------------
@@ -771,4 +793,5 @@ endpoints:
     cost: {type: free, value: 0, currency: USD, unit: call, note: "listed as Free on the published rate card; OBSERVED live 2026-08-20 — repeated calls left the balance unchanged. It DOES count against the 60/min and 1,000/day request limits"}
     docs_url: https://app.ocean.io/docs/getCreditBalance
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/oceanio.account.balance.json

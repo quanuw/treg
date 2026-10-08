@@ -57,6 +57,7 @@ endpoints:
       confidence: documented
       note: "Search is billed per successful request by depth and output type."
     verified: '2026-09-29'
+    added: '2026-09-28'
     docs_url: https://docs.linkup.so/pages/documentation/endpoints/search/reference
     example_response: examples/linkup.web.search.json
 
@@ -95,6 +96,7 @@ endpoints:
       confidence: documented
       note: "Markdown Fetch is billed per successful request by mode and JavaScript rendering."
     verified: '2026-09-29'
+    added: '2026-09-28'
     docs_url: https://docs.linkup.so/pages/documentation/endpoints/fetch/reference
     example_response: examples/linkup.web.fetch.json
 
@@ -134,6 +136,7 @@ endpoints:
       confidence: documented
       note: "A supplied schema adds $0.001 to the mode and JavaScript rendering price."
     verified: '2026-09-29'
+    added: '2026-09-28'
     docs_url: https://docs.linkup.so/pages/documentation/endpoints/fetch/reference
     example_response: examples/linkup.web.fetch.structured.json
 
@@ -177,6 +180,7 @@ endpoints:
       confidence: documented
       note: "Research price depends on reasoningDepth, not mode. Linkup documents that errors deduct no credit; treg releases a failed task's hold."
     verified: '2026-09-29'
+    added: '2026-09-28'
     docs_url: https://docs.linkup.so/pages/documentation/endpoints/research/post
     example_response: examples/linkup.web.answer.json
     async:
@@ -211,5 +215,6 @@ endpoints:
     test_request: {pathParams: {id: "499df310-0eab-4b2d-97f6-fa79a6d66d86"}}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "Polling does not consume Linkup credit."}
     verified: '2026-09-29'
+    added: '2026-09-28'
     docs_url: https://docs.linkup.so/pages/documentation/endpoints/research/get
     example_response: examples/linkup.web.answer.status.json

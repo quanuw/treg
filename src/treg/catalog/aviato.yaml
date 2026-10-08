@@ -48,6 +48,7 @@ endpoints:
     test_request:
       queryParams: {website: "stripe.com", preview: true}
     verified: '2026-08-24'
+    added: '2026-08-25'
     example_response: examples/aviato.companies.enrich.json
     miss:
       status: 404
@@ -89,6 +90,7 @@ endpoints:
     test_request:
       body: {lookups: [{website: "stripe.com"}], require: ["name"]}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.companies.enrich.bulk.json
     cost:
       type: per_success
@@ -124,6 +126,7 @@ endpoints:
       body:
         dsl: {filters: [{name: {operation: "fts", value: "Stripe"}}], limit: 10, offset: 0, sort: []}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.companies.search.json
     cost:
       type: per_success
@@ -159,6 +162,7 @@ endpoints:
     test_request:
       queryParams: {website: "stripe.com", perPage: 1, page: 0}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.companies.employees.json
     cost:
       type: per_success
@@ -193,6 +197,7 @@ endpoints:
     test_request:
       queryParams: {website: "stripe.com", perPage: 1, page: 0}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.companies.founders.json
     cost:
       type: per_success
@@ -227,6 +232,7 @@ endpoints:
     test_request:
       queryParams: {website: "stripe.com", perPage: 1, page: 0}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.companies.funding_rounds.json
     cost:
       type: per_success
@@ -261,6 +267,7 @@ endpoints:
     test_request:
       queryParams: {website: "stripe.com", perPage: 1, page: 0}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.companies.acquisitions.json
     cost:
       type: per_success
@@ -297,6 +304,7 @@ endpoints:
     test_request:
       queryParams: {website: "stripe.com", perPage: 1, page: 0}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.companies.investments.json
     cost:
       type: per_success
@@ -332,6 +340,7 @@ endpoints:
     test_request:
       queryParams: {website: "stripe.com", perPage: 1, page: 0}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.companies.outbound_investments.json
     cost:
       type: per_success
@@ -374,6 +383,7 @@ endpoints:
     test_request:
       queryParams: {linkedinURL: "https://www.linkedin.com/in/satyanadella", preview: true}
     verified: '2026-08-24'
+    added: '2026-08-25'
     example_response: examples/aviato.people.enrich.json
     cost:
       type: per_success
@@ -414,6 +424,7 @@ endpoints:
     test_request:
       body: {lookups: [{linkedinURL: "https://www.linkedin.com/in/satyanadella"}], preview: true}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.people.enrich.bulk.json
     cost:
       type: per_success
@@ -459,6 +470,7 @@ endpoints:
     test_request:
       queryParams: {linkedinURL: "https://www.linkedin.com/in/satyanadella", type: "work"}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.people.contact.get.json
     cost:
       type: per_success
@@ -499,6 +511,7 @@ endpoints:
     test_request:
       queryParams: {linkedinURL: "https://www.linkedin.com/in/satyanadella", type: "work"}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.people.email.find.json
     cost:
       type: per_success
@@ -540,6 +553,7 @@ endpoints:
     test_request:
       queryParams: {linkedinURL: "https://www.linkedin.com/in/williamhgates"}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.people.phone.find.json
     cost:
       type: per_success
@@ -572,6 +586,7 @@ endpoints:
       body:
         dsl: {filters: [{headline: {operation: "fts", value: "software engineer"}}], limit: 10, offset: 0, sort: []}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.people.search.json
     cost:
       type: per_success
@@ -610,6 +625,7 @@ endpoints:
     test_request:
       queryParams: {page: 1, perPage: 1, enrich: false, fullName: "Satya Nadella"}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.people.search.simple.json
     cost:
       type: per_success
@@ -647,6 +663,7 @@ endpoints:
     test_request:
       queryParams: {linkedinNumID: "2135371", page: 1, perPage: 1}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.linkedin.company.posts.json
     cost:
       type: per_success
@@ -682,6 +699,7 @@ endpoints:
     test_request:
       queryParams: {linkedinID: "satyanadella", perPage: 1}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.linkedin.user.posts.json
     cost:
       type: per_success
@@ -718,6 +736,7 @@ endpoints:
       pathParams: {postUrn: "urn:li:ugcPost:7496332962049933312"}
       queryParams: {page: 1, perPage: 1}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.linkedin.post.reactions.json
     cost:
       type: per_success
@@ -753,6 +772,7 @@ endpoints:
       pathParams: {postUrn: "urn:li:ugcPost:7496332962049933312"}
       queryParams: {page: 1, perPage: 1}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.linkedin.post.reposts.json
     cost:
       type: per_success
@@ -789,6 +809,7 @@ endpoints:
       pathParams: {postUrn: "urn:li:ugcPost:7496332962049933312"}
       queryParams: {page: 1, perPage: 1, numReplies: 1, sortOrder: "CHRONOLOGICAL"}
     verified: '2026-08-25'
+    added: '2026-08-25'
     example_response: examples/aviato.linkedin.post.comments.json
     cost:
       type: per_success

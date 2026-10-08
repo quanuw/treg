@@ -35,6 +35,7 @@ async:
   interval: 30
 endpoints:
 - id: openrouter.x.alibaba-happyhorse-1-0
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -107,6 +108,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/alibaba/happyhorse-1.0
 - id: openrouter.x.alibaba-happyhorse-1-1
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -179,6 +181,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/alibaba/happyhorse-1.1
 - id: openrouter.x.alibaba-wan-2-6
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -254,6 +257,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/alibaba/wan-2.6
 - id: openrouter.x.alibaba-wan-2-7
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -322,6 +326,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/alibaba/wan-2.7
 - id: openrouter.x.alibaba-wan-3-0-prime
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -402,6 +407,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/alibaba/wan-3.0-prime
 - id: openrouter.x.black-forest-labs-flux-3-video
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -481,6 +487,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/black-forest-labs/flux-3-video
 - id: openrouter.x.black-forest-labs-flux-video-upscale
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -523,6 +530,7 @@ endpoints:
     note: The live rate card includes a token, image-input, reference-image, or megapixel-second dimension that the request schema cannot bound with one declarative times field; this row remains BYOK-only.
   docs_url: https://openrouter.ai/black-forest-labs/flux-video-upscale
 - id: openrouter.x.bytedance-seedance-1-5-pro
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -585,6 +593,7 @@ endpoints:
     note: The live rate card includes a token, image-input, reference-image, or megapixel-second dimension that the request schema cannot bound with one declarative times field; this row remains BYOK-only.
   docs_url: https://openrouter.ai/bytedance/seedance-1-5-pro
 - id: openrouter.x.bytedance-seedance-2-0
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -653,6 +662,7 @@ endpoints:
     note: The live rate card includes a token, image-input, reference-image, or megapixel-second dimension that the request schema cannot bound with one declarative times field; this row remains BYOK-only.
   docs_url: https://openrouter.ai/bytedance/seedance-2.0
 - id: openrouter.x.bytedance-seedance-2-0-fast
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -715,6 +725,7 @@ endpoints:
     note: The live rate card includes a token, image-input, reference-image, or megapixel-second dimension that the request schema cannot bound with one declarative times field; this row remains BYOK-only.
   docs_url: https://openrouter.ai/bytedance/seedance-2.0-fast
 - id: openrouter.x.bytedance-seedance-2-0-mini
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -777,6 +788,7 @@ endpoints:
     note: The live rate card includes a token, image-input, reference-image, or megapixel-second dimension that the request schema cannot bound with one declarative times field; this row remains BYOK-only.
   docs_url: https://openrouter.ai/bytedance/seedance-2.0-mini
 - id: openrouter.x.google-veo-3-1
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -861,6 +873,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/google/veo-3.1
 - id: openrouter.x.google-veo-3-1-fast
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -957,6 +970,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/google/veo-3.1-fast
 - id: openrouter.x.google-veo-3-1-lite
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1040,6 +1054,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/google/veo-3.1-lite
 - id: openrouter.x.heygen-avatar-iv
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1170,6 +1185,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/heygen/avatar-iv
 - id: openrouter.x.kwaivgi-kling-v3-0-pro
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1245,6 +1261,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/kwaivgi/kling-v3.0-pro
 - id: openrouter.x.kwaivgi-kling-v3-0-std
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1320,6 +1337,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/kwaivgi/kling-v3.0-std
 - id: openrouter.x.kwaivgi-kling-video-o1
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1385,6 +1403,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/kwaivgi/kling-video-o1
 - id: openrouter.x.minimax-hailuo-2-3
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1448,6 +1467,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/minimax/hailuo-2.3
 - id: openrouter.x.minimax-hailuo-3
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1507,6 +1527,7 @@ endpoints:
     note: The live rate card includes a token, image-input, reference-image, or megapixel-second dimension that the request schema cannot bound with one declarative times field; this row remains BYOK-only.
   docs_url: https://openrouter.ai/minimax/hailuo-3
 - id: openrouter.x.openai-sora-2-pro
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1582,6 +1603,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/openai/sora-2-pro
 - id: openrouter.x.runway-aleph-2
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1646,6 +1668,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/runway/aleph-2
 - id: openrouter.x.runway-gen-4-5
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1710,6 +1733,7 @@ endpoints:
     note: Table rows quote the live rate card. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved and the terminal usage.cost settles; observed charges can include a minimum or fee absent from pricing_skus, so a settle may exceed its reserve (reconcile lists overruns).
   docs_url: https://openrouter.ai/runway/gen-4.5
 - id: openrouter.x.x-ai-grok-imagine-video
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models
@@ -1768,6 +1792,7 @@ endpoints:
     note: The live rate card includes a token, image-input, reference-image, or megapixel-second dimension that the request schema cannot bound with one declarative times field; this row remains BYOK-only.
   docs_url: https://openrouter.ai/x-ai/grok-imagine-video
 - id: openrouter.x.x-ai-grok-imagine-video-1-5
+  added: '2026-09-04'
   tier: extended
   platform: video-gen
   domain: models

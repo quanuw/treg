@@ -55,6 +55,7 @@ endpoints:
       confidence: verified
       note: "One verification credit for every accepted standard submission, including a 200 status=verifying response and final unknown results. On treg's key a verifying answer is charged when its result arrives, and released if none arrives within five minutes. Invalid input returned 400 and used no credit. The supplied acquisition rate is $0.004 per credit."
     verified: '2026-09-16'
+    added: '2026-09-16'
     example_response: examples/bounceban.people.email.verify.json
     terminal_example_response: examples/bounceban.people.email.verify.json
     docs_url: https://bounceban.com/public/doc/api.html#tag/Single-Verification
@@ -91,6 +92,7 @@ endpoints:
       note: "Normally one credit. Same-email retries within 30 minutes and catch-all unknown results with disable_catchall_verify=1 can be free. BYOK is not metered by treg."
     platform_blocked: "Free retry and conditional zero-credit rules cannot be settled from the repeated response; connect your own BounceBan key."
     verified: '2026-09-16'
+    added: '2026-09-16'
     example_response: examples/bounceban.people.email.verify.waterfall.json
     docs_url: https://bounceban.com/public/doc/api.html#tag/Single-Verification
 
@@ -113,6 +115,7 @@ endpoints:
     test_request: {queryParams: {id: "sanitized-task-id"}}
     cost: {type: free, value: 0, currency: USD, unit: call, confidence: verified, note: "Live status polling used no verification credit"}
     verified: '2026-09-16'
+    added: '2026-09-16'
     example_response: examples/bounceban.people.email.verify.status.json
     docs_url: https://bounceban.com/public/doc/api.html#tag/Single-Verification
   - id: bounceban.account.usage
@@ -130,5 +133,6 @@ endpoints:
     test_request: {queryParams: {}}
     cost: {type: free, value: 0, currency: USD, unit: call, confidence: verified, note: "Live account probes used no credits"}
     verified: '2026-09-16'
+    added: '2026-09-16'
     example_response: examples/bounceban.account.usage.json
     docs_url: https://bounceban.com/public/doc/api.html#tag/Account

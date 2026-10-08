@@ -51,10 +51,12 @@ endpoints:
       confidence: documented
       note: "Conservative original price: $0.005 per call, plus $0.0005 per returned full-content result beyond 10. More ordinary results alone cost nothing extra. Shared-key calls reserve the request maximum and settle from this response's meta.usage."
     verified: '2026-10-02'
+    added: '2026-09-29'
     example_response: examples/octen.web.search.json
     docs_url: https://docs.octen.ai/api-reference/search
 
   - id: octen.web.search.broad
+    added: '2026-09-29'
     capability: web.search.broad
     platform: web
     domain: search
@@ -85,6 +87,7 @@ endpoints:
     docs_url: https://docs.octen.ai/api-reference/broad-search
 
   - id: octen.web.search.news
+    added: '2026-09-29'
     capability: web.search.news
     platform: web
     domain: search
@@ -124,6 +127,7 @@ endpoints:
     docs_url: https://docs.octen.ai/api-reference/news-search
 
   - id: octen.web.extract
+    added: '2026-09-29'
     capability: web.extract
     platform: web
     domain: extract

@@ -74,9 +74,13 @@ While you're there:
   real target so the cost block's number is metered, not assumed.
 
 ```bash
+uv run --frozen python scripts/catalog_added.py      # adds `added:` (today, UTC) to every new row
 uv run --frozen python scripts/catalog_validate.py   # must exit 0
 uv run --with pytest-xdist pytest -n auto -q         # must pass
 ```
+
+Every endpoint row needs `added: 'YYYY-MM-DD'`, the UTC day your tool reaches the catalog; the
+first command writes it. Do not change the date of any tool that is already listed.
 
 Rebase on the latest `main` right before opening — catalog files move fast and a stale branch
 conflicts in the shared test lists.

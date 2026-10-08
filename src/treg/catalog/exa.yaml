@@ -50,6 +50,7 @@ endpoints:
     test_request:
       body: {query: "open source vector database written in rust", numResults: 3}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.web.search.json
     cost:
       type: per_call
@@ -89,6 +90,7 @@ endpoints:
     test_request:
       body: {query: "open source vector database written in rust", numResults: 3, type: "deep-lite"}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.web.search.deep.json
     cost:
       type: per_call
@@ -124,6 +126,7 @@ endpoints:
     test_request:
       body: {query: "head of security at a fintech in berlin", category: "people", numResults: 3}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.people.search.json
     cost:
       type: per_call
@@ -162,6 +165,7 @@ endpoints:
     test_request:
       body: {query: "vector database startups", category: "company", numResults: 3}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.companies.search.json
     cost:
       type: per_call
@@ -199,6 +203,7 @@ endpoints:
     test_request:
       body: {query: "vector database funding round", category: "news", numResults: 3, startPublishedDate: "2026-07-01"}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.web.search.news.json
     cost:
       type: per_call
@@ -235,6 +240,7 @@ endpoints:
     test_request:
       body: {query: "approximate nearest neighbor search HNSW", category: "publication", numResults: 3}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.web.search.publications.json
     cost:
       type: per_call
@@ -272,6 +278,7 @@ endpoints:
     test_request:
       body: {urls: ["https://en.wikipedia.org/wiki/Hierarchical_navigable_small_world"], text: {maxCharacters: 2000}}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.web.contents.get.json
     cost:
       type: per_result
@@ -310,6 +317,7 @@ endpoints:
     test_request:
       body: {url: "https://qdrant.tech", numResults: 3, excludeSourceDomain: true}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.web.similar.json
     cost:
       type: per_call
@@ -344,6 +352,7 @@ endpoints:
     test_request:
       body: {query: "Instagram creators who post their trucks fitted with Nitto tires", includeDomains: ["instagram.com"], numResults: 3}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.creators.search.json
     cost:
       type: per_call
@@ -378,6 +387,7 @@ endpoints:
     test_request:
       body: {query: "What year was the HNSW algorithm paper published and by whom?"}
     verified: '2026-08-27'
+    added: '2026-08-27'
     example_response: examples/exa.web.answer.json
     cost:
       type: per_call

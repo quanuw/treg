@@ -41,6 +41,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.school.profile.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.company.profile
@@ -97,6 +98,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.company.profile.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.person.profile
@@ -168,6 +170,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.person.profile.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.company.employees.list
@@ -237,6 +240,7 @@ endpoints:
       field: employees
       max_page: 10
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.company.employees.list.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.company.employees.count
@@ -281,6 +285,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.company.employees.count.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.person.profile-picture
@@ -310,6 +315,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.person.profile-picture.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.company.profile-picture
@@ -339,6 +345,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.company.profile-picture.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.person.lookup
@@ -386,6 +393,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.person.lookup.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.company.role.lookup
@@ -421,6 +429,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.company.role.lookup.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.company.lookup
@@ -459,6 +468,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.company.lookup.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.company.lookup-id
@@ -488,6 +498,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.company.lookup-id.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.company.employees.search
@@ -538,6 +549,7 @@ endpoints:
     note: Enrichlayer documents 10 credits per successful request, but a one-result base call spent 16 credits.
       The full charge rule has not been established.
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.company.employees.search.json
   docs_url: https://enrichlayer.com/docs/api/v2/company-api/employee-search
   platform_blocked: A one-result live call used 16 credits versus the documented 10 credits per successful request;
@@ -575,6 +587,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.person.reverse-email.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.contacts.reverse-phone
@@ -604,6 +617,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: documented
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.contacts.reverse-phone.json
   docs_url: https://enrichlayer.com/docs/api/v2/contact-api/reverse-contact-number-lookup
 - id: enrichlayer.person.work-email
@@ -638,6 +652,7 @@ endpoints:
     note: Enrichlayer documents 3 credits for a successful lookup. A live request returned a queued 202 with no
       final email or charge observed.
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.person.work-email.json
   docs_url: https://enrichlayer.com/docs/api/v2/contact-api/work-email-lookup
   platform_blocked: The live call returned a queued 202 without delivery or final charge evidence; connect your
@@ -670,6 +685,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.jobs.profile.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.jobs.search
@@ -720,6 +736,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.jobs.search.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.companies.search
@@ -846,6 +863,7 @@ endpoints:
         use_cache:
           if-recent: 2
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.companies.search.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.people.search
@@ -1056,6 +1074,7 @@ endpoints:
         use_cache:
           if-recent: 2
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.people.search.json
   docs_url: https://enrichlayer.com/docs/api/v2/search-api/person-search
 - id: enrichlayer.email.disposable-check
@@ -1085,6 +1104,7 @@ endpoints:
     checked: '2026-10-01'
     confidence: verified
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.email.disposable-check.json
   docs_url: https://enrichlayer.com/docs
 - id: enrichlayer.contacts.personal-phone
@@ -1130,6 +1150,7 @@ endpoints:
       field: numbers
       max_page: 10
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.contacts.personal-phone.json
   docs_url: https://enrichlayer.com/docs/api/v2/contact-api/personal-contact-number-lookup
 - id: enrichlayer.contacts.personal-email
@@ -1186,6 +1207,7 @@ endpoints:
     note: One credit per returned email; precise validation adds one credit per found email. Fast validation adds
       no charge.
   verified: '2026-10-01'
+  added: '2026-09-30'
   example_response: examples/enrichlayer.contacts.personal-email.json
   docs_url: https://enrichlayer.com/docs/api/v2/contact-api/personal-email-lookup
 proposed_capabilities:

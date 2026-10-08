@@ -71,6 +71,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-ai-keyword-data-keywords-search-volume-live.json
   observed_cost: 0.0102
   capability: ai-search.keywords.volume
@@ -146,6 +147,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-historical-live.json
   observed_cost: 0.101
   capability: ai-search.mentions.historical
@@ -263,6 +265,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-multi-target-metrics-live.json
   observed_cost: 0.104
   capability: ai-search.mentions.multi_target
@@ -366,6 +369,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-search-mentions-live.json
   observed_cost: 0.103
   capability: ai-search.mentions.search
@@ -451,6 +455,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-target-metrics-live.json
   observed_cost: 0.101
   capability: ai-search.mentions.summary
@@ -544,6 +549,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-target-metrics-lite-live.json
   observed_cost: 0.101
   capability: ai-search.mentions.summary
@@ -629,6 +635,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-timeseries-delta-live.json
   observed_cost: 0.105
   capability: ai-search.mentions.timeseries_delta
@@ -714,6 +721,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-timeseries-new-lost-live.json
   observed_cost: 0.105
   capability: ai-search.mentions.timeseries_new_lost
@@ -829,6 +837,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-top-mentioned-brand-categories-live.json
   observed_cost: 0.103
   capability: ai-search.mentions.top_brand_categories
@@ -944,6 +953,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-top-mentioned-brand-categories-lite-live.json
   observed_cost: 0.103
   capability: ai-search.mentions.top_brand_categories
@@ -1059,6 +1069,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-top-mentioned-brands-live.json
   observed_cost: 0.103
   capability: ai-search.mentions.top_brands
@@ -1174,6 +1185,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-top-mentioned-brands-lite-live.json
   observed_cost: 0.103
   capability: ai-search.mentions.top_brands
@@ -1295,6 +1307,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-top-mentioned-domains-live.json
   observed_cost: 0.103
   capability: ai-search.mentions.top_domains
@@ -1416,6 +1429,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-top-mentioned-domains-lite-live.json
   observed_cost: 0.103
   capability: ai-search.mentions.top_domains
@@ -1537,6 +1551,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-top-mentioned-pages-live.json
   observed_cost: 0.103
   capability: ai-search.mentions.top_pages
@@ -1658,6 +1673,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-llm-mentions-top-mentioned-pages-lite-live.json
   observed_cost: 0.103
   capability: ai-search.mentions.top_pages
@@ -1716,6 +1732,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-amazon-bulk-search-volume-live.json
   observed_cost: 0.01236
   observed_time: 0.51
@@ -1784,6 +1801,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-amazon-product-competitors-live.json
   observed_cost: 0.01968
 - id: dataforseo.x.dataforseo-labs-amazon-product-keyword-intersections-live
@@ -1861,6 +1879,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-amazon-product-keyword-intersections-live.json
   observed_cost: 0.012
   observed_time: 1.22
@@ -1917,6 +1936,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-amazon-product-rank-overview-live.json
   observed_cost: 0.01224
   observed_time: 0.42
@@ -1989,6 +2009,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-amazon-ranked-keywords-live.json
   observed_cost: 0.01548
 - id: dataforseo.x.dataforseo-labs-amazon-related-keywords-live
@@ -2064,6 +2085,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-amazon-related-keywords-live.json
   observed_cost: 0.0126
 - id: dataforseo.x.merchant-amazon-asin-live-advanced
@@ -2123,10 +2145,12 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.merchant-amazon-asin-live-advanced.json
   observed_cost: 0.005
   observed_time: 22.57
 - id: dataforseo.x.merchant-amazon-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: amazon
@@ -2225,6 +2249,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.merchant-amazon-products-live-advanced.json
   observed_cost: 0.0033
   observed_time: 23.64
@@ -2285,6 +2310,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.merchant-amazon-sellers-live-advanced.json
   observed_cost: 0.0033
   observed_time: 105.51
@@ -2353,6 +2379,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-apple-app-info-task-post.json
   observed_cost: 0.0006
 - id: dataforseo.x.app-data-apple-app-list-task-post
@@ -2432,6 +2459,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-apple-app-list-task-post.json
   observed_cost: 0.0024
 - id: dataforseo.x.app-data-apple-app-listings-search-live
@@ -2511,6 +2539,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-apple-app-listings-search-live.json
   cost:
     type: per_call
@@ -2598,6 +2627,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-apple-app-reviews-task-post.json
   observed_cost: 0.006
 - id: dataforseo.x.app-data-apple-app-searches-task-post
@@ -2671,6 +2701,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-apple-app-searches-task-post.json
   observed_cost: 0.0024
 - id: dataforseo.x.dataforseo-labs-apple-app-competitors-live
@@ -2740,6 +2771,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-apple-app-competitors-live.json
   observed_cost: 0.0132
 - id: dataforseo.x.dataforseo-labs-apple-app-intersection-live
@@ -2813,6 +2845,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-apple-app-intersection-live.json
   observed_cost: 0.0132
 - id: dataforseo.x.dataforseo-labs-apple-bulk-app-metrics-live
@@ -2868,6 +2901,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-apple-bulk-app-metrics-live.json
   observed_cost: 0.01224
 - id: dataforseo.x.dataforseo-labs-apple-keywords-for-app-live
@@ -2937,9 +2971,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-apple-keywords-for-app-live.json
   observed_cost: 0.0132
 - id: dataforseo.x.serp-baidu-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: baidu
@@ -3053,10 +3089,12 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-baidu-organic-task-post.json
   observed_cost: 0.0012
   capability: baidu.serp.organic
 - id: dataforseo.x.keywords-data-bing-audience-estimation-industries
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: bing
@@ -3068,6 +3106,7 @@ endpoints:
   docs_url: https://docs.dataforseo.com/v3/keywords_data/bing/audience_estimation/industries/
   untestable: the OpenAPI spec ships no example request body for this route, so no test request could be generated
 - id: dataforseo.x.keywords-data-bing-audience-estimation-job-functions
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: bing
@@ -3161,6 +3200,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-bing-audience-estimation-live.json
   observed_cost: 0.09
   capability: bing.audience.estimate
@@ -3231,6 +3271,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-bing-keyword-performance-live.json
   observed_cost: 0.09
   capability: bing.keywords.performance
@@ -3317,6 +3358,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-bing-keywords-for-keywords-live.json
   observed_cost: 0.09
   capability: bing.keywords.ideas
@@ -3397,6 +3439,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-bing-keywords-for-site-live.json
   observed_cost: 0.09
   capability: bing.keywords.for_site
@@ -3479,6 +3522,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-bing-search-volume-live.json
   observed_cost: 0.09
   capability: bing.keywords.volume
@@ -3553,10 +3597,12 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-bing-search-volume-history-live.json
   observed_cost: 0.09
   capability: bing.keywords.volume_history
 - id: dataforseo.x.serp-bing-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: bing
@@ -3676,6 +3722,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-bing-organic-live-advanced.json
   observed_cost: 0.002
   capability: bing.serp.organic
@@ -3772,6 +3819,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-bing-organic-live-regular.json
   observed_cost: 0.002
   capability: bing.serp.organic
@@ -3869,6 +3917,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-chat-gpt-llm-responses-live.json
   observed_cost: 0.0292488
   capability: ai-search.chatgpt.answer
@@ -3924,10 +3973,12 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-chat-gpt-llm-scraper-live-advanced.json
   observed_cost: 0.004
   capability: ai-search.chatgpt.scrape
 - id: dataforseo.x.ai-optimization-chat-gpt-llm-scraper-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: ai-search
@@ -3938,6 +3989,7 @@ endpoints:
   summary: You will receive the list of locations by this API call.
   untestable: the OpenAPI spec ships no example request body for this route, so no test request could be generated
 - id: dataforseo.x.ai-optimization-claude-llm-responses-live
+  added: '2026-07-28'
   tier: extended
   platform: ai-search
   method: POST
@@ -4125,6 +4177,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-gemini-llm-responses-live.json
   observed_cost: 0.036256
   capability: ai-search.gemini.answer
@@ -4180,6 +4233,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-gemini-llm-scraper-live-advanced.json
   observed_cost: 0.004
   capability: ai-search.gemini.scrape
@@ -4259,6 +4313,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-google-extended-reviews-task-post.json
   observed_cost: 0.0015
 - id: dataforseo.x.business-data-google-hotel-info-live-advanced
@@ -4349,6 +4404,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-google-hotel-info-live-advanced.json
   observed_cost: 0.004
 - id: dataforseo.x.business-data-google-hotel-searches-live
@@ -4480,9 +4536,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-google-hotel-searches-live.json
   observed_cost: 0.004
 - id: dataforseo.x.business-data-google-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: google
@@ -4546,6 +4604,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-google-my-business-info-live.json
   observed_cost: 0.0054
 - id: dataforseo.x.business-data-google-my-business-updates-task-post
@@ -4617,6 +4676,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-google-my-business-updates-task-post.json
   observed_cost: 0.00225
 - id: dataforseo.x.business-data-google-questions-and-answers-live
@@ -4676,6 +4736,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-google-questions-and-answers-live.json
   observed_cost: 0.0054
 - id: dataforseo.x.business-data-google-reviews-task-post
@@ -4763,6 +4824,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-google-reviews-task-post.json
   observed_cost: 0.00375
 - id: dataforseo.x.dataforseo-labs-google-app-competitors-live
@@ -4832,6 +4894,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-app-competitors-live.json
   observed_cost: 0.0132
 - id: dataforseo.x.dataforseo-labs-google-app-intersection-live
@@ -4905,9 +4968,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-app-intersection-live.json
   observed_cost: 0.0132
 - id: dataforseo.x.dataforseo-labs-google-available-history
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: google
@@ -4971,6 +5036,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-bulk-app-metrics-live.json
   observed_cost: 0.01224
 - id: dataforseo.x.dataforseo-labs-google-bulk-keyword-difficulty-live
@@ -5028,6 +5094,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-bulk-keyword-difficulty-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-bulk-traffic-estimation-live
@@ -5099,6 +5166,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-bulk-traffic-estimation-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-categories-for-domain-live
@@ -5194,6 +5262,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-categories-for-domain-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-categories-for-keywords-live
@@ -5241,6 +5310,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-categories-for-keywords-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-competitors-domain-live
@@ -5346,6 +5416,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-competitors-domain-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-domain-intersection-live
@@ -5439,6 +5510,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-domain-intersection-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-domain-metrics-by-categories-live
@@ -5548,6 +5620,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-domain-metrics-by-categories-live.json
   observed_cost: 0.1236
 - id: dataforseo.x.dataforseo-labs-google-domain-rank-overview-live
@@ -5611,6 +5684,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-domain-rank-overview-live.json
   observed_cost: 0.01212
 - id: dataforseo.x.dataforseo-labs-google-historical-bulk-traffic-estimation-live
@@ -5694,6 +5768,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-historical-bulk-traffic-estimation-live.json
   observed_cost: 0.1236
 - id: dataforseo.x.dataforseo-labs-google-historical-keyword-data-live
@@ -5747,6 +5822,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-historical-keyword-data-live.json
   observed_cost: 0.01212
 - id: dataforseo.x.dataforseo-labs-google-historical-rank-overview-live
@@ -5822,6 +5898,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-historical-rank-overview-live.json
   observed_cost: 0.1236
 - id: dataforseo.x.dataforseo-labs-google-historical-serps-live
@@ -5885,6 +5962,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-historical-serps-live.json
   observed_cost: 0.00012
 - id: dataforseo.x.dataforseo-labs-google-keyword-ideas-live
@@ -5980,6 +6058,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-keyword-ideas-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-keyword-overview-live
@@ -6045,6 +6124,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-keyword-overview-live.json
   observed_cost: 0.02412
 - id: dataforseo.x.dataforseo-labs-google-keyword-suggestions-live
@@ -6142,6 +6222,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-keyword-suggestions-live.json
   observed_cost: 0.01212
 - id: dataforseo.x.dataforseo-labs-google-keywords-for-app-live
@@ -6211,6 +6292,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-keywords-for-app-live.json
   observed_cost: 0.0132
 - id: dataforseo.x.dataforseo-labs-google-keywords-for-categories-live
@@ -6306,6 +6388,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-keywords-for-categories-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-keywords-for-site-live
@@ -6403,6 +6486,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-keywords-for-site-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-page-intersection-live
@@ -6506,6 +6590,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-page-intersection-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-relevant-pages-live
@@ -6607,6 +6692,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-relevant-pages-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-search-intent-live
@@ -6656,6 +6742,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-search-intent-live.json
   observed_cost: 0.01248
 - id: dataforseo.x.dataforseo-labs-google-serp-competitors-live
@@ -6739,6 +6826,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-serp-competitors-live.json
   observed_cost: 0.0126
 - id: dataforseo.x.dataforseo-labs-google-subdomains-live
@@ -6838,6 +6926,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-subdomains-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.dataforseo-labs-google-top-searches-live
@@ -6917,6 +7006,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.dataforseo-labs-google-top-searches-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.keywords-data-google-ads-ad-traffic-by-keywords-live
@@ -7002,6 +7092,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-google-ads-ad-traffic-by-keywords-live.json
   observed_cost: 0.09
 - id: dataforseo.x.keywords-data-google-ads-keywords-for-keywords-live
@@ -7079,6 +7170,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-google-ads-keywords-for-keywords-live.json
   observed_cost: 0.09
 - id: dataforseo.x.keywords-data-google-ads-keywords-for-site-live
@@ -7156,9 +7248,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-google-ads-keywords-for-site-live.json
   observed_cost: 0.09
 - id: dataforseo.x.keywords-data-google-ads-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: google
@@ -7247,9 +7341,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-google-trends-explore-live.json
   observed_cost: 0.011
 - id: dataforseo.x.keywords-data-google-trends-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: google
@@ -7261,6 +7357,7 @@ endpoints:
   docs_url: https://docs.dataforseo.com/v3/keywords_data/google_trends/locations/
   untestable: the OpenAPI spec ships no example request body for this route, so no test request could be generated
 - id: dataforseo.x.merchant-google-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: google
@@ -7352,6 +7449,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.merchant-google-product-info-task-post.json
   observed_cost: 0.001
 - id: dataforseo.x.merchant-google-products-task-post
@@ -7457,9 +7555,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.merchant-google-products-task-post.json
   observed_cost: 0.001
 - id: dataforseo.x.merchant-google-sellers-ad-url-shop-ad-aclk
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: google
@@ -7567,6 +7667,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.merchant-google-sellers-task-post.json
   observed_cost: 0.001
 - id: dataforseo.x.serp-ai-summary
@@ -7617,6 +7718,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-ai-summary.json
   observed_cost: 0.01
 - id: dataforseo.x.serp-google-ads-advertisers-task-post
@@ -7677,6 +7779,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-ads-advertisers-task-post.json
   observed_cost: 0.0006
 - id: dataforseo.x.serp-google-ads-search-task-post
@@ -7767,6 +7870,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-ads-search-task-post.json
   observed_cost: 0.0006
 - id: dataforseo.x.serp-google-ai-mode-live-advanced
@@ -7846,6 +7950,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-ai-mode-live-advanced.json
   observed_cost: 0.004
 - id: dataforseo.x.serp-google-autocomplete-live-advanced
@@ -7906,6 +8011,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-autocomplete-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-dataset-info-live-advanced
@@ -7952,6 +8058,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-dataset-info-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-dataset-search-live-advanced
@@ -8040,6 +8147,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-dataset-search-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-events-live-advanced
@@ -8114,6 +8222,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-events-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-finance-explore-live-advanced
@@ -8170,6 +8279,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-finance-explore-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-finance-markets-live-advanced
@@ -8226,6 +8336,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-finance-markets-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-finance-quote-live-advanced
@@ -8288,6 +8399,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-finance-quote-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-finance-ticker-search-live-advanced
@@ -8344,6 +8456,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-finance-ticker-search-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-images-live-advanced
@@ -8422,6 +8535,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-images-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-jobs-task-post
@@ -8500,6 +8614,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-jobs-task-post.json
   observed_cost: 0.0006
 - id: dataforseo.x.serp-google-local-finder-live-advanced
@@ -8583,9 +8698,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-local-finder-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: google
@@ -8677,6 +8794,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-maps-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-news-live-advanced
@@ -8768,6 +8886,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-news-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-google-organic-live-advanced
@@ -8913,6 +9032,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-organic-live-advanced.json
   observed_cost: 0.004
 - id: dataforseo.x.serp-google-search-by-image-task-post
@@ -9011,6 +9131,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-google-search-by-image-task-post.json
   observed_cost: 0.0006
 - id: dataforseo.x.serp-screenshot
@@ -9061,6 +9182,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-screenshot.json
   observed_cost: 0.004
 - id: dataforseo.x.app-data-google-app-info-task-post
@@ -9128,6 +9250,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-google-app-info-task-post.json
   observed_cost: 0.0006
 - id: dataforseo.x.app-data-google-app-list-task-post
@@ -9209,6 +9332,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-google-app-list-task-post.json
   observed_cost: 0.0012
 - id: dataforseo.x.app-data-google-app-listings-search-live
@@ -9288,6 +9412,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-google-app-listings-search-live.json
   observed_cost: 0.11
 - id: dataforseo.x.app-data-google-app-reviews-task-post
@@ -9369,6 +9494,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-google-app-reviews-task-post.json
   observed_cost: 0.00075
 - id: dataforseo.x.app-data-google-app-searches-task-post
@@ -9442,9 +9568,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.app-data-google-app-searches-task-post.json
   observed_cost: 0.0012
 - id: dataforseo.x.app-data-google-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: google-play
@@ -9548,6 +9676,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-naver-organic-task-post.json
   observed_cost: 0.0006
   capability: naver.serp.organic
@@ -9629,10 +9758,12 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.ai-optimization-perplexity-llm-responses-live.json
   observed_cost: 0.005861
   capability: ai-search.perplexity.answer
 - id: dataforseo.x.serp-seznam-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: seznam
@@ -9752,10 +9883,12 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-seznam-organic-task-post.json
   observed_cost: 0.0006
   capability: seznam.serp.organic
 - id: dataforseo.x.business-data-tripadvisor-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: tripadvisor
@@ -9861,6 +9994,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-tripadvisor-reviews-task-post.json
   observed_cost: 0.00075
   capability: tripadvisor.business.reviews
@@ -9921,6 +10055,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-tripadvisor-search-task-post.json
   observed_cost: 0.00075
   capability: tripadvisor.search.businesses
@@ -9975,6 +10110,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-trustpilot-reviews-task-post.json
   observed_cost: 0.0015
   capability: trustpilot.business.reviews
@@ -10025,6 +10161,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-trustpilot-search-task-post.json
   observed_cost: 0.0015
   capability: trustpilot.search.businesses
@@ -10076,6 +10213,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-bulk-backlinks-live.json
   observed_cost: 0.02436
 - id: dataforseo.x.backlinks-bulk-new-lost-backlinks-live
@@ -10132,6 +10270,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-bulk-new-lost-backlinks-live.json
   cost:
     type: per_call
@@ -10198,6 +10337,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-bulk-new-lost-referring-domains-live.json
   cost:
     type: per_call
@@ -10250,6 +10390,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-bulk-pages-summary-live.json
   observed_cost: 0.024072
 - id: dataforseo.x.backlinks-bulk-referring-domains-live
@@ -10301,6 +10442,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-bulk-referring-domains-live.json
   observed_cost: 0.02436
 - id: dataforseo.x.backlinks-bulk-spam-score-live
@@ -10352,6 +10494,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-bulk-spam-score-live.json
   observed_cost: 0.02436
 - id: dataforseo.x.backlinks-domain-intersection-live
@@ -10452,6 +10595,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-domain-intersection-live.json
   observed_cost: 0.02418
 - id: dataforseo.x.backlinks-domain-pages-live
@@ -10541,6 +10685,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-domain-pages-live.json
   observed_cost: 0.02418
 - id: dataforseo.x.backlinks-domain-pages-summary-live
@@ -10622,6 +10767,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-domain-pages-summary-live.json
   observed_cost: 0.024144
 - id: dataforseo.x.backlinks-history-live
@@ -10668,9 +10814,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-history-live.json
   observed_cost: 0.024324
 - id: dataforseo.x.backlinks-index
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: web
@@ -10787,6 +10935,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-page-intersection-live.json
   observed_cost: 0.02418
 - id: dataforseo.x.backlinks-referring-networks-live
@@ -10892,6 +11041,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-referring-networks-live.json
   observed_cost: 0.02418
 - id: dataforseo.x.backlinks-timeseries-new-lost-summary-live
@@ -10945,6 +11095,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-timeseries-new-lost-summary-live.json
   observed_cost: 0.024108
 - id: dataforseo.x.backlinks-timeseries-summary-live
@@ -11002,6 +11153,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.backlinks-timeseries-summary-live.json
   observed_cost: 0.024108
 - id: dataforseo.x.business-data-business-listings-categories-aggregation-live
@@ -11084,6 +11236,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-business-listings-categories-aggregation-live.json
   observed_cost: 0.01308
 - id: dataforseo.x.business-data-business-listings-search-live
@@ -11174,6 +11327,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-business-listings-search-live.json
   observed_cost: 0.01308
 - id: dataforseo.x.business-data-social-media-pinterest-live
@@ -11213,6 +11367,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.business-data-social-media-pinterest-live.json
   observed_cost: 0.00012
 - id: dataforseo.x.content-analysis-category-trends-live
@@ -11282,6 +11437,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.content-analysis-category-trends-live.json
   observed_cost: 0.024144
 - id: dataforseo.x.content-analysis-phrase-trends-live
@@ -11355,6 +11511,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.content-analysis-phrase-trends-live.json
   observed_cost: 0.024144
 - id: dataforseo.x.content-analysis-rating-distribution-live
@@ -11422,6 +11579,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.content-analysis-rating-distribution-live.json
   observed_cost: 0.024
 - id: dataforseo.x.content-analysis-search-live
@@ -11521,6 +11679,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.content-analysis-search-live.json
   observed_cost: 0.024036
 - id: dataforseo.x.content-analysis-sentiment-analysis-live
@@ -11582,6 +11741,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.content-analysis-sentiment-analysis-live.json
   observed_cost: 0.024036
 - id: dataforseo.x.content-analysis-summary-live
@@ -11657,6 +11817,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.content-analysis-summary-live.json
   observed_cost: 0.024036
 - id: dataforseo.x.domain-analytics-technologies-aggregation-technologies-live
@@ -11762,6 +11923,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.domain-analytics-technologies-aggregation-technologies-live.json
   observed_cost: 0.0132
 - id: dataforseo.x.domain-analytics-technologies-domain-technologies-live
@@ -11789,6 +11951,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.domain-analytics-technologies-domain-technologies-live.json
   observed_cost: 0.012
 - id: dataforseo.x.domain-analytics-technologies-domains-by-html-terms-live
@@ -11854,6 +12017,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.domain-analytics-technologies-domains-by-html-terms-live.json
   observed_cost: 0.024
 - id: dataforseo.x.domain-analytics-technologies-domains-by-technology-live
@@ -11945,6 +12109,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.domain-analytics-technologies-domains-by-technology-live.json
   cost:
     type: per_call
@@ -11958,6 +12123,7 @@ endpoints:
     note: 'DataForSEO bills by domains returned, not per call: over the 14 days to 2026-10-02 real charges ran $0.038 median and $2.41 at the top (large `limit`), so keep `limit` small. The response `cost` is the exact charge and settles the call.'
   observed_cost: 0.024
 - id: dataforseo.x.domain-analytics-technologies-technologies
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: web
@@ -12049,6 +12215,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.domain-analytics-technologies-technologies-summary-live.json
   observed_cost: 0.0132
 - id: dataforseo.x.domain-analytics-technologies-technology-stats-live
@@ -12092,6 +12259,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.domain-analytics-technologies-technology-stats-live.json
   observed_cost: 0.0144
 - id: dataforseo.x.domain-analytics-whois-overview-live
@@ -12148,6 +12316,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.domain-analytics-whois-overview-live.json
   observed_cost: 0.1224
 - id: dataforseo.x.keywords-data-clickstream-data-bulk-search-volume-live
@@ -12197,6 +12366,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-clickstream-data-bulk-search-volume-live.json
   observed_cost: 0.01236
 - id: dataforseo.x.keywords-data-clickstream-data-dataforseo-search-volume-live
@@ -12260,6 +12430,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-clickstream-data-dataforseo-search-volume-live.json
   observed_cost: 0.18
 - id: dataforseo.x.keywords-data-clickstream-data-global-search-volume-live
@@ -12299,6 +12470,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-clickstream-data-global-search-volume-live.json
   observed_cost: 0.18
 - id: dataforseo.x.keywords-data-dataforseo-trends-demography-live
@@ -12366,6 +12538,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-dataforseo-trends-demography-live.json
   observed_cost: 0.0024
 - id: dataforseo.x.keywords-data-dataforseo-trends-explore-live
@@ -12428,9 +12601,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-dataforseo-trends-explore-live.json
   observed_cost: 0.0012
 - id: dataforseo.x.keywords-data-dataforseo-trends-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: web
@@ -12506,6 +12681,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-dataforseo-trends-merged-data-live.json
   observed_cost: 0.006
 - id: dataforseo.x.keywords-data-dataforseo-trends-subregion-interests-live
@@ -12573,6 +12749,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.keywords-data-dataforseo-trends-subregion-interests-live.json
   observed_cost: 0.0024
 - id: dataforseo.x.on-page-content-parsing
@@ -12611,9 +12788,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.on-page-content-parsing.json
   observed_cost: 0
 - id: dataforseo.x.on-page-content-parsing-live
+  added: '2026-07-28'
   tier: extended
   platform: web
   method: POST
@@ -12688,6 +12867,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-duplicate-content
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -12729,6 +12909,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-duplicate-tags
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -12771,6 +12952,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-keyword-density
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -12821,6 +13003,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-lighthouse-audits
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: web
@@ -12832,6 +13015,7 @@ endpoints:
   docs_url: https://docs.dataforseo.com/v3/on_page/lighthouse/audits/
   untestable: the OpenAPI spec ships no example request body for this route, so no test request could be generated
 - id: dataforseo.x.on-page-lighthouse-live-json
+  added: '2026-07-28'
   tier: extended
   platform: web
   method: POST
@@ -12907,6 +13091,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-links
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -12965,6 +13150,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-microdata
+  added: '2026-07-28'
   tier: extended
   platform: web
   method: POST
@@ -12992,6 +13178,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-non-indexable
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -13033,6 +13220,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-page-screenshot
+  added: '2026-07-28'
   capability: web.screenshot
   tier: extended
   platform: web
@@ -13093,6 +13281,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-pages
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -13148,6 +13337,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-pages-by-resource
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -13193,6 +13383,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-raw-html
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -13218,6 +13409,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-redirect-chains
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -13259,6 +13451,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-resources
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -13322,6 +13515,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-summary-id
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -13537,9 +13731,11 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.on-page-task-post.json
   observed_cost: 0.018
 - id: dataforseo.x.on-page-uncrawlable-resources
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -13584,6 +13780,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.on-page-waterfall
+  added: '2026-07-28'
   platform_blocked: "Shared-key task ownership is not available for this legacy endpoint; connect your own DataForSEO key."
   tier: extended
   platform: web
@@ -13613,6 +13810,7 @@ endpoints:
     note: the POST body is an ARRAY of task objects with these fields — one object per task
   untestable: needs the id of a completed on_page crawl (task_post plus polling); the one-shot route of this family is verified via dataforseo.x.on-page-instant-pages
 - id: dataforseo.x.serp-yahoo-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: yahoo
@@ -13720,6 +13918,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-yahoo-organic-live-advanced.json
   observed_cost: 0.002
   capability: yahoo.serp.organic
@@ -13820,10 +14019,12 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-yahoo-organic-live-regular.json
   observed_cost: 0.002
   capability: yahoo.serp.organic
 - id: dataforseo.x.serp-youtube-locations-country
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: youtube
@@ -13899,6 +14100,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-youtube-organic-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-youtube-video-comments-live-advanced
@@ -13962,6 +14164,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-youtube-video-comments-live-advanced.json
   observed_cost: 0.002
 - id: dataforseo.x.serp-youtube-video-info-live-advanced
@@ -14021,6 +14224,7 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-youtube-video-info-live-advanced.json
   observed_cost: 0.006
 - id: dataforseo.x.serp-youtube-video-subtitles-live-advanced
@@ -14088,5 +14292,6 @@ endpoints:
     json_path: tasks.0.status_code
     equals: 20000
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/dataforseo.x.serp-youtube-video-subtitles-live-advanced.json
   observed_cost: 0.006

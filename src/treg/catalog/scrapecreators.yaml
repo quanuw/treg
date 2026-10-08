@@ -23,6 +23,7 @@ endpoints:
       queryParams: {}
     cost: {type: free, value: 0, currency: USD, unit: call}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.account.usage.json
     docs_url: https://docs.scrapecreators.com/account/credit-balance
 
@@ -44,6 +45,7 @@ endpoints:
       queryParams: {handle: "stoolpresidente"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.tiktok.user.profile.json
     docs_url: https://docs.scrapecreators.com/tiktok/profile
 
@@ -63,6 +65,7 @@ endpoints:
       queryParams: {url: "https://www.tiktok.com/@randomspamvideos25/video/7251387037834595630"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.tiktok.video.detail.json
     docs_url: https://docs.scrapecreators.com/tiktok/video
 
@@ -82,6 +85,7 @@ endpoints:
       queryParams: {url: "https://www.tiktok.com/@randomspamvideos25/video/7251387037834595630"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.tiktok.video.comments.json
     docs_url: https://docs.scrapecreators.com/tiktok/video/comments
 
@@ -105,6 +109,7 @@ endpoints:
       queryParams: {query: "ai", date_posted: "all-time"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.tiktok.search.videos.json
     docs_url: https://docs.scrapecreators.com/tiktok/search/keyword
 
@@ -124,6 +129,7 @@ endpoints:
       queryParams: {handle: "natgeo"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.instagram.user.profile.json
     docs_url: https://docs.scrapecreators.com/instagram/profile
 
@@ -143,6 +149,7 @@ endpoints:
       queryParams: {handle: "natgeo"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.instagram.user.posts.json
     docs_url: https://docs.scrapecreators.com/instagram/user/posts
 
@@ -162,6 +169,7 @@ endpoints:
       queryParams: {url: "https://www.instagram.com/reel/DOq6eV6iIgD"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.instagram.post.comments.json
     docs_url: https://docs.scrapecreators.com/instagram/post/comments
 
@@ -184,6 +192,7 @@ endpoints:
       queryParams: {channelId: "UC-9-kyTW8ZkZNDHQJ6FgpwQ"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.youtube.channel.profile.json
     docs_url: https://docs.scrapecreators.com/youtube/channel
 
@@ -202,6 +211,7 @@ endpoints:
       queryParams: {url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.youtube.video.detail.json
     docs_url: https://docs.scrapecreators.com/youtube/video
 
@@ -221,6 +231,7 @@ endpoints:
       queryParams: {url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.youtube.video.comments.json
     docs_url: https://docs.scrapecreators.com/youtube/video/comments
 
@@ -240,6 +251,7 @@ endpoints:
       queryParams: {handle: "levelsio"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.x.user.profile.json
     docs_url: https://docs.scrapecreators.com/twitter/profile
 
@@ -258,6 +270,7 @@ endpoints:
       queryParams: {handle: "levelsio"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.x.user.posts.json
     docs_url: https://docs.scrapecreators.com/twitter/user-tweets
 
@@ -280,6 +293,7 @@ endpoints:
       queryParams: {url: "https://www.linkedin.com/in/parrsam/"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.linkedin.user.profile.json
     docs_url: https://docs.scrapecreators.com/linkedin/profile
 
@@ -300,6 +314,7 @@ endpoints:
       queryParams: {subreddit: "news"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.reddit.subreddit.posts.json
     docs_url: https://docs.scrapecreators.com/reddit/subreddit
 
@@ -329,6 +344,7 @@ endpoints:
       queryParams: {query: "ai", sort: "relevance"}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-07-28', confidence: verified}
     verified: '2026-07-28'
+    added: '2026-07-28'
     example_response: examples/scrapecreators.reddit.search.posts.json
     docs_url: https://docs.scrapecreators.com/reddit/search
 
@@ -351,5 +367,6 @@ endpoints:
     cost: {type: per_call, value: 10, currency: credit, per: 1, unit: call, source: rate_card_api, source_url: 'https://docs.scrapecreators.com/openapi.json', checked: '2026-08-27', confidence: verified}
     call_note: "Uncharged 503 when every declared link-in-bio page fails and nothing else resolves — retry later rather than treating it as a miss."
     verified: '2026-08-27'
+    added: '2026-08-26'
     example_response: examples/scrapecreators.creators.socials.connected.json
     docs_url: https://docs.scrapecreators.com/v1/find-social-profiles

@@ -40,6 +40,7 @@ endpoints:
       confidence: verified
       note: Datagma reports the exact charge in creditBurn. A fresh verified email used one credit; a cached repeat reported zero.
     verified: '2026-09-18'
+    added: '2026-09-18'
     example_response: examples/datagma.people.email.find.json
     docs_url: https://datagmaapi.readme.io/reference/find-email-from-full-name-company
 
@@ -70,6 +71,7 @@ endpoints:
       <<: *one_credit
       note: Datagma reports the exact charge in creditBurn. A successful basic-person enrichment used one credit.
     verified: '2026-09-18'
+    added: '2026-09-18'
     example_response: examples/datagma.people.enrich.json
     docs_url: https://datagmaapi.readme.io/reference/enrich-a-person-or-company
 
@@ -98,6 +100,7 @@ endpoints:
       <<: *one_credit
       note: Datagma reports the exact charge in creditBurn. A successful premium + full company enrichment used one credit.
     verified: '2026-09-18'
+    added: '2026-09-18'
     example_response: examples/datagma.companies.enrich.json
     docs_url: https://datagmaapi.readme.io/reference/enrich-a-person-or-company
 
@@ -130,6 +133,7 @@ endpoints:
       confidence: verified
       note: Datagma reports the exact charge in creditBurn. A successful mobile lookup used 30 credits; a restricted lookup used zero.
     verified: '2026-09-18'
+    added: '2026-09-18'
     example_response: examples/datagma.people.phone.find.json
     docs_url: https://datagmaapi.readme.io/reference/find-mobile-phone
 
@@ -153,5 +157,6 @@ endpoints:
       <<: *one_credit
       note: Datagma reports the exact charge in creditBurn. A completed job-change check used one credit.
     verified: '2026-09-18'
+    added: '2026-09-18'
     example_response: examples/datagma.people.job-change.detect.json
     docs_url: https://datagmaapi.readme.io/reference/detect-job-change

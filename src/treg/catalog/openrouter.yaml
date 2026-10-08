@@ -63,10 +63,12 @@ endpoints:
       note: "Settles at the reply's `usage.cost`. VERIFIED 2026-09-23: a ~600-byte request cost $0.0000171."
     docs_url: https://openrouter.ai/typesafe/jev-1.13
     verified: '2026-09-27'
+    added: '2026-09-23'
     example_response: examples/openrouter.ai-judge.decide.json
 
   # --- Video --------------------------------------------------------------------------------
   - id: openrouter.video-gen.models.list
+    added: '2026-09-04'
     async: false
     kind: utility
     capability: video-gen.models.list
@@ -82,6 +84,7 @@ endpoints:
     docs_url: https://openrouter.ai/docs/api/api-reference/video-generation/list-videos-models
 
   - id: openrouter.video-gen.task.status
+    added: '2026-09-04'
     async: false
     kind: utility
     capability: video-gen.task.status
@@ -101,6 +104,7 @@ endpoints:
     docs_url: https://openrouter.ai/docs/api/api-reference/video-generation/get-videos
 
   - id: openrouter.video-gen.result.retrieve
+    added: '2026-09-04'
     async: false
     kind: utility
     capability: video-gen.result.retrieve
@@ -162,10 +166,12 @@ endpoints:
       confidence: documented
       note: "Table rows quote the live rate card; the upstream applies a minimum charge the rate card does not publish (live 2026-09-02: 480p x 2 s priced $0.10 by the table, billed $0.2125 as usage.cost). What settles is the terminal usage.cost, never the table row. Indistinguishable mode-specific SKUs collapse to the highest rate. The matched row is reserved; the fallback is the matrix ceiling for unmatched requests."
     verified: 2026-09-02
+    added: '2026-09-04'
     example_response: examples/openrouter.video-gen.wan-3-0.from_text.json
     docs_url: https://openrouter.ai/alibaba/wan-3.0
 
   - id: openrouter.video-gen.wan-3-0.from_image
+    added: '2026-09-04'
     capability: video-gen.wan-3-0.from_image
     platform: video-gen
     domain: models
@@ -262,5 +268,6 @@ endpoints:
       confidence: documented
       note: "The live rate card bills video tokens at $10.70 per million, which is ByteDance's official meter: $0.1028/s at 480p and $0.2312/s at 720p for text or image input. The matched row is reserved and the terminal usage.cost settles: live 2026-09-14 a 4 s 480p clip priced $0.4112 by the table settled usage.cost 0.415481 (1% over, the same unpublished rounding Wan 3.0 shows). A reference-video input (not listed) bills at the cheaper video-input token rate."
     verified: 2026-09-14
+    added: '2026-09-04'
     example_response: examples/openrouter.video-gen.seedance-2-5.json
     docs_url: https://openrouter.ai/bytedance/seedance-2.5

@@ -298,6 +298,7 @@ async def _verdicts_or_empty() -> dict[str, dict]:
 
 @app.get("/catalog/search")
 async def catalog_search(request: Request, q: str = "", limit: int = 25,
+                         added_within_days: int | None = None, sort: str = "",
                          observations: endpoint_stats.EndpointObservationReader = Depends(
                              _endpoint_observation_reader),
                          db: AsyncSession = Depends(get_session)) -> dict:
@@ -307,9 +308,18 @@ async def catalog_search(request: Request, q: str = "", limit: int = 25,
     shelf hides it. Ranking is plain token matching (see `catalog_store.search`) so results are
     reproducible and explainable; equal scores — the common case, not the edge — then break on what
     treg has MEASURED and on price, so the cut stops being file order. `hints` carries the next
-    command, since finding the endpoint is never the goal — inspecting or calling it is."""
+    command, since finding the endpoint is never the goal — inspecting or calling it is.
+
+    `added_within_days` and `sort=newest` (catalog.md "`added`") list recently added tools, with or
+    without words; absent, this route answers exactly as it did before them."""
     cat = catalog_store.load()
     limit = max(1, min(limit, 100))
+    try:
+        opts = catalog_store.added_options(added_within_days, sort)
+    except catalog_store.AddedOptionError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    if opts.active:
+        return await _added_search(request, q, limit, opts, cat, observations, db)
     # Rank a WIDER band than the page: collapsing a routed group (below) frees rows, and the next
     # jobs down the ranking should fill them rather than the page coming up short.
     ranked, total, tie_truncated = catalog_store.rank_band(q, cat, min(100, limit * 4))
@@ -377,6 +387,38 @@ async def catalog_search(request: Request, q: str = "", limit: int = 25,
             first = near[0]
             hints.insert(1, f"nearest: {first['endpoint_id']} matches "
                             f"{', '.join(first['matches'])} but not {', '.join(first['missing'])}")
+    return out
+
+
+async def _added_search(request: Request, q: str, limit: int, opts: catalog_store.AddedOptions, cat,
+                        observations: endpoint_stats.EndpointObservationReader, db: AsyncSession) -> dict:
+    """`/catalog/search` with a recently-added option: a flat list of tools, each with its `added`
+    day and provider (`application.catalog_search.added_page`)."""
+    from ..application import catalog_search as search_app
+    from .hub_gate import reader
+    slug, email = await reader(request, db)
+    page = await search_app.added_page(
+        q, cat, limit, opts, caller=search_app.Caller(hub_slug=slug, hub_email=email),
+        observed=lambda ids: _observed_or_empty(observations, ids))
+    results = [
+        (dict(ep) | {"score": score, "observed": page.stats.get(ep["id"])}) if ep.get("kind") == "hub" else
+        (catalog_store.endpoint_view(ep, _provider_display(ep["provider"]), cat)
+         | catalog_store.endpoint_context(ep, cat)
+         | {"score": score, "observed": page.stats.get(ep["id"])})
+        for ep, score in page.rows
+    ]
+    window = f"in the last {opts.days} days" if opts.days else "yet"
+    hints = ([f"treg catalog get {results[0]['id']}   # params, cost and an example response"] if results
+             else [f"no tool{' matching ' + repr(q) if q.strip() else ''} was added {window}"])
+    if page.total > len(results):
+        hints.append(f"{page.total - len(results)} more — raise limit (max 100)")
+    out = {"query": q, "count": len(results), "total": page.total, "results": results, "hints": hints,
+           "sort": "newest" if opts.newest or not q.strip() else "best"}
+    if opts.days is not None:
+        out["added_within_days"] = opts.days
+    if opts.capped:
+        out["capped_at_days"] = catalog_store.ADDED_DAYS_MAX
+        hints.insert(0, f"added_within_days is capped at {catalog_store.ADDED_DAYS_MAX}")
     return out
 
 
@@ -572,13 +614,17 @@ async def _hub_endpoint_view(endpoint_id: str, db: AsyncSession,
     script, the maker's tools and every key (docs/HUB-DECISIONS.md round 4 q4, round 5 q7)."""
     from ..application import hub as hub_app
     from ..domain.hub import PAY_NOTE as HUB_PAY_NOTE, fees_label as hub_fees_label, price_label as hub_price_label
-    from ..models import Org
+    from ..models import HubListing, Org
     if not hub_app.visible_to(org_slug, email) or not hub_app.is_hub_id_shape(endpoint_id):
         return None
     row = await hub_app.tool_for(db, endpoint_id, caller_slug=org_slug, caller_email=email)
     if row is None:
         return None
     org = await db.get(Org, row.org_id)
+    # a listed tool's `added` is the UTC day treg approved it for search; an unlisted one has none
+    listing = await db.get(HubListing, row.tool_id)
+    added = (listing.decided_at.date().isoformat()
+             if listing is not None and listing.state == "approved" and listing.decided_at else None)
     from ..application.hub.health import health_of
     health = await health_of(db, row.tool_id, row.version, row.check_result)
     base = get_settings().public_url.rstrip("/")
@@ -605,7 +651,7 @@ async def _hub_endpoint_view(endpoint_id: str, db: AsyncSession,
             "id": row.tool_id, "kind": "hub", "hub": True, "version": row.version,
             "name": row.name, "summary": row.summary, "provider": org.slug if org else "",
             "provider_display": org.slug if org else "", "method": "POST",
-            "path": f"/call/{row.tool_id}",
+            "path": f"/call/{row.tool_id}", "added": added,
             "inputs": inputs, "output": m.get("output", {}), "writes": row.writes,
             "recipe": "script" if row.kind == "script" else "steps",
             "limits": m.get("limits", {}),

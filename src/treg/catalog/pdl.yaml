@@ -79,6 +79,7 @@ endpoints:
       status: 404
       means: "no person matched (or none above min_likelihood) — an expected outcome (and free, per the cost note), not an API failure; do not retry the same identifiers"
     verified: 2026-07-31
+    added: '2026-07-28'
     example_response: examples/pdl.people.enrich.json
     docs_url: https://docs.peopledatalabs.com/docs/reference-person-enrichment-api
 
@@ -115,6 +116,7 @@ endpoints:
       confidence: documented
       note: 1 PDL credit PER RECORD in the data array — a size=100 call costs 100 credits, a size=1000 POST costs 1000. A query matching nothing is free.
     verified: 2026-07-31
+    added: '2026-07-28'
     example_response: examples/pdl.people.search.json
     docs_url: https://docs.peopledatalabs.com/docs/reference-person-search-api
 
@@ -156,6 +158,7 @@ endpoints:
       confidence: documented
       note: 1 PDL credit per company returned; a 404 is free.
     verified: 2026-07-31
+    added: '2026-07-28'
     example_response: examples/pdl.companies.enrich.json
     docs_url: https://docs.peopledatalabs.com/docs/reference-company-enrichment-api
 
@@ -191,6 +194,7 @@ endpoints:
       confidence: verified
       note: '1 PDL credit PER RECORD returned; `size` is the cost dial. OBSERVED live 2026-07-31 - a size=1 call returning 1 record carried x-call-credits-spent 1, x-call-credits-type search_company, and left the enrich allowance (x-totallimit-remaining) untouched: search bills a different meter.'
     verified: 2026-07-31
+    added: '2026-07-28'
     example_response: examples/pdl.companies.search.json
     docs_url: https://docs.peopledatalabs.com/docs/reference-company-search-api
 
@@ -215,5 +219,6 @@ endpoints:
       queryParams: {field: "title", text: "data", size: 5}
     cost: {type: free, value: 0, currency: USD, unit: call, note: 'free — PDL states all active keys have free access to Autocomplete, and a live call 2026-07-31 returned no x-call-credits-spent header at all, only the rate-limit ones. Rate-limited to 60/min and 1,000/day. The Cleaner APIs (/company/clean, /location/clean, /school/clean) are likewise free, 10,000/month'}
     verified: 2026-07-31
+    added: '2026-07-28'
     example_response: examples/pdl.account.usage.json
     docs_url: https://docs.peopledatalabs.com/docs/reference-autocomplete-api

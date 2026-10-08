@@ -59,6 +59,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.1688-get-item-detail-v1.json
 - id: justoneapi.x.1688-search-item-list-v1
   tier: extended
@@ -93,6 +94,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.1688-search-item-list-v1.json
 - id: justoneapi.x.amazon-get-best-sellers-v1
   tier: extended
@@ -164,8 +166,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.amazon-get-best-sellers-v1.json
 - id: justoneapi.x.amazon-get-category-products-v1
+  added: '2026-07-28'
   tier: extended
   platform: amazon
   method: GET
@@ -303,8 +307,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.amazon-get-product-detail-v1.json
 - id: justoneapi.x.amazon-get-product-top-reviews-v1
+  added: '2026-07-28'
   tier: extended
   platform: amazon
   method: GET
@@ -475,8 +481,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.amazon-search-products-v1.json
 - id: justoneapi.x.beike-community-list-v1
+  added: '2026-07-28'
   tier: extended
   platform: beike
   method: GET
@@ -508,6 +516,7 @@ endpoints:
   unverified: provider answers code 600 NO PERMISSION — this API is not enabled for the account used on 2026-07-28
   capability: beike.community.list
 - id: justoneapi.x.beike-ershoufang-detail-v1
+  added: '2026-07-28'
   tier: extended
   platform: beike
   method: GET
@@ -529,6 +538,7 @@ endpoints:
   untestable: no test value for required param(s) houseCode — none of the verified responses in this provider carries one
   capability: beike.listing.detail
 - id: justoneapi.x.beike-get-ershoufang-list-v1
+  added: '2026-07-28'
   tier: extended
   platform: beike
   method: GET
@@ -592,6 +602,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.bilibili-get-user-detail-v2.json
 - id: justoneapi.x.bilibili-get-user-relation-stat-v1
   tier: extended
@@ -626,6 +637,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.bilibili-get-user-relation-stat-v1.json
 - id: justoneapi.x.bilibili-get-user-video-list-v2
   tier: extended
@@ -664,6 +676,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.bilibili-get-user-video-list-v2.json
 - id: justoneapi.x.bilibili-get-video-caption-v2
   tier: extended
@@ -708,6 +721,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.bilibili-get-video-caption-v2.json
 - id: justoneapi.x.bilibili-get-video-comment-v2
   tier: extended
@@ -747,6 +761,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.bilibili-get-video-comment-v2.json
 - id: justoneapi.x.bilibili-get-video-danmu-v2
   tier: extended
@@ -791,6 +806,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.bilibili-get-video-danmu-v2.json
 - id: justoneapi.x.bilibili-get-video-detail-v2
   tier: extended
@@ -825,6 +841,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.bilibili-get-video-detail-v2.json
 - id: justoneapi.x.bilibili-search-video-v2
   tier: extended
@@ -876,8 +893,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.bilibili-search-video-v2.json
 - id: justoneapi.x.bilibili-share-url-transfer-v1
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: bilibili
@@ -908,6 +927,7 @@ endpoints:
       shareUrl: https://live.bilibili.com/173551?broadcast_type=0&is_room_feed=1
   unverified: needs a real short share link ('https://b23.tv/'); no such link appears in any verified response, so it cannot be generated from catalog data
 - id: justoneapi.x.dewu-search-item-list-v1
+  added: '2026-07-28'
   tier: extended
   platform: dewu
   method: GET
@@ -980,6 +1000,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douban-get-movie-comments-v1.json
 - id: justoneapi.x.douban-get-movie-review-detail-v1
   tier: extended
@@ -1014,6 +1035,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douban-get-movie-review-detail-v1.json
 - id: justoneapi.x.douban-get-movie-reviews-v1
   tier: extended
@@ -1063,6 +1085,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douban-get-movie-reviews-v1.json
 - id: justoneapi.x.douban-get-recent-hot-movie-v1
   tier: extended
@@ -1098,6 +1121,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douban-get-recent-hot-movie-v1.json
 - id: justoneapi.x.douban-get-recent-hot-tv-v1
   tier: extended
@@ -1133,6 +1157,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douban-get-recent-hot-tv-v1.json
 - id: justoneapi.x.douban-get-subject-detail-v1
   tier: extended
@@ -1167,8 +1192,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douban-get-subject-detail-v1.json
 - id: justoneapi.x.llm-doubao-answer-v1
+  added: '2026-07-28'
   tier: extended
   platform: ai-search
   method: GET
@@ -1189,6 +1216,7 @@ endpoints:
   unverified: provider answers code 600 NO PERMISSION — this API is not enabled for the account used on 2026-07-28
   capability: ai-search.doubao.answer
 - id: justoneapi.x.douyin-get-user-detail-v3
+  added: '2026-07-28'
   tier: extended
   platform: douyin
   method: GET
@@ -1265,6 +1293,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-get-user-video-list-v1.json
 - id: justoneapi.x.douyin-get-user-video-list-v3
   tier: extended
@@ -1305,6 +1334,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-get-user-video-list-v3.json
 - id: justoneapi.x.douyin-get-video-comment-v1
   tier: extended
@@ -1345,6 +1375,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-get-video-comment-v1.json
 - id: justoneapi.x.douyin-get-video-detail-v2
   tier: extended
@@ -1379,6 +1410,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-get-video-detail-v2.json
 - id: justoneapi.x.douyin-get-video-sub-comment-v1
   tier: extended
@@ -1419,6 +1451,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-get-video-sub-comment-v1.json
 - id: justoneapi.x.douyin-hot-search-v1
   tier: extended
@@ -1562,6 +1595,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-hot-search-v1.json
 - id: justoneapi.x.douyin-search-user-v2
   tier: extended
@@ -1610,6 +1644,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-search-user-v2.json
 - id: justoneapi.x.douyin-search-video-v4
   tier: extended
@@ -1686,8 +1721,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-search-video-v4.json
 - id: justoneapi.x.douyin-share-url-transfer-v1
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: douyin
@@ -1755,6 +1792,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-ec-get-item-comments-v1.json
 - id: justoneapi.x.douyin-ec-get-item-detail-v2
   tier: extended
@@ -1789,6 +1827,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-ec-get-item-detail-v2.json
 - id: justoneapi.x.douyin-ec-get-item-sku-info-v1
   tier: extended
@@ -1823,6 +1862,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-ec-get-item-sku-info-v1.json
 - id: justoneapi.x.douyin-ec-get-shop-item-list-v1
   tier: extended
@@ -1862,6 +1902,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-ec-get-shop-item-list-v1.json
 - id: justoneapi.x.douyin-ec-search-item-list-v1
   tier: extended
@@ -1906,6 +1947,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-ec-search-item-list-v1.json
 - id: justoneapi.x.douyin-xingtu-gwaggregator-get-author-commerce-seed-base-info-v1
   tier: extended
@@ -1949,6 +1991,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwaggregator-get-author-commerce-seed-base-info-v1.json
 - id: justoneapi.x.douyin-xingtu-gwaggregator-get-author-commerce-spread-info-v1
   tier: extended
@@ -1983,6 +2026,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwaggregator-get-author-commerce-spread-info-v1.json
 - id: justoneapi.x.douyin-xingtu-gwaggregator-get-author-contract-base-info
   tier: extended
@@ -2026,6 +2070,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwaggregator-get-author-contract-base-info.json
 - id: justoneapi.x.douyin-xingtu-gwaggregator-get-author-homepage-videos-v1
   tier: extended
@@ -2097,6 +2142,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwaggregator-get-author-homepage-videos-v1.json
 - id: justoneapi.x.douyin-xingtu-gwaggregator-get-author-live-statistics-v1
   tier: extended
@@ -2166,6 +2212,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwaggregator-get-author-live-statistics-v1.json
 - id: justoneapi.x.douyin-xingtu-gwaggregator-get-author-live-watch-distribution-v1
   tier: extended
@@ -2220,6 +2267,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwaggregator-get-author-live-watch-distribution-v1.json
 - id: justoneapi.x.douyin-xingtu-gwaggregator-get-author-order-experience-v1
   tier: extended
@@ -2263,6 +2311,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwaggregator-get-author-order-experience-v1.json
 - id: justoneapi.x.douyin-xingtu-gwaggregator-get-author-side-base-info-v1
   tier: extended
@@ -2297,6 +2346,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwaggregator-get-author-side-base-info-v1.json
 - id: justoneapi.x.douyin-xingtu-gwaggregator-get-author-tags-v1
   tier: extended
@@ -2331,6 +2381,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwaggregator-get-author-tags-v1.json
 - id: justoneapi.x.douyin-xingtu-gwauthor-get-author-base-info-v1
   tier: extended
@@ -2376,6 +2427,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwauthor-get-author-base-info-v1.json
 - id: justoneapi.x.douyin-xingtu-gwauthor-get-author-marketing-info-v1
   tier: extended
@@ -2421,6 +2473,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwauthor-get-author-marketing-info-v1.json
 - id: justoneapi.x.douyin-xingtu-gwauthor-get-author-platform-channel-info-v2-v1
   tier: extended
@@ -2466,6 +2519,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwauthor-get-author-platform-channel-info-v2-v1.json
 - id: justoneapi.x.douyin-xingtu-gwauthor-get-author-show-items-v2-v1
   tier: extended
@@ -2526,6 +2580,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwauthor-get-author-show-items-v2-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-get-author-hot-comment-tokens-v1
   tier: extended
@@ -2560,6 +2615,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-get-author-hot-comment-tokens-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-author-audience-distribution-v1
   tier: extended
@@ -2617,6 +2673,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-author-audience-distribution-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-author-cp-info-v1
   tier: extended
@@ -2662,6 +2719,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-author-cp-info-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-author-link-struct-v1
   tier: extended
@@ -2707,6 +2765,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-author-link-struct-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-author-rec-videos-v2-v1
   tier: extended
@@ -2752,6 +2811,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-author-rec-videos-v2-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-author-touch-distribution-v1
   tier: extended
@@ -2797,6 +2857,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-author-touch-distribution-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-author-video-distribution-v1
   tier: extended
@@ -2842,6 +2903,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-author-video-distribution-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-check-author-display-v1
   tier: extended
@@ -2886,6 +2948,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-check-author-display-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-get-author-convert-ability-v1
   tier: extended
@@ -2940,6 +3003,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-get-author-convert-ability-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-get-author-convert-videos-or-products-v1
   tier: extended
@@ -3054,6 +3118,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-get-author-convert-videos-or-products-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-get-author-daily-fans-v1
   tier: extended
@@ -3098,6 +3163,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-get-author-daily-fans-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-get-author-fans-distribution-v1
   tier: extended
@@ -3141,6 +3207,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-get-author-fans-distribution-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-get-author-link-info-v1
   tier: extended
@@ -3231,6 +3298,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-get-author-link-info-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-get-author-spread-info-v1
   tier: extended
@@ -3309,6 +3377,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-get-author-spread-info-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-item-report-detail-v1
   tier: extended
@@ -3343,6 +3412,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-item-report-detail-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-item-report-th-analysis-v1
   tier: extended
@@ -3377,6 +3447,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-item-report-th-analysis-v1.json
 - id: justoneapi.x.douyin-xingtu-gwdata-sp-item-report-trend-v1
   tier: extended
@@ -3411,6 +3482,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwdata-sp-item-report-trend-v1.json
 - id: justoneapi.x.douyin-xingtu-gwgauthor-author-get-business-card-info-v1
   tier: extended
@@ -3445,6 +3517,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwgauthor-author-get-business-card-info-v1.json
 - id: justoneapi.x.douyin-xingtu-gwgauthor-get-author-content-hot-keywords-v1
   tier: extended
@@ -3479,6 +3552,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwgauthor-get-author-content-hot-keywords-v1.json
 - id: justoneapi.x.douyin-xingtu-gwgsearch-search-for-author-square-v1
   tier: extended
@@ -3690,6 +3764,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.douyin-xingtu-gwgsearch-search-for-author-square-v1.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.facebook-get-post-comments-v1
@@ -3731,6 +3806,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.facebook-get-post-comments-v1.json
 - id: justoneapi.x.facebook-get-profile-id-v1
   kind: utility
@@ -3765,6 +3841,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.facebook-get-profile-id-v1.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
   capability: facebook.user.profile.id.resolve
@@ -3807,6 +3884,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.facebook-get-profile-posts-v1.json
 - id: justoneapi.x.facebook-search-post-v1
   tier: extended
@@ -3855,6 +3933,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.facebook-search-post-v1.json
 - id: justoneapi.x.imdb-news-by-category-query-v1
   tier: extended
@@ -3911,6 +3990,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-news-by-category-query-v1.json
 - id: justoneapi.x.imdb-streaming-picks-query-v1
   tier: extended
@@ -3957,6 +4037,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-streaming-picks-query-v1.json
 - id: justoneapi.x.imdb-title-awards-summary-query-v1
   tier: extended
@@ -4008,6 +4089,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-awards-summary-query-v1.json
 - id: justoneapi.x.imdb-title-base-query-v1
   tier: extended
@@ -4059,6 +4141,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-base-query-v1.json
 - id: justoneapi.x.imdb-title-box-office-summary-v1
   tier: extended
@@ -4110,6 +4193,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-box-office-summary-v1.json
 - id: justoneapi.x.imdb-title-chart-rankings-v1
   tier: extended
@@ -4164,6 +4248,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-chart-rankings-v1.json
 - id: justoneapi.x.imdb-title-contribution-questions-v1
   tier: extended
@@ -4214,6 +4299,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-contribution-questions-v1.json
 - id: justoneapi.x.imdb-title-countries-of-origin-v1
   tier: extended
@@ -4264,6 +4350,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-countries-of-origin-v1.json
 - id: justoneapi.x.imdb-title-critics-review-summary-query-v1
   tier: extended
@@ -4315,6 +4402,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-critics-review-summary-query-v1.json
 - id: justoneapi.x.imdb-title-details-query-v1
   tier: extended
@@ -4366,6 +4454,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-details-query-v1.json
 - id: justoneapi.x.imdb-title-did-you-know-query-v1
   tier: extended
@@ -4417,6 +4506,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-did-you-know-query-v1.json
 - id: justoneapi.x.imdb-title-extended-details-query-v1
   tier: extended
@@ -4468,6 +4558,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-extended-details-query-v1.json
 - id: justoneapi.x.imdb-title-more-like-this-query-v1
   tier: extended
@@ -4519,6 +4610,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-more-like-this-query-v1.json
 - id: justoneapi.x.imdb-title-plot-query-v1
   tier: extended
@@ -4570,6 +4662,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-plot-query-v1.json
 - id: justoneapi.x.imdb-title-redux-overview-query-v1
   tier: extended
@@ -4621,6 +4714,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-redux-overview-query-v1.json
 - id: justoneapi.x.imdb-title-release-expectation-query-v1
   tier: extended
@@ -4672,6 +4766,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-release-expectation-query-v1.json
 - id: justoneapi.x.imdb-title-top-cast-and-crew-v1
   tier: extended
@@ -4723,6 +4818,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-top-cast-and-crew-v1.json
 - id: justoneapi.x.imdb-title-user-reviews-summary-query-v1
   tier: extended
@@ -4774,6 +4870,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.imdb-title-user-reviews-summary-query-v1.json
 - id: justoneapi.x.instagram-get-comment-replies-v1
   tier: extended
@@ -4818,6 +4915,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.instagram-get-comment-replies-v1.json
 - id: justoneapi.x.instagram-get-post-comments-v1
   tier: extended
@@ -4866,6 +4964,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.instagram-get-post-comments-v1.json
 - id: justoneapi.x.instagram-get-post-detail-v1
   tier: extended
@@ -4900,6 +4999,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.instagram-get-post-detail-v1.json
 - id: justoneapi.x.instagram-get-user-detail-v1
   tier: extended
@@ -4934,6 +5034,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.instagram-get-user-detail-v1.json
 - id: justoneapi.x.instagram-search-hashtag-posts-v1
   tier: extended
@@ -4974,6 +5075,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.instagram-search-hashtag-posts-v1.json
 - id: justoneapi.x.instagram-search-reels-v1
   tier: extended
@@ -5013,6 +5115,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.instagram-search-reels-v1.json
 - id: justoneapi.x.jd-get-item-comments-v1
   tier: extended
@@ -5052,6 +5155,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.jd-get-item-comments-v1.json
 - id: justoneapi.x.jd-get-item-comments-v2
   tier: extended
@@ -5091,6 +5195,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.jd-get-item-comments-v2.json
 - id: justoneapi.x.jd-get-item-detail-v1
   tier: extended
@@ -5125,6 +5230,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.jd-get-item-detail-v1.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.jd-get-item-detail-v2
@@ -5148,8 +5254,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.jd-get-item-detail-v2.json
 - id: justoneapi.x.jd-get-item-detail-v3
+  added: '2026-07-28'
   tier: extended
   platform: jd
   method: GET
@@ -5211,8 +5319,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.jd-get-item-price-v1.json
 - id: justoneapi.x.jd-get-shop-item-list-v1
+  added: '2026-07-28'
   tier: extended
   platform: jd
   method: GET
@@ -5284,6 +5394,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.jd-search-item-list-v1.json
 - id: justoneapi.x.jd-search-item-list-v2
   tier: extended
@@ -5323,6 +5434,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.jd-search-item-list-v2.json
 - id: justoneapi.x.kuaishou-get-user-detail-v1
   tier: extended
@@ -5357,8 +5469,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.kuaishou-get-user-detail-v1.json
 - id: justoneapi.x.kuaishou-get-user-video-list-v2
+  added: '2026-07-28'
   tier: extended
   platform: kuaishou
   method: GET
@@ -5392,6 +5506,7 @@ endpoints:
       userId: '1159110565'
   unverified: upstream scrape fails (code 301 COLLECT FAILED) on every attempt — 6 passes on 2026-07-28, up to 6 retries each, the last two converting 1 endpoint apiece (convergence). Provider-s
 - id: justoneapi.x.kuaishou-get-video-comment-v1
+  added: '2026-07-28'
   tier: extended
   platform: kuaishou
   method: GET
@@ -5425,6 +5540,7 @@ endpoints:
       videoId: f9f22290943925f9
   unverified: upstream scrape fails (code 301 COLLECT FAILED) on every attempt — 6 passes on 2026-07-28, up to 6 retries each, the last two converting 1 endpoint apiece (convergence). Provider-s
 - id: justoneapi.x.kuaishou-get-video-detail-v2
+  added: '2026-07-28'
   tier: extended
   platform: kuaishou
   method: GET
@@ -5492,6 +5608,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.kuaishou-search-user-v2.json
 - id: justoneapi.x.kuaishou-search-video-v1
   tier: extended
@@ -5531,6 +5648,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.kuaishou-search-video-v1.json
 - id: justoneapi.x.kuaishou-search-video-v2
   tier: extended
@@ -5571,8 +5689,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.kuaishou-search-video-v2.json
 - id: justoneapi.x.kuaishou-share-url-transfer-v1
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: kuaishou
@@ -5641,6 +5761,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.linkedin-get-company-employees-v1.json
 - id: justoneapi.x.linkedin-get-post-comments-v1
   tier: extended
@@ -5699,6 +5820,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.linkedin-get-post-comments-v1.json
 - id: justoneapi.x.linkedin-get-post-reactions-v1
   tier: extended
@@ -5752,6 +5874,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.linkedin-get-post-reactions-v1.json
 - id: justoneapi.x.linkedin-get-user-detail-v1
   tier: extended
@@ -5786,6 +5909,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.linkedin-get-user-detail-v1.json
 - id: justoneapi.x.linkedin-get-user-posts-v1
   tier: extended
@@ -5831,8 +5955,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.linkedin-get-user-posts-v1.json
 - id: justoneapi.x.linkedin-search-user-v1
+  added: '2026-07-28'
   tier: extended
   capability: linkedin.search.people
   platform: linkedin
@@ -5954,6 +6080,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.qq-huxuan-cgi-bin-advertiser-finder-publisher-detail-v1.json
 - id: justoneapi.x.qq-huxuan-cgi-bin-advertiser-finder-publisher-get-finder-video-show-v1
   tier: extended
@@ -6015,6 +6142,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.qq-huxuan-cgi-bin-advertiser-finder-publisher-get-finder-video-show-v1.json
 - id: justoneapi.x.qq-huxuan-cgi-bin-advertiser-finder-publisher-search-v1
   tier: extended
@@ -6056,6 +6184,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.qq-huxuan-cgi-bin-advertiser-finder-publisher-search-v1.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.qq-huxuan-cgi-bin-advertiser-mp-publisher-detail-v1
@@ -6091,6 +6220,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.qq-huxuan-cgi-bin-advertiser-mp-publisher-detail-v1.json
 - id: justoneapi.x.qq-huxuan-cgi-bin-advertiser-mp-publisher-get-user-articles-v1
   tier: extended
@@ -6156,6 +6286,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.qq-huxuan-cgi-bin-advertiser-mp-publisher-get-user-articles-v1.json
 - id: justoneapi.x.qq-huxuan-cgi-bin-advertiser-mp-publisher-search-v1
   tier: extended
@@ -6197,6 +6328,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.qq-huxuan-cgi-bin-advertiser-mp-publisher-search-v1.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.reddit-get-post-comments-v1
@@ -6238,6 +6370,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.reddit-get-post-comments-v1.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.reddit-get-post-detail-v1
@@ -6273,6 +6406,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.reddit-get-post-detail-v1.json
 - id: justoneapi.x.reddit-search-v1
   tier: extended
@@ -6312,6 +6446,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.reddit-search-v1.json
 - id: justoneapi.x.taobao-get-item-comment-v3
   tier: extended
@@ -6369,6 +6504,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-get-item-comment-v3.json
 - id: justoneapi.x.taobao-get-item-detail-v1
   tier: extended
@@ -6403,6 +6539,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-get-item-detail-v1.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.taobao-get-item-detail-v2
@@ -6438,6 +6575,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-get-item-detail-v2.json
 - id: justoneapi.x.taobao-get-item-detail-v4
   tier: extended
@@ -6472,6 +6610,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-get-item-detail-v4.json
 - id: justoneapi.x.taobao-get-item-detail-v5
   tier: extended
@@ -6506,6 +6645,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-get-item-detail-v5.json
 - id: justoneapi.x.taobao-get-item-detail-v9
   tier: extended
@@ -6540,8 +6680,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-get-item-detail-v9.json
 - id: justoneapi.x.taobao-get-item-sale-v1
+  added: '2026-07-28'
   tier: extended
   platform: taobao
   method: GET
@@ -6608,6 +6750,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-get-shop-item-list-v1.json
 - id: justoneapi.x.taobao-get-shop-item-list-v2
   tier: extended
@@ -6665,8 +6808,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-get-shop-item-list-v2.json
 - id: justoneapi.x.taobao-get-shop-item-list-v4
+  added: '2026-07-28'
   tier: extended
   platform: taobao
   method: GET
@@ -6740,6 +6885,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-get-social-feed-v1.json
 - id: justoneapi.x.taobao-search-item-list-v1
   tier: extended
@@ -6805,6 +6951,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.taobao-search-item-list-v1.json
 - id: justoneapi.x.tiktok-get-post-sub-comment-v1
   tier: extended
@@ -6850,6 +6997,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.tiktok-get-post-sub-comment-v1.json
 - id: justoneapi.x.tiktok-search-user-v1
   tier: extended
@@ -6895,6 +7043,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.tiktok-search-user-v1.json
 - id: justoneapi.x.tiktok-shop-get-product-detail-v1
   tier: extended
@@ -6945,6 +7094,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.tiktok-shop-get-product-detail-v1.json
 - id: justoneapi.x.tiktok-shop-search-products-v1
   tier: extended
@@ -7005,8 +7155,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.tiktok-shop-search-products-v1.json
 - id: justoneapi.x.toutiao-get-article-detail-v1
+  added: '2026-07-28'
   tier: extended
   platform: toutiao
   method: GET
@@ -7033,6 +7185,7 @@ endpoints:
         note: The unique identifier of the Toutiao article.
   untestable: no test value for required param(s) id — none of the verified responses in this provider carries one
 - id: justoneapi.x.toutiao-get-user-detail-v1
+  added: '2026-07-28'
   tier: extended
   platform: toutiao
   method: GET
@@ -7059,6 +7212,7 @@ endpoints:
         note: The unique identifier of the Toutiao user.
   untestable: no test value for required param(s) userId — none of the verified responses in this provider carries one
 - id: justoneapi.x.toutiao-get-user-id-v1
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: toutiao
@@ -7118,8 +7272,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.toutiao-search-v2.json
 - id: justoneapi.x.search-v1
+  added: '2026-07-28'
   tier: extended
   platform: web
   method: GET
@@ -7209,6 +7365,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-convert-export-id-v1.json
 - id: justoneapi.x.weixin-channels-get-account-videos-v1
   tier: extended
@@ -7250,8 +7407,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-get-account-videos-v1.json
 - id: justoneapi.x.weixin-channels-get-bound-channel-v1
+  added: '2026-07-28'
   tier: extended
   platform: wechat-channels
   method: GET
@@ -7284,6 +7443,7 @@ endpoints:
         example: ''
   skipped: skipped to conserve balance (¥1.0/call); requires a ghid/url pair for a Channels-bound account, which no verified response returned
 - id: justoneapi.x.weixin-channels-get-video-basic-info-v1
+  added: '2026-07-28'
   tier: extended
   platform: wechat-channels
   method: GET
@@ -7354,6 +7514,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-get-video-comment-v1.json
 - id: justoneapi.x.weixin-channels-get-video-download-url-v1
   tier: extended
@@ -7393,6 +7554,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-get-video-download-url-v1.json
 - id: justoneapi.x.weixin-channels-get-video-metrics-v1
   tier: extended
@@ -7439,6 +7601,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-get-video-metrics-v1.json
 - id: justoneapi.x.weixin-channels-get-video-sub-comment-v1
   tier: extended
@@ -7486,6 +7649,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-get-video-sub-comment-v1.json
 - id: justoneapi.x.weixin-channels-get-video-title-v1
   tier: extended
@@ -7525,8 +7689,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-get-video-title-v1.json
 - id: justoneapi.x.weixin-channels-search-account-v1
+  added: '2026-07-28'
   tier: extended
   platform: wechat-channels
   method: POST
@@ -7601,6 +7767,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-search-account-v2.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.weixin-channels-search-account-v3
@@ -7636,6 +7803,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-search-account-v3.json
 - id: justoneapi.x.weixin-channels-search-video-v1
   tier: extended
@@ -7710,8 +7878,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-channels-search-video-v1.json
 - id: justoneapi.x.weixin-channels-search-video-v2
+  added: '2026-07-28'
   tier: extended
   platform: wechat-channels
   method: POST
@@ -7787,6 +7957,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-convert-article-link-v1.json
 - id: justoneapi.x.weixin-get-account-basic-info-v1
   tier: extended
@@ -7821,6 +7992,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-account-basic-info-v1.json
 - id: justoneapi.x.weixin-get-account-history-articles-v1
   tier: extended
@@ -7872,6 +8044,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-account-history-articles-v1.json
 - id: justoneapi.x.weixin-get-account-history-articles-v2
   tier: extended
@@ -7921,8 +8094,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-account-history-articles-v2.json
 - id: justoneapi.x.weixin-get-account-original-count-v1
+  added: '2026-07-28'
   tier: extended
   platform: wechat-mp
   method: GET
@@ -7955,6 +8130,7 @@ endpoints:
         example: ''
   skipped: skipped to conserve balance (¥1.5/call); WeChat account-info family verified via justoneapi.x.weixin-get-account-basic-info-v1
 - id: justoneapi.x.weixin-get-account-principal-info-v1
+  added: '2026-07-28'
   tier: extended
   platform: wechat-mp
   method: GET
@@ -8035,6 +8211,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-account-today-articles-v1.json
 - id: justoneapi.x.weixin-get-article-comment-v1
   tier: extended
@@ -8076,6 +8253,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-article-comment-v1.json
 - id: justoneapi.x.weixin-get-article-detail-v1
   tier: extended
@@ -8119,6 +8297,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-article-detail-v1.json
 - id: justoneapi.x.weixin-get-article-detail-v2
   tier: extended
@@ -8153,6 +8332,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-article-detail-v2.json
 - id: justoneapi.x.weixin-get-article-detail-v3
   tier: extended
@@ -8196,6 +8376,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-article-detail-v3.json
 - id: justoneapi.x.weixin-get-article-detail-v4
   tier: extended
@@ -8230,6 +8411,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-article-detail-v4.json
 - id: justoneapi.x.weixin-get-article-detail-v5
   tier: extended
@@ -8264,6 +8446,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-article-detail-v5.json
 - id: justoneapi.x.weixin-get-article-metrics-v1
   tier: extended
@@ -8298,6 +8481,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-article-metrics-v1.json
 - id: justoneapi.x.weixin-get-article-metrics-v2
   tier: extended
@@ -8332,6 +8516,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-article-metrics-v2.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.weixin-get-article-sub-comment-v1
@@ -8372,6 +8557,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-get-article-sub-comment-v1.json
 - id: justoneapi.x.weixin-search-account-v1
   tier: extended
@@ -8412,8 +8598,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-search-account-v1.json
 - id: justoneapi.x.weixin-search-account-v2
+  added: '2026-07-28'
   tier: extended
   platform: wechat-mp
   method: POST
@@ -8556,6 +8744,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-search-article-hot-v1.json
 - id: justoneapi.x.weixin-search-article-v1
   tier: extended
@@ -8630,6 +8819,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-search-article-v1.json
 - id: justoneapi.x.weixin-search-article-v2
   tier: extended
@@ -8695,6 +8885,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-search-article-v2.json
 - id: justoneapi.x.weixin-search-miniprogram-v1
   tier: extended
@@ -8748,6 +8939,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-search-miniprogram-v1.json
 - id: justoneapi.x.weixin-search-suggestions-v1
   tier: extended
@@ -8802,6 +8994,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-search-suggestions-v1.json
 - id: justoneapi.x.weixin-search-wechat-index-v1
   tier: extended
@@ -8836,6 +9029,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weixin-search-wechat-index-v1.json
 - id: justoneapi.x.weibo-get-fans-v1
   tier: extended
@@ -8876,6 +9070,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weibo-get-fans-v1.json
 - id: justoneapi.x.weibo-get-followers-v1
   tier: extended
@@ -8916,6 +9111,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weibo-get-followers-v1.json
 - id: justoneapi.x.weibo-get-post-comments-v1
   tier: extended
@@ -8963,6 +9159,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weibo-get-post-comments-v1.json
 - id: justoneapi.x.weibo-get-user-post-v1
   tier: extended
@@ -9007,6 +9204,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weibo-get-user-post-v1.json
 - id: justoneapi.x.weibo-get-user-video-list-v1
   tier: extended
@@ -9046,6 +9244,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weibo-get-user-video-list-v1.json
 - id: justoneapi.x.weibo-get-weibo-detail-v1
   tier: extended
@@ -9080,6 +9279,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weibo-get-weibo-detail-v1.json
 - id: justoneapi.x.weibo-hot-search-v1
   tier: extended
@@ -9107,6 +9307,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weibo-hot-search-v1.json
 - id: justoneapi.x.weibo-search-all-v2
   tier: extended
@@ -9185,6 +9386,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weibo-search-all-v2.json
 - id: justoneapi.x.weibo-search-profile-v1
   tier: extended
@@ -9240,8 +9442,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.weibo-search-profile-v1.json
 - id: justoneapi.x.weibo-tv-component-v1
+  added: '2026-07-28'
   tier: extended
   platform: weibo
   method: GET
@@ -9309,6 +9513,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.twitter-get-post-comments-v1.json
 - id: justoneapi.x.twitter-get-user-detail-v1
   tier: extended
@@ -9343,6 +9548,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.twitter-get-user-detail-v1.json
 - id: justoneapi.x.twitter-get-user-posts-v1
   tier: extended
@@ -9383,6 +9589,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.twitter-get-user-posts-v1.json
 - id: justoneapi.x.twitter-search-v1
   tier: extended
@@ -9435,6 +9642,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.twitter-search-v1.json
 - id: justoneapi.x.xianyu-get-item-detail-v1
   tier: extended
@@ -9469,6 +9677,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xianyu-get-item-detail-v1.json
 - id: justoneapi.x.xianyu-search-item-list-v1
   tier: extended
@@ -9522,6 +9731,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xianyu-search-item-list-v1.json
 - id: justoneapi.x.xiaohongshu-get-note-comment-v2
   tier: extended
@@ -9570,6 +9780,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-get-note-comment-v2.json
 - id: justoneapi.x.xiaohongshu-get-note-detail-v6
   tier: extended
@@ -9604,6 +9815,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-get-note-detail-v6.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.xiaohongshu-get-note-sub-comment-v2
@@ -9648,6 +9860,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-get-note-sub-comment-v2.json
 - id: justoneapi.x.xiaohongshu-get-topic-note-list-v1
   tier: extended
@@ -9696,6 +9909,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-get-topic-note-list-v1.json
 - id: justoneapi.x.xiaohongshu-get-user-v3
   tier: extended
@@ -9730,6 +9944,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-get-user-v3.json
 - id: justoneapi.x.xiaohongshu-hot-list-v1
   tier: extended
@@ -9757,6 +9972,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-hot-list-v1.json
 - id: justoneapi.x.xiaohongshu-hot-search-v1
   tier: extended
@@ -9824,6 +10040,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-hot-search-v1.json
 - id: justoneapi.x.xiaohongshu-search-note-v2
   tier: extended
@@ -9894,6 +10111,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-search-note-v2.json
 - id: justoneapi.x.xiaohongshu-search-recommend-v1
   tier: extended
@@ -9928,6 +10146,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-search-recommend-v1.json
 - id: justoneapi.x.xiaohongshu-search-user-v2
   tier: extended
@@ -9968,8 +10187,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-search-user-v2.json
 - id: justoneapi.x.xiaohongshu-share-url-transfer-v1
+  added: '2026-07-28'
   kind: utility
   tier: extended
   platform: xiaohongshu
@@ -10080,6 +10301,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgypgy-content-square-search-note-v2-v1.json
 - id: justoneapi.x.xiaohongshu-pgypgy-kol-data-core-data-v1
   tier: extended
@@ -10151,6 +10373,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgypgy-kol-data-core-data-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-cooperator-blogger-v2-v1
   tier: extended
@@ -10485,6 +10708,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-cooperator-blogger-v2-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-cooperator-user-blogger-userid-v1
   tier: extended
@@ -10519,6 +10743,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-cooperator-user-blogger-userid-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-data-userid-fans-overall-new-history-v1
   tier: extended
@@ -10571,6 +10796,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-data-userid-fans-overall-new-history-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-data-userid-fans-profile-v1
   tier: extended
@@ -10605,6 +10831,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-data-userid-fans-profile-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-datav2-costeffective-v1
   tier: extended
@@ -10639,6 +10866,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-datav2-costeffective-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-datav2-kolcontenttags-v1
   tier: extended
@@ -10673,6 +10901,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-datav2-kolcontenttags-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-datav2-kolfeaturetags-v1
   tier: extended
@@ -10707,6 +10936,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-datav2-kolfeaturetags-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-datav2-notesdetail-v1
   tier: extended
@@ -10786,6 +11016,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-datav2-notesdetail-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-datav3-datasummary-v1
   tier: extended
@@ -10829,6 +11060,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-datav3-datasummary-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-datav3-fanssummary-v1
   tier: extended
@@ -10863,6 +11095,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-datav3-fanssummary-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-datav3-notesrate-v1
   tier: extended
@@ -10934,6 +11167,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-datav3-notesrate-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-kol-get-similar-kol-v1
   tier: extended
@@ -10974,6 +11208,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-kol-get-similar-kol-v1.json
 - id: justoneapi.x.xiaohongshu-pgysolar-note-noteid-detail-v1
   tier: extended
@@ -11008,6 +11243,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgysolar-note-noteid-detail-v1.json
 - id: justoneapi.x.xiaohongshu-pgy-get-kol-note-list-v1
   tier: extended
@@ -11076,6 +11312,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.xiaohongshu-pgy-get-kol-note-list-v1.json
 - id: justoneapi.x.youku-get-user-detail-v1
   tier: extended
@@ -11110,6 +11347,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.youku-get-user-detail-v1.json
 - id: justoneapi.x.youku-get-video-detail-v1
   tier: extended
@@ -11144,6 +11382,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.youku-get-video-detail-v1.json
 - id: justoneapi.x.youku-search-video-v1
   tier: extended
@@ -11184,6 +11423,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.youku-search-video-v1.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.youtube-get-channel-videos-v1
@@ -11224,8 +11464,10 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.youtube-get-channel-videos-v1.json
 - id: justoneapi.x.youtube-get-video-captions-v1
+  added: '2026-07-28'
   tier: extended
   platform: youtube
   method: GET
@@ -11331,6 +11573,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.youtube-get-video-comment-v1.json
 # note: the call succeeds (code 0) but returned an EMPTY payload for this test target — route and credential are proven, the example shows no response shape
 - id: justoneapi.x.youtube-get-video-sub-comment-v1
@@ -11378,6 +11621,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.youtube-get-video-sub-comment-v1.json
 - id: justoneapi.x.youtube-search-v1
   tier: extended
@@ -11468,6 +11712,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.youtube-search-v1.json
 - id: justoneapi.x.zhihu-get-answer-comments-v1
   tier: extended
@@ -11517,6 +11762,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-answer-comments-v1.json
 - id: justoneapi.x.zhihu-get-answer-list-v1
   tier: extended
@@ -11577,6 +11823,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-answer-list-v1.json
 - id: justoneapi.x.zhihu-get-column-article-detail-v1
   tier: extended
@@ -11611,6 +11858,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-column-article-detail-v1.json
 - id: justoneapi.x.zhihu-get-column-article-list-v1
   tier: extended
@@ -11651,6 +11899,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-column-article-list-v1.json
 - id: justoneapi.x.zhihu-get-comment-replies-v1
   tier: extended
@@ -11700,6 +11949,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-comment-replies-v1.json
 - id: justoneapi.x.zhihu-get-user-articles-v1
   tier: extended
@@ -11749,6 +11999,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-user-articles-v1.json
 - id: justoneapi.x.zhihu-get-user-follow-collections-v1
   tier: extended
@@ -11789,6 +12040,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-user-follow-collections-v1.json
 - id: justoneapi.x.zhihu-get-user-follow-columns-v1
   tier: extended
@@ -11829,6 +12081,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-user-follow-columns-v1.json
 - id: justoneapi.x.zhihu-get-user-follow-questions-v1
   tier: extended
@@ -11869,6 +12122,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-user-follow-questions-v1.json
 - id: justoneapi.x.zhihu-get-user-follow-topics-v1
   tier: extended
@@ -11909,6 +12163,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-user-follow-topics-v1.json
 - id: justoneapi.x.zhihu-get-user-followees-v1
   tier: extended
@@ -11949,6 +12204,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-user-followees-v1.json
 - id: justoneapi.x.zhihu-get-user-followers-v1
   tier: extended
@@ -11989,6 +12245,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-user-followers-v1.json
 - id: justoneapi.x.zhihu-get-user-included-articles-v1
   tier: extended
@@ -12028,6 +12285,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-user-included-articles-v1.json
 - id: justoneapi.x.zhihu-get-user-info-v1
   tier: extended
@@ -12062,6 +12320,7 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-get-user-info-v1.json
 - id: justoneapi.x.zhihu-search-v1
   tier: extended
@@ -12137,4 +12396,5 @@ endpoints:
     json_path: code
     equals: 0
   verified: '2026-07-28'
+  added: '2026-07-28'
   example_response: examples/justoneapi.x.zhihu-search-v1.json

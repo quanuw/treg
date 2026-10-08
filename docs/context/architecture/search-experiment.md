@@ -209,6 +209,9 @@ and the public `/search` page, anonymous, rate limited, streamed, and switchable
   change how agents pick and turn the experiment into a different one. A v2 answer's verdict is a
   word, and its hint says what to do with it.
 - Page length is the same in every arm, so "more options" cannot masquerade as "better options".
+- A recently-added search (`added_within_days` or `sort=newest`, catalog.md "`added`") is not part
+  of the experiment: `added_page` serves it with no judge and no record. Without those inputs
+  `catalog_search` runs the experiment exactly as before.
 - Nothing here touches `/call/`, money, or the HTTP search route (`/catalog/find` is its own
   route). The routed-discovery switch
   (`routed_discovery`) applies to the judged page through the shared finishing function.

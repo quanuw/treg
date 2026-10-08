@@ -6244,7 +6244,7 @@
     },
     "/catalog/search": {
       "get": {
-        "description": "Open: free-text search across the whole catalog — the DISCOVER half of the loop.\n\nAn agent that knows what it wants (\"tiktok comments\") shouldn't have to guess which platform\nshelf hides it. Ranking is plain token matching (see `catalog_store.search`) so results are\nreproducible and explainable; equal scores — the common case, not the edge — then break on what\ntreg has MEASURED and on price, so the cut stops being file order. `hints` carries the next\ncommand, since finding the endpoint is never the goal — inspecting or calling it is.",
+        "description": "Open: free-text search across the whole catalog — the DISCOVER half of the loop.\n\nAn agent that knows what it wants (\"tiktok comments\") shouldn't have to guess which platform\nshelf hides it. Ranking is plain token matching (see `catalog_store.search`) so results are\nreproducible and explainable; equal scores — the common case, not the edge — then break on what\ntreg has MEASURED and on price, so the cut stops being file order. `hints` carries the next\ncommand, since finding the endpoint is never the goal — inspecting or calling it is.\n\n`added_within_days` and `sort=newest` (catalog.md \"`added`\") list recently added tools, with or\nwithout words; absent, this route answers exactly as it did before them.",
         "operationId": "catalog_search_catalog_search_get",
         "parameters": [
           {
@@ -6265,6 +6265,32 @@
               "default": 25,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "added_within_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Added Within Days"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Sort",
+              "type": "string"
             }
           }
         ],

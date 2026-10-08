@@ -308,6 +308,7 @@ class SearchResult(TypedDict, total=False):
     more_providers: int | None   # a judged answer, on a job's first row: vendors of it the page left out
     usd_per_call: float | None
     no_key_needed: bool | None
+    added: str | None            # the UTC day the tool reached the catalog (YYYY-MM-DD); null on a routed row
     score: float | None          # the lexical score; null on a judged answer (no probability is shown)
     works: float | None          # measured success rate, or null when there isn't enough evidence
     samples: int | None          # how many real calls that rate stands on
@@ -328,6 +329,9 @@ class SearchOut(TypedDict, total=False):
     reason: str | None           # on none: gap (the catalog has no tool for it)
     jobs: list[SearchJob] | None  # the jobs on the page, page order
     ranking_note: str | None     # set when the tie group outran what the evidence sort could weigh
+    sort: str | None             # with added_within_days or sort: best | newest, the order applied
+    added_within_days: int | None  # the window applied, after the cap
+    capped_at_days: int | None   # set when added_within_days asked for more than the maximum
     near: list[dict] | None      # zero results only: the rows just under the gate + the words they miss
     hint: str | None
     next: str | None
@@ -737,13 +741,17 @@ async def _whose_grant(client: httpx.AsyncClient, slug: str | None, *, oauth: bo
         "provider or platform name lists what it offers. Returns each endpoint's id, provider, price "
         "per call, and whether treg can serve it without you owning an API key. Read `verdict`: "
         "strong = these do it; closest = nearest, check catalog_get; none = not in the catalog, file "
-        "catalog_request. Use it when a task needs data or an API you have no key for."
+        "catalog_request. Use it when a task needs data or an API you have no key for. "
+        "Recently added tools: added_within_days=N (1-365; 30 is a good default) keeps tools added "
+        "in the last N days, sort='newest' lists newest first; with either, query may be empty."
     ),
     annotations=_READS,
     structured_output=True
 )
-async def catalog_search(query: str, ctx: Context, limit: int = 8) -> SearchOut:
-    return await _catalog_search_impl(query, limit, ctx=ctx, surface=_TEAM_SURFACE)
+async def catalog_search(query: str, ctx: Context, limit: int = 8, added_within_days: int | None = None,
+                         sort: str | None = None) -> SearchOut:
+    return await _catalog_search_impl(query, limit, ctx=ctx, surface=_TEAM_SURFACE,
+                                      added_within_days=added_within_days, sort=sort)
 
 
 async def _search_identity(ctx: Context | None) -> tuple[str | None, int | None, str | None]:
@@ -769,13 +777,19 @@ async def _search_identity(ctx: Context | None) -> tuple[str | None, int | None,
 
 
 async def _catalog_search_impl(
-    query: str, limit: int = 8, *, ctx: Context | None = None, surface: _SurfacePolicy
+    query: str, limit: int = 8, *, ctx: Context | None = None, surface: _SurfacePolicy,
+    added_within_days: int | None = None, sort: str | None = None,
 ) -> SearchOut:
     """The use case is `application.catalog_search`: the shipped ranker's page, the discovery
     experiment's say over it, and the records. This layer resolves who is asking (the hub's lists
-    and the experiment's log both need it) and shapes the rows for an agent."""
+    and the experiment's log both need it) and shapes the rows for an agent. With a recently-added
+    option the page is `search_app.added_page` instead: a date list, no judge, no experiment."""
     cat = catalog_store.load()
     limit = max(1, min(limit, 25))
+    try:
+        opts = catalog_store.added_options(added_within_days, sort)
+    except catalog_store.AddedOptionError as e:
+        return {"error": "invalid_option", "detail": str(e)}
     # While a list limits the hub, only a caller in it (by team or by email) sees hub rows.
     hub_slug = hub_email = None
     if get_settings().hub_enabled and get_settings().hub_limited:
@@ -783,10 +797,15 @@ async def _catalog_search_impl(
         if token:
             hub_slug, hub_email = await _hub_reader(token)
     from .routers.catalog import _provider_display
-    page = await search_app.search(
-        query, limit, cat=cat, source=surface.event_source,
-        caller=search_app.Caller(hub_slug=hub_slug, hub_email=hub_email),
-        observed=_observed_stats, identify=lambda: _search_identity(ctx), provider_display=_provider_display)
+    if opts.active:
+        page = await search_app.added_page(
+            query, cat, limit, opts, caller=search_app.Caller(hub_slug=hub_slug, hub_email=hub_email),
+            observed=_observed_stats)
+    else:
+        page = await search_app.search(
+            query, limit, cat=cat, source=surface.event_source,
+            caller=search_app.Caller(hub_slug=hub_slug, hub_email=hub_email),
+            observed=_observed_stats, identify=lambda: _search_identity(ctx), provider_display=_provider_display)
     ranked, stats, hidden, total, _steering = page.rows, page.stats, page.hidden, page.total, page.steering
     if page.arm is not None:
         analytics.capture(page.caller_key or "anonymous", "catalog_search_judged", {
@@ -825,6 +844,7 @@ async def _catalog_search_impl(
                 and any(get_settings().platform_key_for((cat.by_id.get(i) or {}).get("provider"))
                         for i in ep.get("routed_children") or [])
                 or bool(get_settings().platform_key_for(ep.get("provider")))),
+            "added": ep.get("added") or None,
             "score": None if page.judged else score,
             # The measured half of the answer, at the step where the agent is choosing. Without it
             # the "your agent picks on evidence" story only came true at catalog_get — one endpoint
@@ -833,6 +853,21 @@ async def _catalog_search_impl(
             "samples": obs.get("samples") or 0,
         })
     out = {"query": query, "count": len(results), "total_matches": total, "results": results}
+    if opts.active:
+        out["sort"] = "newest" if opts.newest or not query.strip() else "best"
+        if opts.days is not None:
+            out["added_within_days"] = opts.days
+        if opts.capped:
+            out["capped_at_days"] = catalog_store.ADDED_DAYS_MAX
+        within = f" in the last {opts.days} days" if opts.days else ""
+        out["hint"] = ((f"added_within_days is capped at {catalog_store.ADDED_DAYS_MAX}. " if opts.capped else "")
+                       + (f"{total} tools added{within}" + (f" match {query!r}" if query.strip() else "")
+                          if results else f"no tool{' matching ' + repr(query) if query.strip() else ''} "
+                                          f"was added{within or ' yet'}"))
+        if results:
+            out["next"] = ("catalog_get(endpoint_id) for parameters and the exact price, then "
+                           f"{surface.next_call}")
+        return out
     if page.verdict is not None:
         out["verdict"] = page.verdict
         if page.verdict == find_app.NONE:
@@ -1690,13 +1725,18 @@ for _name in ("httpx", "httpx2", "httpcore", "httpcore2"):
     description=(
         "Searches Treg's catalog by capability or task words and returns matching endpoint ids, "
         "providers, prices and measured reliability; `verdict` says whether they do the task "
-        "(strong), are the nearest (closest) or the catalog has no tool for it (none)."
+        "(strong), are the nearest (closest) or the catalog has no tool for it (none). "
+        "added_within_days (1-365) keeps tools added in the last N days and sort='newest' lists "
+        "newest first; with either, query may be empty."
     ),
     annotations=_DIRECTORY_SEARCH,
     structured_output=True,
 )
-async def directory_catalog_search(query: str, ctx: Context, limit: int = 8) -> SearchOut:
-    return await _catalog_search_impl(query, limit, ctx=ctx, surface=_DIRECTORY_SURFACE)
+async def directory_catalog_search(query: str, ctx: Context, limit: int = 8,
+                                   added_within_days: int | None = None,
+                                   sort: str | None = None) -> SearchOut:
+    return await _catalog_search_impl(query, limit, ctx=ctx, surface=_DIRECTORY_SURFACE,
+                                      added_within_days=added_within_days, sort=sort)
 
 
 @directory_mcp.tool(

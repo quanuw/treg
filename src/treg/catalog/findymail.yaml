@@ -61,10 +61,12 @@ endpoints:
       confidence: documented
       note: "1 finder credit, charged only when a deliverable email is returned. Confirmed live 2026-08-20 (finder counter fell by exactly 1)."
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/findymail.search.name.json
     docs_url: https://app.findymail.com/docs/
 
   - id: findymail.search.business-profile
+    added: '2026-08-20'
     domain: contacts
     capability: people.email.find
     platform: people
@@ -97,6 +99,7 @@ endpoints:
   - id: findymail.search.domain
     example_response: examples/findymail.search.domain.json
     verified: '2026-08-28'
+    added: '2026-08-20'
     domain: contacts
     capability: people.search
     platform: people
@@ -130,6 +133,7 @@ endpoints:
   - id: findymail.search.employees
     example_response: examples/findymail.search.employees.json
     verified: '2026-08-28'
+    added: '2026-08-20'
     domain: contacts
     capability: people.search
     platform: people
@@ -161,6 +165,7 @@ endpoints:
     docs_url: https://app.findymail.com/docs/
 
   - id: findymail.search.company
+    added: '2026-08-20'
     test_request: {"body": {"domain": "stripe.com"}}
     domain: companies
     capability: companies.enrich
@@ -195,6 +200,7 @@ endpoints:
     docs_url: https://app.findymail.com/docs/
 
   - id: findymail.search.phone
+    added: '2026-08-20'
     domain: contacts
     capability: people.phone.find
     platform: people
@@ -226,6 +232,7 @@ endpoints:
   - id: findymail.search.reverse-email
     example_response: examples/findymail.search.reverse-email.json
     verified: '2026-08-28'
+    added: '2026-08-20'
     domain: contacts
     capability: people.identity.resolve
     platform: people
@@ -282,6 +289,7 @@ endpoints:
       confidence: documented
       note: "spends the SEPARATE verifier pool, not finder credits — confirmed live 2026-08-20 (verifier counter 10 -> 9, finder counter unmoved). Verifier credits are granted as a plan bonus with no standalone published price, so this route has no USD rate."
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/findymail.verify.json
     docs_url: https://app.findymail.com/docs/
 
@@ -313,6 +321,7 @@ endpoints:
       confidence: documented
       note: "1 finder credit when technologies are returned; nothing when the domain is unknown. Confirmed live 2026-08-20."
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/findymail.technologies.json
     docs_url: https://app.findymail.com/docs/
 
@@ -333,10 +342,12 @@ endpoints:
       queryParams: {q: "shopify"}
     cost: {type: free, value: 0, currency: USD, unit: call}
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/findymail.technologies.search.json
     docs_url: https://app.findymail.com/docs/
 
   - id: findymail.lookalike.search
+    added: '2026-08-20'
     domain: companies
     capability: companies.similar
     platform: companies
@@ -370,6 +381,7 @@ endpoints:
     docs_url: https://app.findymail.com/docs/
 
   - id: findymail.intellimatch.search
+    added: '2026-08-20'
     domain: companies
     capability: companies.search
     platform: companies
@@ -417,10 +429,12 @@ endpoints:
       queryParams: {hash: "doesnotexist"}
     cost: {type: free, value: 0, currency: USD, unit: call}
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/findymail.intellimatch.status.json
     docs_url: https://app.findymail.com/docs/
 
   - id: findymail.intellimatch.data
+    added: '2026-08-20'
     domain: companies
     capability: companies.search.results
     platform: companies
@@ -464,6 +478,7 @@ endpoints:
       queryParams: {per_page: 2}
     cost: {type: free, value: 0, currency: USD, unit: call}
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/findymail.signals.json
     docs_url: https://app.findymail.com/docs/
 
@@ -482,6 +497,7 @@ endpoints:
     test_request: {queryParams: {}}
     cost: {type: free, value: 0, currency: USD, unit: call}
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/findymail.lists.json
     docs_url: https://app.findymail.com/docs/
 
@@ -503,6 +519,7 @@ endpoints:
       pathParams: {id: 0}
     cost: {type: free, value: 0, currency: USD, unit: call}
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/findymail.contacts.get.json
     docs_url: https://app.findymail.com/docs/
 
@@ -521,6 +538,7 @@ endpoints:
     test_request: {queryParams: {}}
     cost: {type: free, value: 0, currency: USD, unit: call}
     verified: '2026-08-20'
+    added: '2026-08-20'
     example_response: examples/findymail.credits.json
     docs_url: https://app.findymail.com/docs/
 

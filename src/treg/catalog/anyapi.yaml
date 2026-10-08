@@ -111,6 +111,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.x.search.posts.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/twitter/search
   note: AnyAPI lists this flat per request at the default limit of 20, and one of the four sources bills
     per result, so a SMALL request can settle below the price here ($0.0002 observed at limit=1 on 2026-09-08);
@@ -155,6 +156,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.x.user.profile.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   miss:
     status: 200
     means: 'handle not found: 200 with output.found false, BILLED $0.00022 (observed 2026-09-19)'
@@ -219,6 +221,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.instagram.search.reels.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/instagram/reels-search
   note: 'AnyAPI slug `instagram.reels_search`. Price is the p90 of what AnyAPI really charged for this
     endpoint over the 60 days to 2026-09-09 (9055 charged calls, $0.002 median), not a list price; roughly
@@ -323,6 +326,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.google.serp.organic.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/google/search
   note: 'Flat per request whatever the result count. `google.search_100` returns up to 100 ranked results
     for one flat charge and is cheaper past roughly 20 results. AnyAPI slug `google.search`. Price is
@@ -384,6 +388,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.linkedin.search.posts.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/linkedin/search-posts
   note: The cheap tier of LinkedIn post search. `linkedin.search_posts_full` ($0.005) returns the full
     post record for each hit. AnyAPI slug `linkedin.search_posts`. Price is the p90 of what AnyAPI really
@@ -444,6 +449,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.x.user.posts.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/twitter/user-tweets
   note: Listed flat per request at the default limit of 20. As with `x.search.posts`, a per-result source
     can settle a small request below the price here ($0.0002 observed at limit=1 on 2026-09-08). AnyAPI
@@ -556,6 +562,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.linkedin.search.jobs.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/linkedin/jobs-thin
   note: 'The cheap tier of LinkedIn job search: listing fields only. `linkedin.jobs` ($0.0286) returns
     the full posting. AnyAPI slug `linkedin.jobs_thin`. Price is the p90 of what AnyAPI really charged
@@ -599,6 +606,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.tiktok.user.profile.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   miss:
     status: 200
     means: 'handle not found: 200 with output.found false, BILLED $0.00045 (observed 2026-09-19)'
@@ -647,6 +655,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.linkedin.user.profile.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   miss:
     status: 200
     means: 'profile not found: 200 with output.found false, BILLED $0.0012 (observed 2026-09-19, 11 s)'
@@ -746,6 +755,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.google.serp.maps.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/maps/search
   note: 'Flat per request on every source, but not at the same price: this row has the widest failover
     ceiling in the listing ($0.116). The cheapest source charges $0.00175 and serves most calls; the two
@@ -862,6 +872,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.linkedin.search.posts.full.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/linkedin/search-posts-full
   note: 'The FULL tier of LinkedIn post search, on the same capability as `linkedin.search_posts` above
     and deliberately priced 4x higher: it returns the author record, engagement counts, attachments and
@@ -917,6 +928,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.instagram.post.detail.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   miss:
     status: 200
     means: 'post not found: 200 with output.found false, BILLED $0.0005 (observed 2026-09-19, 16 s)'
@@ -973,6 +985,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.instagram.user.reels.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/instagram/user-reels
   note: AnyAPI slug `instagram.user_reels`. Price is the p90 of what AnyAPI really charged for this endpoint
     over the 60 days to 2026-09-09 (15155 charged calls, $0.0015 median), not a list price; roughly one
@@ -1020,6 +1033,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.instagram.user.posts.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/instagram/user-posts
   note: AnyAPI slug `instagram.user_posts`. Price is the p90 of what AnyAPI really charged for this endpoint
     over the 60 days to 2026-09-09 (18163 charged calls, $0.002 median), not a list price; roughly one
@@ -1065,6 +1079,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.linkedin.user.profile.full.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   miss:
     status: 200
     means: 'profile not found: 200 with output.found false, BILLED $0.004 (observed 2026-09-19, 1 s)'
@@ -1119,6 +1134,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.x.user.posts.timeline.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/twitter/user-posts
   note: The profile Posts-tab timeline, in profile order with a pinned post first. `x.user.posts` above
     (`twitter.user_tweets`) returns authored posts AND replies in reverse-chronological order. Different
@@ -1193,6 +1209,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.instagram.hashtag.posts.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/instagram/search-hashtag
   note: Searches a web index of hashtag posts rather than Instagram's own hashtag feed, which is what
     lets it filter by date. AnyAPI slug `instagram.search_hashtag`. Price is the p90 of what AnyAPI really
@@ -1240,6 +1257,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.tiktok.user.videos.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/tiktok/profile-videos
   note: AnyAPI slug `tiktok.profile_videos`. Price is the p90 of what AnyAPI really charged for this endpoint
     over the 60 days to 2026-09-09 (2307 charged calls, $0.0012 median), not a list price; roughly one
@@ -1287,6 +1305,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.instagram.post.comments.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/instagram/post-comments
   note: AnyAPI slug `instagram.post_comments`. Price is the p90 of what AnyAPI really charged for this
     endpoint over the 60 days to 2026-09-09 (9965 charged calls, $0.0012 median), not a list price; roughly
@@ -1346,6 +1365,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.tiktok.search.general.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/tiktok/search-top
   note: AnyAPI slug `tiktok.search_top`. Price is the p90 of what AnyAPI really charged for this endpoint
     over the 60 days to 2026-09-09 (1771 charged calls, $0.002 median), not a list price; roughly one
@@ -1393,6 +1413,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.tiktok.video.comments.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/tiktok/video-comments
   note: AnyAPI slug `tiktok.video_comments`. Price is the p90 of what AnyAPI really charged for this endpoint
     over the 60 days to 2026-09-09 (1873 charged calls, $0.00144 median), not a list price; roughly one
@@ -1449,6 +1470,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.facebook.group.posts.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/facebook/group-posts
   note: AnyAPI slug `facebook.group_posts`. Price is the p90 of what AnyAPI really charged for this endpoint
     over the 60 days to 2026-09-09 (1738 charged calls, $0.002 median), not a list price; roughly one
@@ -1500,6 +1522,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.facebook.user.posts.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/facebook/profile-posts
   note: AnyAPI slug `facebook.profile_posts`. Price is the p90 of what AnyAPI really charged for this
     endpoint over the 60 days to 2026-09-09 (1445 charged calls, $0.002 median), not a list price; roughly
@@ -1543,6 +1566,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.facebook.post.detail.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/facebook/post
   note: AnyAPI slug `facebook.post`. Price is the p90 of what AnyAPI really charged for this endpoint
     over the 60 days to 2026-09-09 (1352 charged calls, $0.002 median), not a list price; roughly one
@@ -1619,6 +1643,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.tiktok.search.videos.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/tiktok/search-keyword
   note: AnyAPI slug `tiktok.search_keyword`. Price is the p90 of what AnyAPI really charged for this endpoint
     over the 60 days to 2026-09-09 (921 charged calls, $0.0012 median), not a list price; roughly one
@@ -1661,6 +1686,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.tiktok.video.captions.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/tiktok/video-transcript
   note: AnyAPI slug `tiktok.video_transcript`. Price is the p90 of what AnyAPI really charged for this
     endpoint over the 60 days to 2026-09-09 (1005 charged calls, $0.002 median), not a list price; roughly
@@ -1737,6 +1763,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.google.serp.news.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/google/news
   note: AnyAPI slug `google.news`. Price is the p90 of what AnyAPI really charged for this endpoint over
     the 60 days to 2026-09-09 (742 charged calls, $0.00099 median), not a list price; roughly one call
@@ -1792,6 +1819,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.x.post.comments.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/twitter/replies
   note: These are the replies to ONE post, keyed by post URL. A user's own replies across their timeline
     are a different job and a different shelf (`x.user.replies`); AnyAPI does not sell that one. AnyAPI
@@ -1849,6 +1877,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.linkedin.company.people.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   miss:
     status: 200
     means: 'company not found: 200 with output.found false and costUsd 0, free (observed 2026-09-19)'
@@ -1863,6 +1892,7 @@ endpoints:
     estimate. A request no source could serve answers non-2xx and is not charged; a source that answers not-found is a 2xx whose `found` is false and IS charged (probed 2026-09-19). Send the `max_cost_usd` query parameter
     to refuse any source dearer than a price you name.'
 - id: anyapi.linkedin.email.work.find
+  added: '2026-09-19'
   capability: people.email.find
   platform: people
   scope: any_account
@@ -1943,6 +1973,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.google.serp.ai_overview.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/google/ai-overview
   note: 'AI OVERVIEW IS NOT AI MODE. This returns the AI Overview panel Google renders above an ordinary
     search result. AI Mode is Google''s separate conversational surface, which `google.serp.ai_mode` names
@@ -2084,6 +2115,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.linkedin.search.jobs.full.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/linkedin/jobs
   note: 'The FULL tier of LinkedIn job search: description, salary, applicant count, seniority and company
     detail. `linkedin.search.jobs` above (`linkedin.jobs_thin`) returns listing fields only. Since 2026-10-06
@@ -2132,6 +2164,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.tiktok.search.users.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/tiktok/search-users
   note: AnyAPI slug `tiktok.search_users`. Price is the p90 of what AnyAPI really charged for this endpoint
     over the 60 days to 2026-09-09 (507 charged calls, $0.001 median), not a list price; roughly one call
@@ -2213,6 +2246,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.google.maps.reviews.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/maps/reviews
   note: 'One of the three sources bills per review returned, and the router picks it when it is cheaper
     for the requested count: the committed test_request metered $0.00138 on 2026-09-08. Measured over
@@ -2303,6 +2337,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.google.serp.maps.place.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/maps/place
   note: 'Two AnyAPI rows share this shelf: this one resolves a query to the SINGLE best-matching place
     with its details, and maps.search returns up to 20 matches for a keyword and location. AnyAPI slug
@@ -2357,6 +2392,7 @@ endpoints:
     confidence: verified
   example_response: examples/anyapi.google.keywords.ideas.json
   verified: '2026-09-19'
+  added: '2026-09-19'
   docs_url: https://getanyapi.com/api/google/autocomplete
   note: 'The autocomplete flavour of keyword ideas: Google''s own suggestions for a partial query, with
     no search volume, CPC or difficulty figures attached. AnyAPI slug `google.autocomplete`. Price is

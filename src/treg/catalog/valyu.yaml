@@ -21,6 +21,7 @@ proposed_capabilities:
   research.sources.list: Discover Valyu source IDs
 endpoints:
 - id: valyu.web.search
+  added: '2026-09-29'
   platform: web
   domain: search
   capability: web.search
@@ -94,6 +95,7 @@ endpoints:
     note: Web costs one and a half credits per 1,000 results; settle the reported deduction.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.research.papers.search
+  added: '2026-09-29'
   platform: research
   domain: papers
   capability: research.papers.search
@@ -179,6 +181,7 @@ endpoints:
     note: ChemRxiv is the highest-priced source in this view at five credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.stocks.search
+  added: '2026-09-29'
   platform: stocks
   domain: stocks
   capability: stocks.search
@@ -260,6 +263,7 @@ endpoints:
     note: Stocks cost six credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.crypto.search
+  added: '2026-09-29'
   platform: crypto
   domain: crypto
   capability: crypto.search
@@ -341,6 +345,7 @@ endpoints:
     note: Crypto costs six credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.markets.forex.search
+  added: '2026-09-29'
   platform: markets
   domain: forex
   capability: markets.forex.search
@@ -422,6 +427,7 @@ endpoints:
     note: Foreign exchange costs six credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.stocks.filings.search
+  added: '2026-09-29'
   platform: stocks
   domain: filings
   capability: stocks.filings.search
@@ -503,6 +509,7 @@ endpoints:
     note: SEC filings cost twelve credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.stocks.insiders.search
+  added: '2026-09-29'
   platform: stocks
   domain: insiders
   capability: stocks.insiders.search
@@ -584,6 +591,7 @@ endpoints:
     note: Insider transactions cost twelve credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.markets.monitor.search
+  added: '2026-09-29'
   platform: markets
   domain: monitor
   capability: markets.monitor.search
@@ -666,6 +674,7 @@ endpoints:
     note: Market movers are the highest-priced source in this view at twelve credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.markets.predictions.search
+  added: '2026-09-29'
   platform: markets
   domain: predictions
   capability: markets.predictions.search
@@ -748,6 +757,7 @@ endpoints:
     note: Both prediction sources cost five credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.health.trials.search
+  added: '2026-09-29'
   platform: health
   domain: trials
   capability: health.trials.search
@@ -829,6 +839,7 @@ endpoints:
     note: Clinical trials cost five credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.health.references.search
+  added: '2026-09-29'
   platform: health
   domain: references
   capability: health.references.search
@@ -911,6 +922,7 @@ endpoints:
     note: Both health reference sources cost three credits per 1,000 results; the live WHO id is valyu/valyu-who-gho.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.economics.indicators.search
+  added: '2026-09-29'
   platform: economics
   domain: indicators
   capability: economics.indicators.search
@@ -993,6 +1005,7 @@ endpoints:
     note: Both official-statistics sources cost five credits per 1,000 results.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/search
 - id: valyu.web.contents
+  added: '2026-09-29'
   platform: web
   domain: extract
   capability: web.extract
@@ -1057,6 +1070,7 @@ endpoints:
     note: One successful URL cost 0.001 credit live; failed URLs have no extraction charge.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/contents
 - id: valyu.web.answer
+  added: '2026-09-29'
   platform: web
   domain: answer
   capability: web.answer
@@ -1113,6 +1127,7 @@ endpoints:
       this catalog row is BYOK only.'
   docs_url: https://docs.valyu.ai/api-reference/endpoint/answer
 - id: valyu.research.deep
+  added: '2026-09-29'
   platform: research
   domain: deepresearch
   capability: research.deep
@@ -1214,6 +1229,7 @@ endpoints:
       path: output
     interval: 20
 - id: valyu.research.deep.status
+  added: '2026-09-29'
   kind: utility
   platform: research
   domain: deepresearch
@@ -1241,6 +1257,7 @@ endpoints:
     note: Valyu publishes no separate polling charge; the completed task reports its total cost.
   docs_url: https://docs.valyu.ai/api-reference/endpoint/deepresearch-status
 - id: valyu.sources.list
+  added: '2026-09-29'
   kind: utility
   platform: research
   domain: sources

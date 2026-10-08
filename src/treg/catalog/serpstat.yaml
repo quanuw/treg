@@ -58,6 +58,7 @@ pricing_url: https://serpstat.com/pay/
 endpoints:
   # --- Domain analytics -------------------------------------------------------------------------
   - id: serpstat.google.domain.overview
+    added: '2026-07-28'
     capability: google.domain.overview
     platform: google
     scope: any_account
@@ -89,6 +90,7 @@ endpoints:
     docs_url: https://api-docs.serpstat.com/docs/serpstat-public-api/
 
   - id: serpstat.google.domain.ranked_keywords
+    added: '2026-07-28'
     capability: google.domain.ranked_keywords
     platform: google
     scope: any_account
@@ -128,6 +130,7 @@ endpoints:
     docs_url: https://api-docs.serpstat.com/docs/serpstat-public-api/
 
   - id: serpstat.google.domain.competitors
+    added: '2026-07-28'
     capability: google.domain.competitors
     platform: google
     scope: any_account
@@ -161,6 +164,7 @@ endpoints:
 
   # --- Keyword analytics ------------------------------------------------------------------------
   - id: serpstat.google.keywords.volume
+    added: '2026-07-28'
     capability: google.keywords.volume
     platform: google
     scope: any_account
@@ -194,6 +198,7 @@ endpoints:
     docs_url: https://api-docs.serpstat.com/docs/serpstat-public-api/2brcbdgmr6rcx-get-keywords-info
 
   - id: serpstat.google.keywords.ideas
+    added: '2026-07-28'
     capability: google.keywords.ideas
     platform: google
     scope: any_account
@@ -232,6 +237,7 @@ endpoints:
     docs_url: https://api-docs.serpstat.com/docs/serpstat-public-api/7yidbv07n5q9u-get-related-keywords
 
   - id: serpstat.google.serp.organic
+    added: '2026-07-28'
     capability: google.serp.organic
     platform: google
     scope: any_account
@@ -273,6 +279,7 @@ endpoints:
   # Every method here takes `query` + `searchType` instead of `domain` + `se`: the backlink index is
   # global, not per-country. `searchType` decides what `query` means and therefore what you get back.
   - id: serpstat.web.backlinks.summary
+    added: '2026-07-28'
     capability: web.backlinks.summary
     platform: web
     scope: any_account
@@ -303,6 +310,7 @@ endpoints:
     docs_url: https://api-docs.serpstat.com/docs/serpstat-public-api/xu9jnzib39dsn-backlinks-api
 
   - id: serpstat.web.backlinks.list
+    added: '2026-07-28'
     capability: web.backlinks.list
     platform: web
     scope: any_account
@@ -342,6 +350,7 @@ endpoints:
     docs_url: https://api-docs.serpstat.com/docs/serpstat-public-api/xu9jnzib39dsn-backlinks-api
 
   - id: serpstat.web.linking_domains.list
+    added: '2026-07-28'
     capability: web.linking_domains.list
     platform: web
     scope: any_account
@@ -377,6 +386,7 @@ endpoints:
     docs_url: https://api-docs.serpstat.com/docs/serpstat-public-api/xu9jnzib39dsn-backlinks-api
 
   - id: serpstat.web.anchors.list
+    added: '2026-07-28'
     capability: web.anchors.list
     platform: web
     scope: any_account
@@ -414,6 +424,7 @@ endpoints:
     docs_url: https://api-docs.serpstat.com/docs/serpstat-public-api/xu9jnzib39dsn-backlinks-api
 
   - id: serpstat.web.site.top_pages
+    added: '2026-07-28'
     capability: web.site.top_pages
     platform: web
     scope: any_account
@@ -450,6 +461,7 @@ endpoints:
 
   # --- Account (free) ---------------------------------------------------------------------------
   - id: serpstat.account.usage
+    added: '2026-07-28'
     kind: account
     capability: account.usage
     platform: account

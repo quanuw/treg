@@ -199,6 +199,9 @@ so parallel runs and side-by-side runs never share one.
   names the fragments it updated.
 - `/mcp/` and `/mcp/v2/` differ on purpose. A change to either or to shared MCP code is reviewed
   against both; do not unify them in passing.
+- **Every tool row carries `added:`**, the UTC day it reached main (`scripts/catalog_added.py`
+  writes today's where it is missing). Never change an existing one without the
+  `added-date-change` label; CI compares every tool id with the base branch.
 - **A catalog data PR is a few rows and a PR body.** Cache admission, comparison declarations,
   adapters and contracts are rows in `src/treg/catalog/`; each declaration carries a one-line
   reason and nothing more. The evidence (traffic, byte sizes, change observations, bodies read)

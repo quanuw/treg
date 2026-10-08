@@ -61,6 +61,7 @@ endpoints:
       credit, so a no-email answer is free here. Verification date is not a fresh SMTP verification.
   docs_url: https://app.quickenrich.io/docs
   verified: '2026-09-08'
+  added: '2026-09-09'
   example_response: examples/quickenrich.people.email.find.json
 - id: quickenrich.people.phone.find
   cache:
@@ -88,6 +89,7 @@ endpoints:
     note: One credit when a phone is returned; zero on miss. Both observed live.
   docs_url: https://app.quickenrich.io/docs
   verified: '2026-09-08'
+  added: '2026-09-09'
   example_response: examples/quickenrich.people.phone.find.json
 - id: quickenrich.people.enrich
   capability: people.enrich
@@ -120,6 +122,7 @@ endpoints:
     note: One credit on match, zero on miss. Prefer meta.credits_used.
   docs_url: https://app.quickenrich.io/docs
   verified: '2026-09-08'
+  added: '2026-09-09'
   example_response: examples/quickenrich.people.enrich.json
 - id: quickenrich.people.search.domain
   capability: people.search
@@ -170,6 +173,7 @@ endpoints:
       together still one). Empty pages are free. Holds reserve at most 20 credits with title, one without.'
   docs_url: https://app.quickenrich.io/docs
   verified: '2026-09-08'
+  added: '2026-09-09'
   example_response: examples/quickenrich.people.search.domain.json
 - id: quickenrich.people.search
   capability: people.search
@@ -320,6 +324,7 @@ endpoints:
     note: Free discovery; meta.credits_used=0. Authentication is still required.
   docs_url: https://app.quickenrich.io/docs
   verified: '2026-09-08'
+  added: '2026-09-09'
   example_response: examples/quickenrich.people.search.json
 - id: quickenrich.companies.search
   capability: companies.search
@@ -440,4 +445,5 @@ endpoints:
       plan waiver. Web-app-only subscriptions are not an API product.
   docs_url: https://app.quickenrich.io/docs
   verified: '2026-09-08'
+  added: '2026-09-09'
   example_response: examples/quickenrich.companies.search.json

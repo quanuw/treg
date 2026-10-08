@@ -57,6 +57,7 @@ endpoints:
     test_request: {queryParams: {query: "TinyFish API documentation", domain_type: web}}
     cost: {type: free, value: 0, currency: USD, unit: call, source: docs, source_url: "https://www.tinyfish.ai/pricing", checked: '2026-09-23', confidence: verified, note: "TinyFish lists Search at $0.00 per request; a live call left the wallet unchanged."}
     verified: '2026-09-23'
+    added: '2026-09-23'
     example_response: examples/tinyfish.web.search.json
     docs_url: https://docs.tinyfish.ai/api-reference/search-the-web
 
@@ -89,6 +90,7 @@ endpoints:
     test_request: {queryParams: {query: "AI browser agents", domain_type: news}}
     cost: {type: free, value: 0, currency: USD, unit: call, source: docs, source_url: "https://www.tinyfish.ai/pricing", checked: '2026-09-23', confidence: verified, note: "TinyFish lists Search at $0.00 per request; the news index uses the same free endpoint."}
     verified: '2026-09-23'
+    added: '2026-09-23'
     example_response: examples/tinyfish.web.search.news.json
     docs_url: https://docs.tinyfish.ai/api-reference/search-the-web
 
@@ -121,6 +123,7 @@ endpoints:
     test_request: {queryParams: {query: "browser agent benchmark", domain_type: research_paper, pub_year_min: 2024}}
     cost: {type: free, value: 0, currency: USD, unit: call, source: docs, source_url: "https://www.tinyfish.ai/pricing", checked: '2026-09-23', confidence: verified, note: "TinyFish lists Search at $0.00 per request; the research-paper index uses the same free endpoint."}
     verified: '2026-09-23'
+    added: '2026-09-23'
     example_response: examples/tinyfish.web.search.publications.json
     docs_url: https://docs.tinyfish.ai/api-reference/search-the-web
 
@@ -154,6 +157,7 @@ endpoints:
     test_request: {body: {urls: ["https://example.com"], format: markdown, links: true, ttl: 0}}
     cost: {type: free, value: 0, currency: USD, unit: call, source: docs, source_url: "https://www.tinyfish.ai/pricing", checked: '2026-09-23', confidence: verified, note: "TinyFish lists Fetch at $0.00 per URL; a live fetch left the wallet unchanged."}
     verified: '2026-09-23'
+    added: '2026-09-23'
     example_response: examples/tinyfish.web.fetch.json
     docs_url: https://docs.tinyfish.ai/api-reference/fetch-and-extract-content-from-urls
 
@@ -215,6 +219,7 @@ endpoints:
       confidence: verified
       note: "TinyFish publishes $0.016 per Agent step. COMPLETED, FAILED, and CANCELLED runs settle from the terminal num_of_steps value, so a zero-step terminal response costs $0 while completed work remains billable; a completed live run reported 3 steps and reduced the wallet by exactly $0.048, and a cancelled live run reported 0 steps with no wallet change."
     verified: '2026-09-23'
+    added: '2026-09-23'
     example_response: examples/tinyfish.web.agent.run.json
     docs_url: https://docs.tinyfish.ai/api-reference/automation/start-automation-asynchronously
 
@@ -236,6 +241,7 @@ endpoints:
     test_request: {pathParams: {run_id: "e1f90a04-486f-441b-95af-7f7223eb994b"}}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "Reading a run does not start another Agent run."}
     verified: '2026-09-23'
+    added: '2026-09-23'
     example_response: examples/tinyfish.web.agent.run.get.json
     docs_url: https://docs.tinyfish.ai/api-reference/runs/get-run-by-id
 
@@ -257,10 +263,12 @@ endpoints:
     test_request: {pathParams: {run_id: "e1f90a04-486f-441b-95af-7f7223eb994b"}}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "The cancel request itself is free; any Agent steps already completed belong to the original run."}
     verified: '2026-09-23'
+    added: '2026-09-23'
     example_response: examples/tinyfish.web.agent.run.cancel.json
     docs_url: https://docs.tinyfish.ai/api-reference/runs/cancel-run-by-id
 
   - id: tinyfish.web.agent.step.screenshot
+    added: '2026-09-23'
     async: false
     kind: utility
     capability: web.agent.step.screenshot
@@ -280,6 +288,7 @@ endpoints:
     docs_url: https://docs.tinyfish.ai/api-reference/runs/get-step-screenshot
 
   - id: tinyfish.web.agent.step.html
+    added: '2026-09-23'
     async: false
     kind: utility
     capability: web.agent.step.html

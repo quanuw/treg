@@ -26,6 +26,7 @@ limits: "per-app and per-page business-use-case limits"
 pricing_url: https://developers.facebook.com/docs/graph-api/overview/rate-limiting
 endpoints:
   - id: facebook.facebook.page.posts
+    added: '2026-07-28'
     capability: facebook.page.posts
     platform: facebook
     scope: own_account
@@ -48,6 +49,7 @@ endpoints:
     docs_url: https://developers.facebook.com/docs/graph-api/reference/page/feed/
 
   - id: facebook.facebook.page.insights
+    added: '2026-07-28'
     capability: facebook.page.insights
     platform: facebook
     scope: own_account
@@ -73,6 +75,7 @@ endpoints:
     docs_url: https://developers.facebook.com/docs/graph-api/reference/page/insights/
 
   - id: facebook.facebook.page.post.create
+    added: '2026-07-28'
     kind: action
     capability: facebook.page.post.create
     platform: facebook
@@ -96,6 +99,7 @@ endpoints:
     docs_url: https://developers.facebook.com/docs/pages-api/posts
 
   - id: facebook.facebook.page.photo.create
+    added: '2026-07-28'
     kind: action
     # Two jobs in one route, and the difference is `published`. published=true posts the photo on
     # its own. published=false uploads it UNPUBLISHED and returns an id — that id, wrapped as
@@ -124,6 +128,7 @@ endpoints:
     docs_url: https://developers.facebook.com/docs/graph-api/reference/page/photos/
 
   - id: facebook.facebook.page.video.create
+    added: '2026-07-28'
     kind: action
     capability: facebook.page.video.create
     platform: facebook

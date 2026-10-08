@@ -455,7 +455,12 @@ Bare **`treg connections`** now lists (the subparser is `required=False` with a 
   platform, provider, cost, `✓`/`·` verified, tier, clipped summary — footer hint `treg catalog get <id>`.
   Cost prints in **USD** (`_cost_usd`, 3 significant digits) rather than `_cost_label`'s source currency:
   the column is only worth reading if CNY and USD rows compare. The no-match message names
-  `treg catalog request "<query>"` — the empty search is the moment the filer exists.
+  `treg catalog request "<query>"` — the empty search is the moment the filer exists. An ADDED
+  column shows each tool's `added` day (`-` on a routed row). `--new [DAYS]` (30 when bare, capped
+  at 365 with one line saying so) keeps tools added in the last DAYS days and `--sort newest` lists
+  newest first; with either, the words are optional (`treg catalog search --new`). `--new` takes a
+  number, so search words go before it. An older server that ignores both options gets "this
+  server does not support --new yet", not plain results labelled as new. `catalog get` prints `added`.
 - **`catalog request <what's missing…>`** (`_catalog_request`) — file a "the catalog doesn't have X"
   report (`POST /tool-requests`, `source: cli`). Open endpoint, rate-limited server-side; a configured
   token rides along as attribution only, never a requirement.

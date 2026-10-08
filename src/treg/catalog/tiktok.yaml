@@ -21,6 +21,7 @@ source:
 pricing_url: https://developers.tiktok.com/doc/display-api-get-started
 endpoints:
   - id: tiktok.tiktok.user.profile
+    added: '2026-07-28'
     capability: tiktok.user.profile
     platform: tiktok
     scope: own_account
@@ -36,6 +37,7 @@ endpoints:
     docs_url: https://developers.tiktok.com/doc/display-api-get-user-info/
 
   - id: tiktok.tiktok.user.videos
+    added: '2026-07-28'
     capability: tiktok.user.videos
     platform: tiktok
     scope: own_account
@@ -75,6 +77,7 @@ endpoints:
   # (private) regardless of the privacy_level sent, and creator_info reports the allowed values.
   # Always read tiktok.creator.info first rather than assuming PUBLIC_TO_EVERYONE will stick.
   - id: tiktok.tiktok.creator.info
+    added: '2026-07-28'
     kind: account
     capability: tiktok.creator.info
     platform: tiktok
@@ -90,6 +93,7 @@ endpoints:
     docs_url: https://developers.tiktok.com/doc/content-posting-api-reference-query-creator-info/
 
   - id: tiktok.tiktok.video.publish.init
+    added: '2026-07-28'
     kind: action
     capability: tiktok.video.publish
     platform: tiktok
@@ -109,6 +113,7 @@ endpoints:
     docs_url: https://developers.tiktok.com/doc/content-posting-api-reference-direct-post/
 
   - id: tiktok.tiktok.video.inbox.init
+    added: '2026-07-28'
     kind: action
     capability: tiktok.video.draft
     platform: tiktok
@@ -127,6 +132,7 @@ endpoints:
     docs_url: https://developers.tiktok.com/doc/content-posting-api-reference-upload-video/
 
   - id: tiktok.tiktok.content.init
+    added: '2026-07-28'
     kind: action
     capability: tiktok.photo.publish
     platform: tiktok
@@ -148,6 +154,7 @@ endpoints:
     docs_url: https://developers.tiktok.com/doc/content-posting-api-reference-direct-post/
 
   - id: tiktok.tiktok.publish.status
+    added: '2026-07-28'
     kind: utility
     capability: tiktok.publish.status
     platform: tiktok

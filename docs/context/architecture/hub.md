@@ -303,7 +303,9 @@ bump; a script's amounts change only with a new version of run.js.
   listing (a `HubListing` row in state `approved`, below): the newest live version is scored by `catalog_store.score_extra` with the catalog's
   own tokens, aliases, platform boost, idf and admission gate, then merged by score with no boost
   (`merge_by_score`, catalog rows first on a tie). The row is the public contract plus its 30-day ok
-  rate from runs by others; unlisted, unapproved, failed and retired never appear.
+  rate from runs by others; unlisted, unapproved, failed and retired never appear. Its `added` is the
+  UTC day of the approval (`HubListing.decided_at`), so a recently-added search lists it beside
+  catalog tools (`search_listed(everything=True)` with no words; catalog.md "`added`").
 - **The listing review** (`docs/hub-listing-decisions.md` round 2, 2026-09-24): `PATCH
   /hub/tools/{id} {"listed": true}` (`treg hub list`) is a request, a `HubListing` row, one per
   tool and not per version, so the listing stays while each new version is reviewed (below; migration 0050; the old

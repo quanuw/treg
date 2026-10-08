@@ -5156,17 +5156,53 @@ def _clip(text: str, width: int) -> str:
     return text if len(text) <= width else text[: width - 1] + "…"
 
 
+def _catalog_new_days(value: str) -> int:
+    """`--new [DAYS]`: a whole number of days. A word here is a search word typed after `--new`."""
+    try:
+        return int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"--new takes a number of days, not {value!r}; put search words before --new "
+            f"(treg catalog search phone --new 60)") from None
+
+
 def _catalog_search(query: str, args, cfg) -> None:
-    """Ranked free-text search over every endpoint — the way in when you know the job, not the shelf."""
-    if not query.strip():
-        sys.exit("search for what? e.g. treg catalog search tiktok comments")
+    """Ranked free-text search over every endpoint — the way in when you know the job, not the shelf.
+
+    `--new [DAYS]` keeps tools added in the last DAYS days (30 when no number is given) and `--sort
+    newest` lists newest first; with either, the words are optional."""
+    days, sort = getattr(args, "new", None), getattr(args, "sort", None) or "best"
+    added = days is not None or sort == "newest"
+    if not query.strip() and not added:
+        sys.exit("search for what? e.g. treg catalog search tiktok comments\n"
+                 "or list new tools: treg catalog search --new")
+    params: dict = {"q": query, "limit": getattr(args, "limit", 25) or 25}
+    if days is not None:
+        params["added_within_days"] = days
+    if sort != "best":
+        params["sort"] = sort
     with _client(cfg, auth=False) as c:
-        r = c.get("/catalog/search", params={"q": query, "limit": getattr(args, "limit", 25) or 25})
+        r = c.get("/catalog/search", params=params)
     if r.status_code != 200 or _JSON_OVERRIDE:
         _show(r)
         return
     body = r.json()
     rows = body.get("results", [])
+    if added and "added_within_days" not in body and "sort" not in body:
+        # An older server ignores both options and answers a plain search: say so rather than
+        # labelling ordinary results as new tools.
+        print("this server does not support --new yet")
+        return
+    if body.get("capped_at_days"):
+        _dim(f"--new is capped at {body['capped_at_days']} days")
+    if added:
+        within = body.get("added_within_days")
+        about = f"\"{query}\" tools" if query.strip() else "tools"
+        if not rows:
+            print(f"no {about} added in the last {within} days" if within else f"no {about} found")
+            return
+        what = (f"{about} added in the last {within} days" if within else about) \
+            + (", newest first" if body.get("sort") == "newest" else "")
     if not rows:
         print(f"nothing matches \"{query}\"")
         for n in (body.get("near") or [])[:3]:
@@ -5177,12 +5213,13 @@ def _catalog_search(query: str, args, cfg) -> None:
         return
 
     idw = min(max(len(e["id"]) for e in rows), 46)
-    print(f"\n{body['total']} matches for \"{query}\""
+    print(f"\n{body['total']} " + (what if added else f"matches for \"{query}\"")
           + (f" — showing {len(rows)} (--limit {min(body['total'], 100)} for more)" if body["total"] > len(rows) else ""))
     connected = _connected_providers(cfg)
     # No PLATFORM/PROVIDER columns: the id spells both (`hunter.people.email.find`), and the width
-    # is better spent on the summary an agent actually reads.
-    print(f"\n  {'ENDPOINT':<{idw}} {'COST':<16} ●  SUMMARY")
+    # is better spent on the summary an agent actually reads. ADDED is the UTC day the tool
+    # reached main (a routed row is a choice among tools and has none).
+    print(f"\n  {'ENDPOINT':<{idw}} {'COST':<16} {'ADDED':<10} ●  SUMMARY")
     # The server groups a capability that has a ROUTED row: the parent first, its children right
     # under it. Draw that as a hierarchy — "let treg choose" leads, the specific providers indent.
     routed_caps = {e["capability"] for e in rows if e.get("kind") == "routed"}
@@ -5200,7 +5237,7 @@ def _catalog_search(query: str, args, cfg) -> None:
         if e.get("kind") == "routed":
             _close_group()
             open_group = e
-            print(f"▸ {_clip(e['id'], idw):<{idw}} {_clip(_cost_usd(e.get('cost')), 16):<16} "
+            print(f"▸ {_clip(e['id'], idw):<{idw}} {_clip(_cost_usd(e.get('cost')), 16):<16} {'-':<10} "
                   f"{'●' if e['provider'] in connected else ' '}  ROUTED — {_clip(e.get('summary', ''), 70)}")
             _dim(f"    treg picks among {len(e.get('routed_children') or [])} providers (own keys first, then cheapest "
                  f"per hit) and names the one that served. To choose the provider yourself, call a child id:")
@@ -5210,6 +5247,7 @@ def _catalog_search(query: str, args, cfg) -> None:
             open_group = None
         indent = "    " if e.get("capability") in routed_caps else "  "
         print(f"{indent}{_clip(e['id'], idw):<{idw}} {_clip(_cost_usd(e.get('cost')), 16):<16} "
+              f"{e.get('added') or '-':<10} "
               f"{'●' if e['provider'] in connected else ' '}  {_clip(e.get('summary', ''), 78)}")
     _close_group()
     _dim(f"\ntreg catalog get {rows[0]['id']}   # params, cost, example response")
@@ -5718,6 +5756,7 @@ def _catalog_get_hub(e: dict) -> None:
     def _line(k: str, v: str) -> None:
         if v:
             print(f"  {_M}{k:<10}{_R}{v}")
+    _line("added", e.get("added") or "")
     _line("maker", f"{e.get('provider')}  (a hub tool made of {e.get('made_of')} tool{'s' if e.get('made_of') != 1 else ''}; {e.get('recipe')} recipe, v{e.get('version')})")
     _line("price", f"{e.get('price_line')}")
     _line("a run", f"{e.get('price_range') or ''}   (what a caller paid per successful run: provider fees and the seller price together)")
@@ -5802,6 +5841,7 @@ def _catalog_get(endpoint_id: str, cfg) -> None:
         _line("verified", "generated from its children's verified adapters — not a live route itself")
     else:
         _line("verified", e.get("verified") or "not verified against the live API")
+    _line("added", e.get("added") or "")
     _line("tier", e.get("tier", "core"))
     _line("limits", prov.get("limits", ""))
     _line("pricing", prov.get("pricing_url", ""))
@@ -6995,6 +7035,9 @@ def build_parser() -> argparse.ArgumentParser:
             "treg catalog                                   # platforms, busiest first",
             "treg catalog tiktok                            # every provider's tiktok endpoints, by capability",
             "treg catalog search tiktok comments            # find an endpoint by what it does",
+            "treg catalog search --new                      # tools added in the last 30 days, newest first",
+            "treg catalog search phone --new 60             # phone tools added in the last 60 days",
+            "treg catalog search linkedin --sort newest     # linkedin tools, newest first",
             "treg catalog get tikhub.tiktok.video.comments  # params, cost, example response, how to call it",
             "treg catalog request \"Ahrefs backlinks\"        # missing? file it — requests steer what gets added")
     ct.add_argument("platform", nargs="?", metavar="<platform|search|get|request>",
@@ -7002,6 +7045,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "`request <what's missing>`")
     ct.add_argument("rest", nargs="*", metavar="<args>", help="the search query, endpoint id, or request text")
     ct.add_argument("--limit", type=int, default=25, help="search: how many results (default: 25, max 100)")
+    ct.add_argument("--new", nargs="?", type=_catalog_new_days, const=30, default=None, metavar="DAYS",
+                    help="search: only tools added in the last DAYS days (default 30, max 365); "
+                         "words are optional")
+    ct.add_argument("--sort", choices=["best", "newest"], default="best",
+                    help="search: best match (default) or newest first")
     ct.add_argument("--all", action="store_true", dest="show_all",
                     help="include management endpoints (account/utility CRUD) hidden from the browse by default")
     ct.set_defaults(fn=cmd_catalog)

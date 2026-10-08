@@ -36,6 +36,7 @@ endpoints:
       queryParams: {}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "Reading the balance spends no credits."}
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://api.crawl4ai.com/docs
     example_response: examples/crawl4ai.account.usage.json
 
@@ -58,6 +59,7 @@ endpoints:
     test_request: {body: {endpoint: scrape, url: "https://example.com"}}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "Estimates spend no credits."}
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.extract.estimate.json
 
@@ -95,6 +97,7 @@ endpoints:
       confidence: verified
       note: "treg's account price: a flat 0.15 credits per page at every effort (archived, plain, PDF, browser, hard); failures free. The x-c4-cost header settles the charge (0.150 observed live 2026-10-08 at efforts 0, 1, 2 and 3)."
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.scrape.json
 
@@ -125,6 +128,7 @@ endpoints:
       confidence: verified
       note: "1 credit base times the effort; a cached search cost 0.5 live. The x-c4-cost header settles the actual charge."
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.search.json
 
@@ -155,6 +159,7 @@ endpoints:
       confidence: verified
       note: "A rich search cost 2 credits live. The x-c4-cost header settles the actual charge."
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.search.rich.json
 
@@ -195,6 +200,7 @@ endpoints:
       confidence: verified
       note: "0.5 credit base times the page's effort, plus the model's tokens (1 credit per 5,000-token block). A three-record extract from the HN front page cost 1.952 live. The 10-credit hold is an upper bound for a large page; the x-c4-cost header settles the actual charge."
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.extract.structured.json
 
@@ -231,6 +237,7 @@ endpoints:
       confidence: verified
       note: "1 credit for the web's own answer (source google_ai_*), 3 for a written answer (prose or JSON, with or without a schema), 0.5 cached; no answer, a 400 or a 503 is free. The 3-credit hold is a written answer; the x-c4-cost header settles the actual charge (1, 3, 0.5 and 0 observed live 2026-10-07)."
     verified: '2026-10-07'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.answer.json
 
@@ -265,6 +272,7 @@ endpoints:
       confidence: verified
       note: "1 credit for Google's answer, 0.5 cached, 0 when there is none; the x-c4-cost header settles the charge (1 and 0 observed live 2026-10-07)."
     verified: '2026-10-07'
+    added: '2026-10-07'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.google.serp.ai_mode.json
 
@@ -303,6 +311,7 @@ endpoints:
       confidence: verified
       note: "Each URL costs like a scrape (a flat 0.15 credits on treg's account) and its line carries that cost; the closing summary line carries the total, which settles the call. The 3.75-credit hold is 25 URLs at that price."
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.extract.batch.json
 
@@ -339,6 +348,7 @@ endpoints:
       confidence: verified
       note: "A job costs a flat 0.15 credits per URL on treg's account (usage.unit_cost 0.150, observed 2026-10-08); the finished job's usage.cost (after refunds for failed URLs) settles the call. The 75-credit hold is 500 URLs. Job ids may name their region (j_sin-…) and can be read from any region."
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.scrape.job.start.json
     async:
@@ -375,6 +385,7 @@ endpoints:
     test_request: {pathParams: {id: "j_13108741c7e781bf5b1983b6a5482cb1"}}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "Polling spends no credits."}
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.scrape.job.status.json
 
@@ -398,5 +409,6 @@ endpoints:
     test_request: {pathParams: {id: "j_13108741c7e781bf5b1983b6a5482cb1"}}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "Reading results spends no credits."}
     verified: '2026-10-05'
+    added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.web.scrape.job.results.json

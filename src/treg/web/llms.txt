@@ -180,6 +180,7 @@ Start from the job, not the vendor:
 
     treg catalog                                    # every platform, busiest first
     treg catalog search "backlinks for a domain"    # find endpoints by what they DO
+    treg catalog search --new                       # tools added in the last 30 days, newest first
     treg catalog get tikhub.tiktok.user.profile     # docs, params, PRICE, and how you'd be served
     treg call tikhub.tiktok.user.profile --query uniqueId=tiktok
     # raw HTTP: GET {BASE}/call/tikhub.tiktok.user.profile?uniqueId=tiktok  + X-Treg-Token
@@ -608,7 +609,10 @@ A small tool set, the same for every client:
 job ranked by measured success (a provider or platform name lists what it offers). Read its
 `verdict`: `strong` means these do the job; `closest` means the nearest, read `catalog_get`
 before relying on one; `none` means the catalog has no tool for it, so file `catalog_request`
-instead of rephrasing; `keyword` means ranked by words alone.
+instead of rephrasing; `keyword` means ranked by words alone. To see recently added tools, give
+`catalog_search` `added_within_days` (1-365; 30 is a good default) and/or `sort: "newest"`; with
+either, `query` may be empty and the answer is a flat list of tools, each with its `added` day
+(UTC) and provider. Every result also carries `added`.
 <!--hub-->
 - `hub_create` · `hub_update` · `hub_mine` — publish a tool made of tools (the four files as fields; the check runs once on your balance; live on pass).
 <!--/hub-->

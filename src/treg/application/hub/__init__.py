@@ -453,14 +453,17 @@ async def _apply_price(db: AsyncSession, row: HubTool, price_usd: float) -> HubT
 
 
 async def search_listed(db: AsyncSession, query: str, cat: Any, *, org_slug: str | None = None,
-                        email: str | None = None) -> tuple[list[tuple[dict, float]], dict[str, dict]]:
+                        email: str | None = None, everything: bool = False,
+                        ) -> tuple[list[tuple[dict, float]], dict[str, dict]]:
     """The listed live hub tools that match `query` (docs/hub-listing-decisions.md, decision 2):
     the newest live version of every tool with `listed` on, scored by `catalog_store.score_extra`
     (the catalog's own tokens, idf and gate, no boost). Returns `([(row, score)], stats)`; `stats`
     is keyed by id with the 30-day ok rate and sample count of runs by OTHERS, the same shape the
     evidence rerank reads for a catalog row. The row is the public contract: never the script, the
-    maker's tools or a key."""
-    if not visible_to(org_slug, email) or not query.strip():
+    maker's tools or a key. A row's `added` is the UTC day treg approved its listing, the day it
+    reached search (catalog.md "`added`"). `everything` with no query returns every listed tool at
+    score 0, for a recently-added list that has no words to match."""
+    if not visible_to(org_slug, email) or not (query.strip() or everything):
         return [], {}
     from datetime import timedelta
     from ...domain.catalog import store as catalog_store
@@ -471,8 +474,9 @@ async def search_listed(db: AsyncSession, query: str, cat: Any, *, org_slug: str
         select(HubTool).join(HubListing, HubListing.tool_id == HubTool.tool_id)
         .where(HubListing.state == "approved", HubTool.status == "live")
         .order_by(HubTool.tool_id, HubTool.version.desc()))).scalars().all()
-    caps = {r.tool_id: r.capability for r in (await db.execute(
-        select(HubListing).where(HubListing.state == "approved"))).scalars().all()}
+    listings = (await db.execute(select(HubListing).where(HubListing.state == "approved"))).scalars().all()
+    caps = {r.tool_id: r.capability for r in listings}
+    approved = {r.tool_id: r.decided_at.date().isoformat() for r in listings if r.decided_at}
     newest: dict[str, HubTool] = {}
     for r in rows:
         newest.setdefault(r.tool_id, r)
@@ -499,7 +503,7 @@ async def search_listed(db: AsyncSession, query: str, cat: Any, *, org_slug: str
             "id": tid, "kind": "hub", "hub": True, "version": r.version,
             "name": r.name, "summary": r.summary, "provider": slug, "provider_display": slug,
             "capability": caps.get(tid) or None, "capability_description": cat.capabilities.get(caps.get(tid) or "", ""),
-            "platform": "", "tier": "core", "verified": True,
+            "platform": "", "tier": "core", "verified": True, "added": approved.get(tid),
             "method": "POST", "path": f"/call/{tid}", "writes": r.writes,
             "cost": {"type": "per_success", "usd": worst, "currency": "USD", "unit": "run"},
             "price_line": "seller " + price_label(m) + fees_label(m, ranges.get(tid)), "price_label": price_label(m),
@@ -511,7 +515,8 @@ async def search_listed(db: AsyncSession, query: str, cat: Any, *, org_slug: str
         if caps.get(tid):          # an approved job speaks the catalog's own words, like a provider's row
             fields.append((catalog_store.W_CAPABILITY, f"{caps[tid]} {cat.capabilities.get(caps[tid], '')}".lower()))
         extra.append((ep, fields))
-    scored = catalog_store.score_extra(query, cat, extra)
+    scored = (catalog_store.score_extra(query, cat, extra) if query.strip()
+              else [(ep, 0.0) for ep, _ in extra])
     stats = {tid: {"ok_rate": (a[1] / a[0]) if a[0] else None, "samples": a[0]} for tid, a in agg.items()}
     return scored, stats
 

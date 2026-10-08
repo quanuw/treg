@@ -46,6 +46,7 @@ endpoints:
       confidence: verified
       note: "One basic page costs one credit with parsers: []; a PDF is returned as base64. Firecrawl bills a returned target 403/404 document, but no-document failures are free."
     verified: '2026-09-28'
+    added: '2026-09-28'
     docs_url: https://docs.firecrawl.dev/api-reference/endpoint/scrape
     example_response: examples/firecrawl.web.scrape.json
 
@@ -83,6 +84,7 @@ endpoints:
       confidence: verified
       note: "The live three-result search returned creditsUsed: 2 and the account balance fell by two credits."
     verified: '2026-09-28'
+    added: '2026-09-28'
     docs_url: https://docs.firecrawl.dev/api-reference/endpoint/search
     example_response: examples/firecrawl.web.search.json
 
@@ -112,6 +114,7 @@ endpoints:
       unit: call
       note: "Live one-link, three-link and five-link maps each reduced the balance by one credit; Firecrawl's billing guide states one credit per call."
     verified: '2026-09-28'
+    added: '2026-09-28'
     docs_url: https://docs.firecrawl.dev/api-reference/endpoint/map
     example_response: examples/firecrawl.web.map.json
 
@@ -161,6 +164,7 @@ endpoints:
       confidence: verified
       note: "A live one-page crawl ended with creditsUsed: 1 and reduced the balance by one credit. The hold is the requested page limit and terminal usage settles it."
     verified: '2026-09-28'
+    added: '2026-09-28'
     docs_url: https://docs.firecrawl.dev/api-reference/endpoint/crawl-post
     example_response: examples/firecrawl.web.crawl.json
     async:
@@ -197,6 +201,7 @@ endpoints:
     test_request: {pathParams: {id: "01a0e888-65d6-75ae-afff-7b8e37572349"}}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "Polling does not consume Firecrawl credits."}
     verified: '2026-09-28'
+    added: '2026-09-28'
     docs_url: https://docs.firecrawl.dev/api-reference/endpoint/crawl-get
     example_response: examples/firecrawl.web.crawl.status.json
 
@@ -235,6 +240,7 @@ endpoints:
       confidence: verified
       note: "A live one-URL batch ended with creditsUsed: 1 and reduced the balance by one credit. The ten-credit hold is a conservative upper bound; terminal usage settles the actual charge."
     verified: '2026-09-28'
+    added: '2026-09-28'
     docs_url: https://docs.firecrawl.dev/api-reference/endpoint/batch-scrape
     example_response: examples/firecrawl.web.batch-scrape.json
     async:
@@ -271,5 +277,6 @@ endpoints:
     test_request: {pathParams: {id: "01a0e887-c66f-76e9-abc1-3f749d48e3ab"}}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "Polling does not consume Firecrawl credits."}
     verified: '2026-09-28'
+    added: '2026-09-28'
     docs_url: https://docs.firecrawl.dev/api-reference/endpoint/batch-scrape-get
     example_response: examples/firecrawl.web.batch-scrape.status.json

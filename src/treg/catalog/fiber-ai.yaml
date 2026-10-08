@@ -40,6 +40,7 @@ pricing_url: https://www.fiber.ai/pricing.md  # 1 credit = $0.02 on Prospector; 
 
 endpoints:
   - id: fiber-ai.people.contacts.reveal
+    added: '2026-08-20'
     domain: contacts
     capability: people.email.find
     miss:
@@ -77,6 +78,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/syncQuickContactReveal.md
 
   - id: fiber-ai.people.contacts.turbo
+    added: '2026-08-20'
     domain: contacts
     capability: people.email.find
     platform: people
@@ -109,6 +111,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/syncTurboContactEnrichment.md
 
   - id: fiber-ai.people.enrich
+    added: '2026-08-20'
     domain: contacts
     capability: people.enrich
     platform: people
@@ -146,6 +149,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/KitchenSinkProfile.md
 
   - id: fiber-ai.companies.enrich
+    added: '2026-08-20'
     domain: companies
     capability: companies.enrich
     platform: companies
@@ -178,6 +182,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/kitchenSinkCompany.md
 
   - id: fiber-ai.linkedin.user.profile
+    added: '2026-08-20'
     domain: user
     capability: linkedin.user.profile
     platform: linkedin
@@ -212,6 +217,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/profileLiveEnrich.md
 
   - id: fiber-ai.linkedin.company.profile
+    added: '2026-08-20'
     domain: company
     capability: linkedin.company.profile
     platform: linkedin
@@ -243,6 +249,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/companyLiveEnrich.md
 
   - id: fiber-ai.people.identity.resolve
+    added: '2026-08-20'
     domain: contacts
     capability: people.identity.resolve
     platform: people
@@ -272,6 +279,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/reverseEmailLookup.md
 
   - id: fiber-ai.companies.search
+    added: '2026-08-20'
     domain: companies
     capability: companies.search
     platform: companies
@@ -308,6 +316,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/companySearch.md
 
   - id: fiber-ai.people.search
+    added: '2026-08-20'
     domain: contacts
     capability: people.search
     miss:
@@ -345,6 +354,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/peopleSearch.md
 
   - id: fiber-ai.people.search.natural_language
+    added: '2026-08-20'
     domain: contacts
     capability: people.search.natural_language
     platform: people
@@ -376,6 +386,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/slushieRun.md
 
   - id: fiber-ai.people.github.to_linkedin.trigger
+    added: '2026-08-20'
     domain: contacts
     capability: people.github.to_linkedin
     platform: people
@@ -408,6 +419,7 @@ endpoints:
     docs_url: https://api.fiber.ai/ai-docs/githubToLinkedInTrigger.md
 
   - id: fiber-ai.people.github.to_linkedin.poll
+    added: '2026-08-20'
     domain: contacts
     capability: people.github.to_linkedin
     platform: people

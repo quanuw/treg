@@ -90,6 +90,8 @@ Everything in this document maps onto them:
   Its `verdict` says what you got: `strong` (these do the job, every provider of it by measured
   success), `closest` (nearest, check `catalog_get`), `none` (not in the catalog: file
   `catalog_request`, do not rephrase), `keyword` (ranked by words alone)
+- "what's new" → `catalog_search` with `added_within_days` (30 is a good default) or `sort: "newest"`;
+  `query` may be empty.
 - "call it" → `call` with the endpoint id, or `<tool-name>/<path>` for one of the team's own tools
 - "check the balance" → `balance`
 - "share feedback" → `feedback`
@@ -110,6 +112,7 @@ generation.
 
 ```bash
 treg catalog search "subreddit posts"            # find endpoints by what they do
+treg catalog search --new                        # tools added in the last 30 days, newest first
 treg catalog get scrapecreators.reddit.subreddit.posts   # params, PRICE, how you'd be served
 treg call scrapecreators.reddit.subreddit.posts --query subreddit=news
 treg balance                                     # the prepaid balance + recent charges

@@ -127,6 +127,29 @@ async def lexical(query: str, cat: catalog_store.Catalog, limit: int, *, observe
     return Page(rows, total, tie_truncated, stats, hidden, steer)
 
 
+async def added_page(query: str, cat: catalog_store.Catalog, limit: int, opts: catalog_store.AddedOptions, *,
+                     caller: Caller, observed: Observed) -> Page:
+    """A recently-added page (catalog.md "`added`"), for every surface: a flat list of tools inside
+    the window, best match first when there are words, newest first with `sort=newest` or with no
+    words. No routed parent (a choice among tools, not a tool added on a day), no grouping, no
+    judge and no experiment record: the options ask for a date list, which is deterministic.
+    Listed hub tools take part on the day treg approved them."""
+    keep = catalog_store.added_keep(opts)
+    async with session_maker() as db:
+        hub_rows, hub_stats = await hub_app.search_listed(
+            db, query, cat, org_slug=caller.hub_slug, email=caller.hub_email, everything=not query.strip())
+    hub_rows = [(ep, score) for ep, score in hub_rows if keep(ep)]
+    if opts.newest or not query.strip():
+        rows, total = catalog_store.added_rows(query, cat, opts)
+        rows = catalog_store.newest_first(rows + hub_rows)[:limit]
+        stats = await observed([ep["id"] for ep, _ in rows if ep.get("kind") != "hub"])
+    else:
+        rows, total, _ = catalog_store.rank_band(query, cat, limit, keep=keep)
+        stats = await observed([ep["id"] for ep, _ in rows])
+        rows = catalog_store.merge_by_score(catalog_store.rerank(rows, stats, cat), hub_rows)[:limit]
+    return Page(rows, total + len(hub_rows), False, {**stats, **hub_stats}, {}, False)
+
+
 # --------------------------------------------------------------------------------------------
 # v2: the job-first answer, laid out for an agent
 # --------------------------------------------------------------------------------------------

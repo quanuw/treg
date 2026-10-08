@@ -35,10 +35,12 @@ endpoints:
     test_request: {body: {query: "site:example.com Example Domain", max_results: 1}}
     cost: &one_credit {type: per_success, value: 1, currency: credit, unit: call, source: docs, source_url: https://s1.dev/docs/essentials/credits-and-limits, checked: '2026-09-30', confidence: documented, note: "One credit on HTTP 200, including zero results; errors consume no credit."}
     verified: '2026-09-30'
+    added: '2026-09-30'
     example_response: examples/search1api.web.search.json
     docs_url: https://s1.dev/docs/basic/search
 
   - id: search1api.web.search.crawl
+    added: '2026-09-30'
     capability: web.search
     platform: web
     domain: search
@@ -88,10 +90,12 @@ endpoints:
     test_request: {body: {query: OpenAI, search_service: hackernews, max_results: 1}}
     cost: *one_credit
     verified: '2026-09-30'
+    added: '2026-09-30'
     example_response: examples/search1api.web.news.json
     docs_url: https://s1.dev/docs/basic/news
 
   - id: search1api.web.news.crawl
+    added: '2026-09-30'
     capability: web.search.news
     platform: web
     domain: search
@@ -132,6 +136,7 @@ endpoints:
     test_request: {body: {url: "https://example.com"}}
     cost: *one_credit
     verified: '2026-09-30'
+    added: '2026-09-30'
     example_response: examples/search1api.web.crawl.json
     docs_url: https://s1.dev/docs/basic/crawl
 
@@ -153,6 +158,7 @@ endpoints:
     test_request: {body: {url: "https://example.com", type: sitemap}}
     cost: *one_credit
     verified: '2026-09-30'
+    added: '2026-09-30'
     example_response: examples/search1api.web.sitemap.json
     docs_url: https://s1.dev/docs/basic/sitemap
 
@@ -174,6 +180,7 @@ endpoints:
     test_request: {body: {search_service: hackernews, max_results: 1}}
     cost: *one_credit
     verified: '2026-09-30'
+    added: '2026-09-30'
     example_response: examples/search1api.web.trending.json
     docs_url: https://s1.dev/docs/basic/trending
 
@@ -196,10 +203,12 @@ endpoints:
     test_request: {body: {url: "https://example.com", prompt: "Extract the page title.", response_format: {type: json_schema, json_schema: {type: object, properties: {title: {type: string}}, required: [title]}}}}
     cost: {type: per_success, value: 10, currency: credit, unit: call, source: docs, source_url: https://s1.dev/docs/essentials/credits-and-limits, checked: '2026-09-30', confidence: documented, note: "Ten credits on success; rejected and failed requests are unbilled."}
     verified: '2026-09-30'
+    added: '2026-09-30'
     example_response: examples/search1api.web.extract.structured.json
     docs_url: https://s1.dev/docs/advanced/extract
 
   - id: search1api.web.screenshot
+    added: '2026-09-30'
     capability: web.screenshot
     platform: web
     domain: extract
@@ -249,6 +258,7 @@ endpoints:
     test_request: {body: {url: "https://example.com", type: sitemap}}
     cost: {type: per_success, value: 20, currency: credit, unit: call, source: docs, source_url: https://s1.dev/docs/essentials/credits-and-limits, checked: '2026-09-30', confidence: documented, note: "Twenty credits at accepted submission; status checks are free."}
     verified: '2026-09-30'
+    added: '2026-09-30'
     example_response: examples/search1api.web.deepcrawl.json
     docs_url: https://s1.dev/docs/advanced/deepcrawl
     resource_ownership:
@@ -287,5 +297,6 @@ endpoints:
     test_request: {pathParams: {taskId: "00000000-0000-4000-8000-000000000001"}}
     cost: {type: free, value: 0, currency: USD, unit: call, note: "Task status consumes no credits."}
     verified: '2026-09-30'
+    added: '2026-09-30'
     example_response: examples/search1api.web.deepcrawl.status.json
     docs_url: https://s1.dev/docs/advanced/deepcrawl

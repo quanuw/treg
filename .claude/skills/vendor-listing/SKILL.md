@@ -148,9 +148,15 @@ slash in `probe_path`), 200-with-error-body (read a body field), CSV/text respon
 
 ```bash
 TREG_CATALOG_CRED='<secret>' uv run --frozen python scripts/catalog_verify.py <service>.yaml
+uv run --frozen python scripts/catalog_added.py       # `added:` (today, UTC) on every new row
 uv run --frozen python scripts/catalog_validate.py    # must exit 0
 uv run --frozen python -m pytest -q
 ```
+
+- Every endpoint row needs `added: 'YYYY-MM-DD'`, the UTC day the tool reaches main. The helper
+  above writes today's date where it is missing and never touches an existing one. If the PR waits
+  long, update the new rows' dates before merging. Never change the date of a tool that is already
+  on main.
 
 - Stamp `verified:` only on endpoints that PASSED **with a real target that returned real data and
   billed the documented amount**. Docs lie; documented ≠ verified. Three stamp traps from #191:

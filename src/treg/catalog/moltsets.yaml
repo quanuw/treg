@@ -67,6 +67,7 @@ endpoints:
     note: One ordinary record per result; misses and errors are free.
   platform_blocked: Variable result counts cannot yet be settled safely from the generic response contract; connect your own MoltSets key.
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.people.search.json
   docs_url: https://docs.moltsets.com/api-reference/search-people
 
@@ -101,6 +102,7 @@ endpoints:
   cost: *record_cost
   platform_blocked: Variable result counts cannot yet be settled safely from the generic response contract; connect your own MoltSets key.
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.companies.search.json
   docs_url: https://docs.moltsets.com/api-reference/search-companies
 
@@ -126,6 +128,7 @@ endpoints:
   cost: *record_cost
   platform_blocked: Full searches can return multiple records and count_only has different pricing; connect your own MoltSets key.
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.linkedin.profile.search.json
   docs_url: https://docs.moltsets.com/api-reference/search-linkedin-profile
 
@@ -160,6 +163,7 @@ endpoints:
     note: One ordinary record on status ok; status not_found and errors are free.
   expect: *found
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.people.email.find.name.json
   docs_url: https://docs.moltsets.com/api-reference/search-business-email-by-name
 
@@ -184,6 +188,7 @@ endpoints:
   cost: *success_cost
   expect: *found
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.people.enrich.name.json
   docs_url: https://docs.moltsets.com/api-reference/search-business-profile-by-name
 - id: moltsets.people.enrich.email
@@ -203,6 +208,7 @@ endpoints:
   cost: *success_cost
   expect: *found
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.people.enrich.email.json
   docs_url: https://docs.moltsets.com/api-reference/reverse-email-lookup
 
@@ -223,6 +229,7 @@ endpoints:
   cost: *success_cost
   expect: *found
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.people.enrich.linkedin.json
   docs_url: https://docs.moltsets.com/api-reference/reverse-linkedin-lookup
 
@@ -240,6 +247,7 @@ endpoints:
   cost: *success_cost
   expect: *found
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.people.audiences.maid.json
   docs_url: https://docs.moltsets.com/api-reference/email-to-maid
 
@@ -257,6 +265,7 @@ endpoints:
   cost: *success_cost
   expect: *found
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.people.audiences.sha256.json
   docs_url: https://docs.moltsets.com/api-reference/business-email-to-sha256
 
@@ -274,6 +283,7 @@ endpoints:
   cost: *success_cost
   expect: *found
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.people.audiences.hashes.json
   docs_url: https://docs.moltsets.com/api-reference/linkedin-to-sha256
 
@@ -291,6 +301,7 @@ endpoints:
   cost: *success_cost
   expect: *found
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.linkedin.profile.from-email.json
   docs_url: https://docs.moltsets.com/api-reference/email-to-linkedin
 
@@ -311,5 +322,6 @@ endpoints:
   cost: *success_cost
   expect: *found
   verified: '2026-09-16'
+  added: '2026-09-16'
   example_response: examples/moltsets.companies.identify.ip.json
   docs_url: https://docs.moltsets.com/api-reference/ip-to-company

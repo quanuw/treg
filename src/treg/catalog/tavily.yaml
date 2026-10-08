@@ -27,6 +27,7 @@ endpoints:
     platform_request: {body.include_usage: true}
     test_request: {body: {query: "AI policy", topic: news, max_results: 10, search_depth: basic, include_usage: true}}
     verified: '2026-10-05'
+    added: '2026-10-05'
     cost: {type: per_call, value: 1, currency: credit, unit: call,
            tavily_rates: {basic: 1, fast: 1, ultra_fast: 1, advanced: 2},
            source: docs, source_url: "https://docs.tavily.com/documentation/api-credits",
@@ -76,6 +77,7 @@ endpoints:
     test_request:
       body: {query: "recent changes to the EU AI Act guidance", search_depth: basic, max_results: 3, include_usage: true}
     verified: '2026-09-21'
+    added: '2026-09-21'
     cost:
       type: per_call
       table:
@@ -120,6 +122,7 @@ endpoints:
     test_request:
       body: {urls: ["https://example.com"], extract_depth: basic}
     verified: '2026-09-21'
+    added: '2026-09-21'
     cost:
       type: per_success
       value: 0.4
@@ -163,6 +166,7 @@ endpoints:
     test_request:
       body: {url: "https://example.com", limit: 10}
     verified: '2026-09-21'
+    added: '2026-09-21'
     cost:
       type: per_success
       value: 0.2
@@ -211,6 +215,7 @@ endpoints:
     test_request:
       body: {url: "https://example.com", limit: 10, extract_depth: basic}
     verified: '2026-09-21'
+    added: '2026-09-21'
     cost:
       type: per_success
       value: 0.6

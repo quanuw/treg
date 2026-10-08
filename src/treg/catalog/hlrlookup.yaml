@@ -52,6 +52,7 @@ endpoints:
       note: "One credit per live mobile lookup; a US mobile with usa_status YES costs two. Landlines, NO_COVERAGE, BAD_FORMAT, per-result errors and HTTP 4xx/5xx are free. A live mobile lookup reported credits_spent 1 and lowered the balance by one credit; a landline reported 0 and left it unchanged. A US mobile with usa_status YES reported credits_spent 2 and lowered the balance by two credits. treg reserves from usa_status and settles results[0].credits_spent."
       reported_charge: &reported_credits {path: results.0.credits_spent, unit: credit}
     verified: '2026-10-08'
+    added: '2026-10-07'
     example_response: examples/hlrlookup.people.phone.verify.json
     docs_url: https://www.hlrlookup.com/knowledge/full-api-result
 
@@ -90,6 +91,7 @@ endpoints:
       note: "Half the price of an HLR lookup. A live mobile lookup reported credits_spent 0.5 and lowered the balance by half a credit. NO_COVERAGE, NOT_APPLICABLE and per-result errors are free. treg settles results[0].credits_spent."
       reported_charge: *reported_credits
     verified: '2026-10-08'
+    added: '2026-10-07'
     example_response: examples/hlrlookup.people.phone.network.json
     docs_url: https://www.hlrlookup.com/hlr-api-v2.openapi.json
 
@@ -114,5 +116,6 @@ endpoints:
     expect: {json_path: results.0.error, equals: NONE}
     cost: {type: free, value: 0, currency: USD, unit: call}
     verified: '2026-10-08'
+    added: '2026-10-07'
     example_response: examples/hlrlookup.people.phone.validate.json
     docs_url: https://www.hlrlookup.com/hlr-api-v2.openapi.json

@@ -41,6 +41,7 @@ endpoints:
     test_request: {queryParams: {ids: "bitcoin,ethereum", vs_currencies: "usd", include_24hr_change: "true"}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented, note: "1 credit per successful request, uniform across plan endpoints"}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.simple.price.json
     docs_url: https://docs.coingecko.com/reference/simple-price
 
@@ -58,6 +59,7 @@ endpoints:
     test_request: {queryParams: {}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.simple.supported-currencies.json
     docs_url: https://docs.coingecko.com/reference/simple-supported-currencies
 
@@ -81,6 +83,7 @@ endpoints:
     test_request: {queryParams: {vs_currency: "usd", per_page: "3", page: "1"}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.coins.markets.json
     docs_url: https://docs.coingecko.com/reference/coins-markets
 
@@ -104,6 +107,7 @@ endpoints:
     test_request: {queryParams: {coin_id: "bitcoin", localization: "false", tickers: "false", market_data: "true", community_data: "false", developer_data: "false"}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.coins.get.json
     docs_url: https://docs.coingecko.com/reference/coins-id
 
@@ -125,6 +129,7 @@ endpoints:
     test_request: {queryParams: {coin_id: "bitcoin", vs_currency: "usd", days: "1"}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.coins.market-chart.json
     docs_url: https://docs.coingecko.com/reference/coins-id-market-chart
 
@@ -145,6 +150,7 @@ endpoints:
     test_request: {queryParams: {coin_id: "bitcoin", date: "01-01-2026", localization: "false"}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.coins.history.json
     docs_url: https://docs.coingecko.com/reference/coins-id-history
 
@@ -165,6 +171,7 @@ endpoints:
     test_request: {queryParams: {coin_id: "bitcoin", vs_currency: "usd", days: "1"}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.coins.ohlc.json
     docs_url: https://docs.coingecko.com/reference/coins-id-ohlc
 
@@ -183,6 +190,7 @@ endpoints:
     test_request: {queryParams: {query: "solana"}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.search.json
     docs_url: https://docs.coingecko.com/reference/search-data
 
@@ -200,6 +208,7 @@ endpoints:
     test_request: {queryParams: {}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.search.trending.json
     docs_url: https://docs.coingecko.com/reference/trending-search
 
@@ -217,6 +226,7 @@ endpoints:
     test_request: {queryParams: {}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.global.json
     docs_url: https://docs.coingecko.com/reference/crypto-global
 
@@ -236,5 +246,6 @@ endpoints:
     test_request: {queryParams: {per_page: "3", page: "1"}}
     cost: {type: per_call, value: 1, currency: credit, per: 1, unit: call, source_url: "https://docs.coingecko.com/reference/common-errors-rate-limit", checked: "2026-08-15", confidence: documented}
     verified: 2026-08-15
+    added: '2026-08-16'
     example_response: examples/coingecko.exchanges.json
     docs_url: https://docs.coingecko.com/reference/exchanges

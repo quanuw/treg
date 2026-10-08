@@ -32,7 +32,7 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import yaml
@@ -200,15 +200,19 @@ def carry_verification(provider: str, endpoints: list[dict], *, carry_capability
     replaces a proven request, not re-ingesting.
     """
     old_file = CATALOG / f"{provider}.extended.yaml"
-    if not old_file.is_file():
-        return 0
-    old = {ep["id"]: ep for ep in (yaml.safe_load(old_file.read_text()) or {}).get("endpoints") or []}
+    old = ({ep["id"]: ep for ep in (yaml.safe_load(old_file.read_text()) or {}).get("endpoints") or []}
+           if old_file.is_file() else {})
+    added = catalog_added_dates()
+    today = datetime.now(UTC).date().isoformat()
     kept = 0
     for ep in endpoints:
+        # `added` is carried by id from ANY catalog file, and before the route check below: a tool
+        # whose route moved, or that was promoted to core and back, is still the tool that reached
+        # main that day. Only an id the catalog has never had gets today's UTC date.
+        ep["added"] = added.get(ep["id"], today)
         prev = old.get(ep["id"])
-        if not prev:
-            continue
-        if prev.get("method") != ep.get("method") or prev.get("path") != ep.get("path"):
+        if not prev or prev.get("method") != ep.get("method") or prev.get("path") != ep.get("path"):
+            place_added(ep)
             continue
         carried_fields = [
             "verified", "example_response", "unverified", "name", "kind", "platform_blocked",
@@ -232,7 +236,32 @@ def carry_verification(provider: str, endpoints: list[dict], *, carry_capability
             if prev.get("test_request") is not None:
                 ep["test_request"] = prev["test_request"]
                 ep.pop("untestable", None)
+        place_added(ep)
     return kept
+
+
+def catalog_added_dates() -> dict[str, str]:
+    """id -> `added` over every catalog file, core and extended."""
+    out = {}
+    for path in CATALOG.glob("*.yaml"):
+        doc = yaml.safe_load(path.read_text())
+        for ep in (doc.get("endpoints") or []) if isinstance(doc, dict) else []:
+            if isinstance(ep, dict) and ep.get("id") and ep.get("added"):
+                out[str(ep["id"])] = str(ep["added"])
+    return out
+
+
+def place_added(ep: dict) -> None:
+    """Move `added` next to `verified` (after `id` when unverified), where catalog_added.py puts it,
+    so a re-ingest does not reorder rows the backfill or the helper wrote."""
+    day = ep.pop("added")
+    anchor = "verified" if "verified" in ep else "id"
+    items = list(ep.items())
+    ep.clear()
+    for key, value in items:
+        ep[key] = value
+        if key == anchor:
+            ep["added"] = day
 
 
 def write_extended(provider: str, source: dict, endpoints: list[dict], notes: list[str],

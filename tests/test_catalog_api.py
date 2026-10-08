@@ -76,7 +76,7 @@ async def test_platform_detail_groups_the_same_job_across_providers(clients: Asy
 
     ep = next(e for e in profile["endpoints"] if e["provider"] == "tikhub")
     assert set(ep) == {"id", "provider", "provider_display", "name", "summary", "method", "path",
-                       "scope", "tier", "kind", "domain", "call_template", "cost", "verified", "docs_url",
+                       "scope", "tier", "kind", "domain", "call_template", "cost", "verified", "added", "docs_url",
                        "has_example", "input", "platform_eligible", "platform_blocked",
                        "test_request", "miss", "status", "status_note", "superseded_by", "async"}
     assert ep["kind"] == "data", "an endpoint with no explicit kind is data (the browse surface)"

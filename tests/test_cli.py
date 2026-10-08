@@ -1004,6 +1004,56 @@ def test_a_credit_price_reads_as_dollars_with_the_credits_behind_it():
     assert "$" not in cli._cost_usd(unpriced), "no rate, no invented dollar figure"
 
 
+def test_catalog_search_new_and_newest(monkeypatch, capsys):
+    """`--new [DAYS]` (30 when bare) and `--sort newest` reach the server; words become optional,
+    every row shows its ADDED day, and a capped window says so in one line."""
+    p = cli.build_parser()
+    assert p.parse_args(["catalog", "search", "--new"]).new == 30
+    a = p.parse_args(["catalog", "search", "phone", "--new", "60", "--sort", "newest"])
+    assert a.rest == ["phone"] and a.new == 60 and a.sort == "newest"
+    assert p.parse_args(["catalog", "search", "phone"]).new is None
+    with pytest.raises(SystemExit):
+        p.parse_args(["catalog", "search", "--new", "phone"])
+    assert "put search words before --new" in capsys.readouterr().err
+
+    seen = []
+    body = {"query": "", "count": 2, "total": 2, "sort": "newest", "added_within_days": 365,
+            "capped_at_days": 365, "hints": [], "results": [
+                {"id": "hlrlookup.people.phone.verify", "provider": "hlrlookup", "summary": "Verify a phone",
+                 "cost": {"type": "per_call", "usd": 0.01}, "added": "2026-10-07"},
+                {"id": "tavily.web.search", "provider": "tavily", "summary": "Search the web",
+                 "cost": {"type": "per_call", "usd": 0.008}, "added": "2026-09-21"}]}
+
+    class _C:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def get(self, url, params=None):
+            seen.append((url, params))
+            return _CatalogResp(body)
+    monkeypatch.setattr(cli, "_client", lambda cfg, auth=True: _C())
+    monkeypatch.setattr(cli, "_connected_providers", lambda cfg: set())
+    cli.cmd_catalog(p.parse_args(["catalog", "search", "--new", "900"]), {"base_url": "http://x"})
+    assert seen[-1] == ("/catalog/search", {"q": "", "limit": 25, "added_within_days": 900})
+    out = capsys.readouterr().out
+    assert "capped at 365 days" in out
+    assert "2 tools added in the last 365 days, newest first" in out
+    assert "ADDED" in out and "2026-10-07" in out and "2026-09-21" in out
+
+    cli.cmd_catalog(p.parse_args(["catalog", "search", "web", "--sort", "newest"]), {"base_url": "http://x"})
+    assert seen[-1][1] == {"q": "web", "limit": 25, "sort": "newest"}
+    capsys.readouterr()
+
+    # an older server ignores both options: its plain answer is not labelled as new tools
+    for key in ("sort", "added_within_days", "capped_at_days"):
+        body.pop(key, None)
+    for argv in (["catalog", "search", "--new"], ["catalog", "search", "web", "--sort", "newest"]):
+        cli.cmd_catalog(p.parse_args(argv), {"base_url": "http://x"})
+        out = capsys.readouterr().out
+        assert "this server does not support --new yet" in out and "added in the last" not in out
+    with pytest.raises(SystemExit):
+        cli.cmd_catalog(p.parse_args(["catalog", "search"]), {"base_url": "http://x"})
+
+
 def test_catalog_get_needs_an_id_and_404s_helpfully(monkeypatch, capsys):
     p = cli.build_parser()
     with pytest.raises(SystemExit):

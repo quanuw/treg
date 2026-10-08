@@ -51,6 +51,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/google-search
   strict_query: true
   verified: '2026-10-05'
+  added: '2026-10-05'
   example_response: examples/litescrape.google.serp.news.json
 - id: litescrape.google.serp.organic
   capability: google.serp.organic
@@ -347,6 +348,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.serp.organic.json
 - id: litescrape.google.serp.ai_overview
   capability: google.serp.ai_overview
@@ -641,6 +643,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.serp.ai_overview.json
 - id: litescrape.google.serp.ai_mode
   capability: google.serp.ai_mode
@@ -744,6 +747,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.serp.ai_mode.json
 - id: litescrape.google.serp.ads
   capability: google.serp.ads
@@ -825,6 +829,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.serp.ads.json
 - id: litescrape.google.serp.local
   capability: google.serp.local
@@ -928,6 +933,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.serp.local.json
 - id: litescrape.google.serp.shopping
   capability: google.serp.shopping
@@ -1071,6 +1077,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.serp.shopping.json
 - id: litescrape.google.shopping.product
   capability: google.shopping.product
@@ -1180,6 +1187,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.shopping.product.json
 - id: litescrape.google.serp.maps
   capability: google.serp.maps
@@ -1363,6 +1371,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.serp.maps.json
 - id: litescrape.google.maps.reviews
   capability: google.maps.reviews
@@ -1464,6 +1473,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.maps.reviews.json
 - id: litescrape.google.maps.contributor_reviews
   capability: google.maps.contributor_reviews
@@ -1527,6 +1537,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.maps.contributor_reviews.json
 - id: litescrape.google.maps.popular_times
   capability: google.maps.popular_times
@@ -1591,6 +1602,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.maps.popular_times.json
 - id: litescrape.google.maps.posts
   capability: google.maps.posts
@@ -1659,6 +1671,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.maps.posts.json
 - id: litescrape.google.maps.photo_metadata
   capability: google.maps.photo_metadata
@@ -1722,6 +1735,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google.maps.photo_metadata.json
 - id: litescrape.bing.serp.organic
   capability: bing.serp.organic
@@ -1836,6 +1850,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.bing.serp.organic.json
 - id: litescrape.bing.maps.search
   capability: bing.maps.search
@@ -1912,6 +1927,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.bing.maps.search.json
 - id: litescrape.duckduckgo.serp.organic
   capability: duckduckgo.serp.organic
@@ -1997,6 +2013,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.duckduckgo.serp.organic.json
 - id: litescrape.duckduckgo.maps.search
   capability: duckduckgo.maps.search
@@ -2068,6 +2085,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.duckduckgo.maps.search.json
 - id: litescrape.apple_maps.places
   capability: apple-maps.places
@@ -2117,6 +2135,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.apple_maps.places.json
 - id: litescrape.apple_maps.reviews
   capability: apple-maps.reviews
@@ -2168,8 +2187,10 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.apple_maps.reviews.json
 - id: litescrape.yelp.business.search
+  added: '2026-09-29'
   capability: yelp.business.search
   platform: yelp
   domain: places
@@ -2364,6 +2385,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.yelp.business.reviews.json
 - id: litescrape.tripadvisor.search.general
   capability: tripadvisor.search.general
@@ -2466,6 +2488,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.tripadvisor.search.general.json
 - id: litescrape.tripadvisor.place.detail
   capability: tripadvisor.place.detail
@@ -2534,6 +2557,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.tripadvisor.place.detail.json
 - id: litescrape.tripadvisor.business.reviews
   capability: tripadvisor.business.reviews
@@ -2618,6 +2642,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.tripadvisor.business.reviews.json
 - id: litescrape.google_play.search.apps
   capability: google-play.search.apps
@@ -2728,6 +2753,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google_play.search.apps.json
 - id: litescrape.google_play.search.games
   capability: google-play.search.games
@@ -2829,6 +2855,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google_play.search.games.json
 - id: litescrape.google_play.search.books
   capability: google-play.search.books
@@ -2934,6 +2961,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google_play.search.books.json
 - id: litescrape.google_play.search.movies
   capability: google-play.search.movies
@@ -3033,6 +3061,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google_play.search.movies.json
 - id: litescrape.google_play.product
   capability: google-play.product
@@ -3107,6 +3136,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google_play.product.json
 - id: litescrape.google_play.reviews
   capability: google-play.reviews
@@ -3214,6 +3244,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.google_play.reviews.json
 - id: litescrape.app_store.search.apps
   capability: app-store.search.apps
@@ -3301,6 +3332,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.app_store.search.apps.json
 - id: litescrape.app_store.product
   capability: app-store.product
@@ -3354,6 +3386,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.app_store.product.json
 - id: litescrape.app_store.reviews
   capability: app-store.reviews
@@ -3417,6 +3450,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.app_store.reviews.json
 - id: litescrape.web.fetch
   capability: web.extract
@@ -3666,6 +3700,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.web.fetch.json
 - id: litescrape.web.fetch.post
   capability: web.extract.advanced
@@ -3938,6 +3973,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   body_allowlist: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.web.fetch.post.json
 - id: litescrape.web.screenshot
   capability: web.screenshot
@@ -4063,6 +4099,7 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   strict_query: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.web.screenshot.json
 - id: litescrape.web.screenshot.post
   capability: web.screenshot.advanced
@@ -4212,8 +4249,10 @@ endpoints:
   docs_url: https://litescrape.com/docs/reference
   body_allowlist: true
   verified: '2026-09-29'
+  added: '2026-09-29'
   example_response: examples/litescrape.web.screenshot.post.json
 - id: litescrape.web.screenshot.download
+  added: '2026-09-29'
   capability: web.screenshot.download
   platform: web
   domain: extract

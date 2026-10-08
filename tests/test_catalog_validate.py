@@ -513,6 +513,7 @@ def test_validator_checks_the_endpoint_descriptor_that_replaces_the_provider_def
         "    method: POST\n"
         "    path: /generate\n"
         "    summary: Generate a video\n"
+        "    added: '2026-09-01'\n"
         "    input:\n"
         "      body:\n"
         "        model: {type: string, required: true}\n"

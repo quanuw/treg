@@ -33,6 +33,7 @@ limits: "credit pool plus per-minute caps that differ per endpoint"
 pricing_url: https://www.apollo.io/pricing  # Per USER per month. API access for custom integrations requires Organization. Exporting a mobile number commonly costs 5 credits. Credits do NOT roll over.; free tier: 10 expor
 endpoints:
   - id: apollo.people.enrich
+    added: '2026-07-28'
     cache:
       ignore_paths: ["request_id"]
     test_request: {"queryParams": {"email": "patrick@stripe.com"}}
@@ -80,6 +81,7 @@ endpoints:
       body: {person_titles: ["head of marketing"], q_organization_domains_list: ["stripe.com"], per_page: 3}
     example_response: examples/apollo.people.search.json
     verified: '2026-08-29'
+    added: '2026-07-28'
     domain: contacts
     capability: people.search
     platform: people
@@ -107,6 +109,7 @@ endpoints:
     docs_url: https://docs.apollo.io/reference/people-api-search
 
   - id: apollo.companies.enrich
+    added: '2026-07-28'
     test_request: {"queryParams": {"domain": "stripe.com"}}
     domain: companies
     capability: companies.enrich
@@ -137,6 +140,7 @@ endpoints:
     docs_url: https://docs.apollo.io/reference/organization-enrichment
 
   - id: apollo.companies.search
+    added: '2026-07-28'
     test_request: {"queryParams": {"q_organization_domains_list[]": "stripe.com", "per_page": 1}}
     domain: companies
     capability: companies.search
@@ -204,6 +208,7 @@ endpoints:
       confidence: documented
       note: 1 credit per PAGE returned, same page rule as company search.
     verified: 2026-08-20
+    added: '2026-08-20'
     example_response: examples/apollo.companies.jobs.json
     docs_url: https://docs.apollo.io/reference/organization-jobs-postings
 
@@ -239,10 +244,12 @@ endpoints:
       confidence: documented
       note: 1 credit per PAGE returned, up to 25 articles per page.
     verified: 2026-08-20
+    added: '2026-08-20'
     example_response: examples/apollo.companies.news.json
     docs_url: https://docs.apollo.io/reference/news-articles-search
 
   - id: apollo.people.bulk_enrich
+    added: '2026-07-28'
     domain: contacts
     capability: people.enrich
     platform: people
@@ -276,6 +283,7 @@ endpoints:
     docs_url: https://docs.apollo.io/reference/bulk-people-enrichment
 
   - id: apollo.account.usage
+    added: '2026-07-28'
     kind: account
     capability: account.usage
     platform: account
