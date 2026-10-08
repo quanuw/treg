@@ -2,7 +2,7 @@
 // is the one source: the Dashboard imports it, and the build also compiles it to the classic
 // `/agent-setup.js` script for the standalone Arena page (see index.ts). No credentials are stored.
 
-export type Agent = { id: string, name: string, icon: string | null, plugin?: string }
+export type Agent = { id: string, name: string, icon: string | null, plugin?: string, connector?: boolean }
 export type Example = { k: string, cat: string, logo: string, avatar?: string, show?: string, prompt: string }
 export type OAuthGroup = { label: string, items: { s: string, n: string }[], soon: { s: string, n: string }[] }
 export type IconUrl = (icon: string | null | undefined, theme?: string) => string
@@ -12,7 +12,7 @@ export type IconUrl = (icon: string | null | undefined, theme?: string) => strin
 export const agents: Agent[] = [
   {id:'claude-code',name:'Claude Code',icon:'claudecode-color'},
   {id:'codex',name:'Codex',icon:'codex-color'},
-  {id:'claudeai',name:'Claude.ai',icon:'claude-color'},
+  {id:'claudeai',name:'Claude.ai',icon:'claude-color',connector:true},
   {id:'grokbot',name:'Grok Bot',icon:'/logos/agents/grokbot.png',plugin:'https://x.ai/bot/plugin/55647425'},
   {id:'hermes',name:'Hermes Agent',icon:'hermesagent'},
   {id:'cursor',name:'Cursor',icon:'cursor'},
@@ -30,6 +30,12 @@ export const iconUrl: IconUrl = (icon, theme = 'light') =>
 
 // The published setup line, kept byte-for-byte with the copy the landing pages already show.
 export const command = (base: string) => 'set up treg \u2014 '+base.replace(/\/$/,'')+'/llms.txt'
+
+// Claude.ai adds treg as a custom connector over OAuth: no setup line, no key. This link opens
+// Claude.ai's add-connector dialog with this server's MCP URL filled in.
+export const claudeConnectorLink = (base: string) =>
+  'https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=Treg&connectorUrl='
+  + encodeURIComponent(base.replace(/\/$/,'')+'/mcp/v2')
 
 export function setupText(command: string, team?: string, token?: string, masked = false) {
   if(!team&&!token) return command
