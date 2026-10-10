@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event
+from sqlalchemy import create_engine, event
 from sqlmodel import select
 
 from conftest import make_upstream
@@ -339,6 +339,18 @@ async def test_connection_binds_the_key_to_an_active_agent_membership(env):
     assert (await env.c.get(path, headers=_h(env.owner))).status_code == 404
 
 
+def _assert_connection_index_lookup(plan, identity_columns=("api_key_id", "user_email")):
+    # EXISTS also emits SCAN CONSTANT ROW; only access to the history table must be a search.
+    accesses = [row[3].lower() for row in plan if "callrecord" in row[3].lower()]
+    assert len(accesses) == 1, plan
+    access = accesses[0]
+    assert access.startswith(("search callrecord using index ",
+                              "search callrecord using covering index ")), plan
+    assert "org_id=?" in access, plan
+    assert any(f"{column}=?" in access for column in identity_columns), plan
+    assert not any("temp b-tree" in row[3].lower() for row in plan), plan
+
+
 async def test_connection_uses_one_indexed_exists_and_no_history_aggregation(env):
     agent = await _agent(env)
     statements = []
@@ -352,13 +364,39 @@ async def test_connection_uses_one_indexed_exists_and_no_history_aggregation(env
         result = await env.c.get(_connection_path(env, agent), headers=_h(env.owner))
     finally:
         event.remove(engine.sync_engine, "before_cursor_execute", record_sql)
-    assert result.json() == {"connected": False}
+    assert result.status_code == 200 and result.json() == {"connected": False}
     assert len(statements) == 1
     sql, parameters = statements[0]
     assert "exists" in sql.lower()
-    for heavy in ("group by", "distinct", "count(", "sum(", "response_body", "request_body"):
+    for heavy in ("group by", "distinct", "count(", "sum(", "response_body", "request_body",
+                  "error_request", "error_response"):
         assert heavy not in sql.lower()
     if engine.dialect.name == "sqlite":
         async with engine.connect() as conn:
             plan = (await conn.exec_driver_sql("EXPLAIN QUERY PLAN " + sql, parameters)).all()
-        assert "ix_callrecord_org_key_id" in str(plan)
+        # Empty-table estimates may choose either composite index, depending on SQLite's
+        # planner/statistics. Require an org + identity search, not a particular index name.
+        _assert_connection_index_lookup(plan)
+
+        # A fresh credential for an agent with a long history must not walk that history.
+        # Replay the endpoint's actual SQL against the model's indexes in a separate DB so
+        # ANALYZE statistics cannot leak into other API tests that share the fixture engine.
+        history_engine = create_engine("sqlite://")
+        try:
+            with history_engine.begin() as conn:
+                table = CallRecord.__table__
+                table.create(conn)
+                record = dict(org_id=env.org_id, user_email=agent["email"], tool_name="test",
+                              method="GET", path="/", status_code=200)
+                conn.execute(table.insert(), [
+                    {**record, "api_key_id": agent["api_key_id"] + offset + 1}
+                    for offset in range(64) for _ in range(32)
+                ])
+                conn.exec_driver_sql("ANALYZE callrecord")
+                plan = conn.exec_driver_sql("EXPLAIN QUERY PLAN " + sql, parameters).all()
+                _assert_connection_index_lookup(plan, identity_columns=("api_key_id",))
+                assert not conn.exec_driver_sql(sql, parameters).scalar_one()
+                conn.execute(table.insert(), {**record, "api_key_id": agent["api_key_id"]})
+                assert conn.exec_driver_sql(sql, parameters).scalar_one()
+        finally:
+            history_engine.dispose()
