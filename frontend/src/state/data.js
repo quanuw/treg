@@ -29,12 +29,12 @@ export default function data(){
       editAccess:null, accessDraft:{}, inviteCustomize:false, inviteLocalRun:true, inviteToolSel:{}, accessNote:'',
       // agents (machine identities), projects (sub-scope) and deny rules (policy)
       orgTab:'members', showInvite:false, showAddAgent:false,
-      apiKeys:[], keyName:'', keyNameInvalid:false, keyBusy:false, keyErr:'', keyMsg:null, newApiKey:null, editKey:null, editKeyName:'', keyMenu:null, keyConfirm:null, activityKey:'',
+      apiKeys:[], keyName:'', keyNameInvalid:false, keyBusy:false, keyErr:'', keyMsg:null, editKey:null, editKeyName:'', keyMenu:null, keyConfirm:null, activityKey:'',
       agentSnip:'prompt',   // which paste-ready snippet the agent card shows (prompt = hand-to-agent, first)
       snipAgent:null,    // an EXISTING agent whose setup snippets are open (no token — placeholder)
       agents:[], agentName:'', agentRole:'member', agentCap:-1, agentBusy:false, agentErr:'', agentProjSel:{}, agentAccessMode:null, agentToolSel:{},
-      observedAgents:[], promoteHint:'', promotePending:null, agentTokens:{},  // minted tokens, THIS page-load only — the server stores hashes
-      newAgent:null, confirmAgent:null,
+      observedAgents:[], promoteHint:'', promotePending:null,
+      credentialIssues:{}, confirmAgent:null, // unacknowledged key results, memory only and scoped by org
       projects:[], projectName:'', projBusy:false, confirmProj:null, projDraft:{},
       editProj:null, projToolDraft:{}, projToolBusy:false,
       denyRules:[], denyForm:{host:'',path_prefix:'',method:'',user_id:null,project_id:null,note:''}, denyBusy:false, confirmDeny:null, cliDeny:[],

@@ -5,6 +5,16 @@ sources:
   - frontend/src/App.vue
   - frontend/src/views.ts
   - frontend/src/state/controller.js
+  - frontend/src/state/agents.js
+  - frontend/src/state/agentsComputed.js
+  - frontend/src/state/credentialIssues.js
+  - frontend/src/state/data.js
+  - frontend/src/state/keys.js
+  - frontend/src/state/session.js
+  - frontend/src/state/team.js
+  - frontend/src/pages/TeamPage.vue
+  - frontend/tests/agents.test.ts
+  - frontend/e2e/agents.spec.ts
   - frontend/src/state/catalog.js
   - frontend/src/styles/base.css
   - frontend/e2e/layout.spec.ts
@@ -66,6 +76,51 @@ this page keeps what no single file shows. The look follows the root `design.md`
 - **New tables use `components/ui/table`**; the sheet's old table rules are `:where()`-scoped.
 - **`e2e/layout.spec.ts`** fails on text painted over text or past its row, a page scrolling
   sideways, or overlapping top-bar items, at desktop and phone width.
+
+## Agent setup status
+
+`loadOrgAdmin` loads the full Team roster on entry and after management actions. Setup cards use
+`pollAgentConnected` instead: one `GET /orgs/{org_id}/agents/{user_id}/connection?api_key_id=...`
+after each three-second pause, at most forty attempts per visit. The next pause starts only after
+the previous request settles; polling never reloads the roster, usage, or observed-agent aggregates.
+
+Both the Members card and the API Keys rotation card track the newly issued key. A previous key's
+check-in does not satisfy a replacement's setup. The status endpoint requires an admin in the
+selected org, validates the active key's agent membership, and uses an indexed `EXISTS` against
+`CallRecord` for that org and key. The full agent roster keeps its lifetime identity history.
+
+`TeamPage` resumes unfinished detection on mount and aborts it on unmount. Closing or replacing a
+card, switching teams, and unmounting the controller also cancel it. A request captures its card,
+team, and polling session; a late response cannot mark a replacement card connected or restart a
+cancelled loop. Authentication or missing-key errors stop detection and remove an inaccessible
+credential from the setup card; transient failures retry within the same attempt limit.
+
+Credential writes have a different lifetime from these reads. `credentialIssues` holds one
+unacknowledged issuance per org in the dashboard instance's memory, keyed by org ID and identified
+by its operation object. Creating an Agent, either rotation control, and additional-key creation
+retain successful results even after navigation. `newAgent` / `newApiKey` expose only the active
+org's result. A second issuance in the same org waits for acknowledgement, including when the
+first POST is pending across a switch; other orgs can issue independently. This state machine
+does not abort writes or add automatic mutation retries. The shared `api.ts` transport still has
+its existing encoded retry for a string-body request rejected by a 403 HTML edge response; that
+behavior is unchanged. An uncertain write reports that it may have completed.
+
+While an issuance needs attention, the API Keys menu disables state-changing actions and explains
+the retained-result guard. `requestKeyAction`, `confirmKeyAction`, and `keyAction` also check it
+defensively and report the same reason. If the guard becomes active with a confirmation already
+open, the dialog stays open with its confirm button disabled; it does not imply the action ran.
+
+`resumeCredentialIssue` checks a retained key before revealing it on receipt or return: the
+lightweight connection endpoint for Agents, active key metadata for additional keys, and the
+current derived bearer for Default keys. A revoked/inaccessible result is cleared with a notice;
+a transient read failure preserves it and offers a read-only retry. Read sessions are guarded and
+aborted on navigation so an older check cannot erase or replace a later result. A key can still be
+changed in another session after its most recent check; this is not continuous validity monitoring.
+
+The setup card's Done / I've updated action clears the retained secret. There is no separate
+Agent-token cache, local/session storage, or persisted queue. Logout and application teardown
+clear all retained issuances; closing/reloading the browser tab or losing the POST response before
+it is received cannot recover a hash-stored key. The UI tells the user to save it before closing.
 
 ## Catalog, Connections, a provider
 

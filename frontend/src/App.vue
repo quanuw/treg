@@ -104,11 +104,12 @@ export default { ...controller, components: { ...controller.components, ...dialo
     </div>
 
     <div v-if="keyMenu" class="key-actions-menu" role="menu" :style="{top:keyMenu.top+'px',right:keyMenu.right+'px'}" @click.stop>
+      <p v-if="credentialIssue" id="key-action-blocked" class="sub" style="max-width:240px;margin:0;padding:6px 10px" role="status">{{keyActionBlockReason()}}</p>
       <button v-if="keyMenu.key.can_rename" role="menuitem" @click="editKey=keyMenu.key.id; editKeyName=keyMenu.key.name; keyMenu=null">Rename</button>
-      <button v-if="keyMenu.key.can_disable" role="menuitem" @click="requestKeyAction(keyMenu.key,'disable')">Disable</button>
-      <button v-if="keyMenu.key.can_enable" role="menuitem" @click="requestKeyAction(keyMenu.key,'enable')">Enable</button>
-      <button v-if="keyMenu.key.can_revoke" class="danger" role="menuitem" @click="requestKeyAction(keyMenu.key,'revoke')">Revoke</button>
-      <button v-if="keyMenu.key.can_hide && keyMenu.key.state==='revoked'" role="menuitem" @click="requestKeyAction(keyMenu.key,'hide')">Hide</button>
+      <button v-if="keyMenu.key.can_disable" role="menuitem" :disabled="!!credentialIssue" :aria-describedby="credentialIssue?'key-action-blocked':null" @click="requestKeyAction(keyMenu.key,'disable')">Disable</button>
+      <button v-if="keyMenu.key.can_enable" role="menuitem" :disabled="!!credentialIssue" :aria-describedby="credentialIssue?'key-action-blocked':null" @click="requestKeyAction(keyMenu.key,'enable')">Enable</button>
+      <button v-if="keyMenu.key.can_revoke" class="danger" role="menuitem" :disabled="!!credentialIssue" :aria-describedby="credentialIssue?'key-action-blocked':null" @click="requestKeyAction(keyMenu.key,'revoke')">Revoke</button>
+      <button v-if="keyMenu.key.can_hide && keyMenu.key.state==='revoked'" role="menuitem" :disabled="!!credentialIssue" :aria-describedby="credentialIssue?'key-action-blocked':null" @click="requestKeyAction(keyMenu.key,'hide')">Hide</button>
     </div>
 
     <div v-if="keyConfirm" class="scrim" role="dialog" aria-modal="true" aria-labelledby="key-confirm-title" v-dialog="() => { keyConfirm=null }" @click.self="keyConfirm=null">
@@ -118,7 +119,8 @@ export default { ...controller, components: { ...controller.components, ...dialo
         <p v-else-if="keyConfirm.action==='disable'" class="sub" style="margin:12px 0 0">Calls using this key will stop until you enable it again. Its value will not change.</p>
         <p v-else-if="keyConfirm.action==='revoke'" class="sub" style="margin:12px 0 0"><template v-if="keyConfirm.key.kind==='agent'">This removes the agent from the team and revokes all its keys. Historical Activity will remain available.</template><template v-else>This key will stop working permanently. Historical Activity will remain available.</template></p>
         <p v-else class="sub" style="margin:12px 0 0">This revoked key will disappear from the API Keys list. Historical Activity will remain available.</p>
-        <div class="row-actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="btn sm" @click="keyConfirm=null">Cancel</button><button class="btn sm" :class="{danger:keyConfirm.action!=='hide'}" :disabled="keyBusy" @click="confirmKeyAction">{{keyBusy?'…':'Confirm '+keyConfirm.action}}</button></div>
+        <p v-if="credentialIssue" class="banner" role="alert" style="margin-top:12px">{{keyActionBlockReason()}}</p>
+        <div class="row-actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="btn sm" @click="keyConfirm=null">Cancel</button><button class="btn sm" :class="{danger:keyConfirm.action!=='hide'}" :disabled="keyBusy||!!credentialIssue" @click="confirmKeyAction">{{keyBusy?'…':'Confirm '+keyConfirm.action}}</button></div>
       </div>
     </div>
 

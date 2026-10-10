@@ -163,6 +163,7 @@
     padding:8px 10px;border-radius:7px;font:inherit;font-size:12px;cursor:pointer}
   .key-actions-menu button:hover,.key-actions-menu button:focus-visible{background:var(--panel2);outline:0}
   .key-actions-menu button.danger{color:var(--red)}
+  .key-actions-menu button:disabled{opacity:.5;cursor:not-allowed;background:none}
   .key-table .key-identity{min-width:220px}
   .key-table td{padding-top:12px;padding-bottom:12px;vertical-align:middle}
   .key-primary{display:flex;align-items:center;gap:7px;white-space:nowrap}
