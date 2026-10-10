@@ -17,13 +17,14 @@ import re
 from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
+from typing import cast
 
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import defer
+from sqlalchemy.orm import QueryableAttribute, defer
 from sqlmodel import select
 
 from . import archive, audit, crypto, localrun, oauth_providers, ratestore, runner, sandbox as demo_sandbox
@@ -769,9 +770,13 @@ async def get_call(
     A 404 here therefore means "no audit row", not "this call never happened" — check `ledger` in the
     body before concluding anything about money.
     """
-    row = (await db.execute(select(CallRecord).where(
-        CallRecord.org_id == caller.org_id, CallRecord.call_ref == call_ref,
-        *pinned_tag_predicates(CallRecord.tags, caller.membership.pinned_tags)))).scalars().first()
+    # This view does not use failure evidence; forbid an accidental lazy load of those wide fields.
+    row = (await db.execute(
+        select(CallRecord)
+        .options(defer(cast(QueryableAttribute, CallRecord.error_request), raiseload=True),
+                 defer(cast(QueryableAttribute, CallRecord.error_response), raiseload=True))
+        .where(CallRecord.org_id == caller.org_id, CallRecord.call_ref == call_ref,
+               *pinned_tag_predicates(CallRecord.tags, caller.membership.pinned_tags)))).scalars().first()
     if row is None and caller.membership.pinned_tags:
         owned = (await db.execute(select(LedgerEntry.id).where(
             LedgerEntry.org_id == caller.org_id, LedgerEntry.call_id == call_ref,

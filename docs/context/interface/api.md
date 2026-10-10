@@ -645,7 +645,8 @@ validated before resolving the shared HTTP client. `/auth/logout` remains an HTT
     SQL excludes `kind=async_poll` before pagination. Failure evidence is neither selected nor
     returned. Counts and fees in this feed are analytics, not an invoice.
   - `GET /calls/{call_ref}` returns the audit record, ledger entries and async-task view. Hidden
-    poll records remain inspectable here; admin diagnostics retain failure evidence.
+    poll records remain inspectable here. `get_call` defers `error_request` and `error_response`
+    with lazy loading forbidden; neither field is returned. Admin diagnostics retain failure evidence.
   - Both routes derive async status, final charge and result from `async_task_app.views_for`.
     `_async_charged` returns null while pending and the settled amount afterward, including
     zero for a refund. The original submission is the Activity row for the task.
