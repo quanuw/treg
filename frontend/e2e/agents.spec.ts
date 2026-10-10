@@ -83,6 +83,8 @@ test('agent setup polls only connection status across return and both rotation c
   await expect(menu.getByRole('menuitem', { name: 'Disable', exact: true })).toBeDisabled()
   await expect(menu.getByRole('menuitem', { name: 'Revoke', exact: true })).toBeDisabled()
   await expect(menu.getByRole('menuitem', { name: 'Rename', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'More actions for menu-active', exact: true }).click()
+  await expect(menu).not.toBeVisible()
   await page.getByRole('button', { name: 'More actions for menu-retired', exact: true }).click()
   await expect(menu.getByRole('menuitem', { name: 'Hide', exact: true })).toBeDisabled()
   await expect(menu).toContainText("Handle this team's retained key result first")
