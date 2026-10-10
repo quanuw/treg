@@ -35,7 +35,7 @@ async emailVerify(){ const code=(this.codeInput||'').trim(); if(!code) return; t
 async acceptInvite(inv){ try{ await this.api('/invites/'+inv.id+'/accept',{method:'POST'});
         this.pendingInvites=this.pendingInvites.filter(i=>i.id!==inv.id); await this.loadAll(); }
       catch(e){ this.err='Accept failed: '+(e.detail||e.status); } },
-logout(){ window.TregTracking?.identify('',''); try{ if(window.Intercom) window.Intercom('shutdown'); }catch(e){}  // drop the Intercom cookie so the next user on this machine can't read these conversations
+logout(){ this.clearCredentialIssues(); window.TregTracking?.identify('',''); try{ if(window.Intercom) window.Intercom('shutdown'); }catch(e){}  // drop the Intercom cookie so the next user on this machine can't read these conversations
       if(this.sessionMode){ fetch('/auth/logout',{method:'POST',credentials:'include'}).finally(()=>{storageRemove('treg-active');location.reload();}); } else { this.cfg={active:null,orgs:{}}; this.save(); location.reload(); } },
 async addToken(tok, isAdd){ tok=(tok||'').trim(); if(!tok) return; this.busy=true; this.loginErr='';
       try{ const orgs=await this.api('/orgs',{headers:this.headers(tok)}); const active=orgs.find(o=>o.active)||orgs[0];
@@ -44,9 +44,9 @@ async addToken(tok, isAdd){ tok=(tok||'').trim(); if(!tok) return; this.busy=tru
         this.cfg.active=active.slug; this.save(); this.tokenInput=''; this.addOrg=false; await this.loadAll();
       }catch(e){ this.loginErr = e.status===401?'Invalid token.':('Error: '+(e.detail||e.status)); }
       finally{ this.busy=false; } },
-switchOrg(o){ this.stopAgentPoll(); this.ticket('agentIssue'); this.ticket('keyAction');
+switchOrg(o){ this.parkCredentialIssue(); this.ticket('agentIssue'); this.ticket('keyAction');
       this.agentBusy=false; this.keyBusy=false;
-      this.orgMenu=false; this.newAgent=null; this.snipAgent=null; this.newApiKey=null; this.keyMsg=null;
+      this.orgMenu=false; this.snipAgent=null; this.keyMsg=null;
       if(!this.connected(o.slug)){ this.addOrg=true; return; }
       // The previous team's balance and auto top-up settings must not be shown, or paid against,
       // while the new team's load: they arrive with loadBilling.

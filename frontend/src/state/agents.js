@@ -21,7 +21,7 @@ export default {
           if(status.connected){ target.connected=true; this.stopAgentPoll(); return; }
         }catch(e){
           if(!live()) return;
-          if([401,403,404].includes(e.status)){ this.stopAgentPoll(); return; }
+          if([401,403,404].includes(e.status)){ this.invalidateCredentialIssue(target); this.stopAgentPoll(); return; }
         }
         // Schedule only after settlement: a slow response cannot overlap another poll.
         if(live() && tries<40) poll.timer=setTimeout(tick,3000);
@@ -56,7 +56,8 @@ async createAgent(){ const name=(this.agentName||'').trim();
           'Create "'+name+'" as an ADMIN agent?\n\nAn admin agent can register and delete tools and '
           +'secrets, invite members, and set access for this team — not just call tools.\n\n'
           +'Most agents only need "member".')) return;
-      const orgId=this.activeOrgId, live=this.ticket('agentIssue');
+      const issue=this.beginCredentialIssue('agent'); if(!issue) return;
+      const orgId=issue.org_id, live=this.ticket('agentIssue');
       this.agentBusy=true; this.agentErr='';
       const body={name, role:this.agentRole, daily_call_cap:this.agentCap};
       body.tool_access=this.agentAccessMode==='all' ? null : this.accessNames.filter(n=>this.agentToolSel[n]);
@@ -66,26 +67,29 @@ async createAgent(){ const name=(this.agentName||'').trim();
       if(this.promotePending){ body.promoted_member=this.promotePending.member; body.promoted_client=this.promotePending.client; }
       try{ const r=await this.api('/orgs/'+orgId+'/agents',{method:'POST',headers:{'content-type':'application/json'},
              body:JSON.stringify(body)});
-           if(!live()) return;
-           this.agentTokens[r.user_id]=r.token; this.newApiKey=null; this.newAgent={...r,org_id:orgId,connected:false,rotated:false}; this.snipAgent=null; this.agentName=''; this.agentAccessMode=null; this.agentToolSel={}; this.promoteHint=''; this.promotePending=null; await this.loadOrgAdmin(); }
-      catch(e){ if(live()) this.agentErr='Create failed: '+(e.detail||e.status); }
+           await this.finishCredentialIssue(issue,{...r,connected:false,rotated:false});
+           if(live()){ this.snipAgent=null; this.agentName=''; this.agentAccessMode=null; this.agentToolSel={}; this.promoteHint=''; this.promotePending=null; }
+           if(this.view==='orgs' && this.credentialIssue===issue) await this.loadOrgAdmin(); }
+      catch(e){ this.failCredentialIssue(issue); }
       finally{ if(live()) this.agentBusy=false; } },
 // Rotate = create with the SAME name: the server replaces the token hash, so the old one dies.
     // We deliberately send only name/role/cap — the server leaves every field we DON'T send as it is,
     // so the agent's tool ACL and project scope survive a rotate (they used to be silently cleared).
     async rotateAgent(a, confirmed=false){ const mark='rotate-'+a.user_id;
+      if(this.credentialIssue) return;
       if(!confirmed && this.confirmAgent!==mark){ this.confirmAgent=mark; return; }
-      const orgId=this.activeOrgId, live=this.ticket('agentIssue');
+      const issue=this.beginCredentialIssue('agent'); if(!issue) return;
+      const orgId=issue.org_id, live=this.ticket('agentIssue');
       this.confirmAgent=null; this.agentBusy=true; this.agentErr='';
       try{ const r=await this.api('/orgs/'+orgId+'/agents',{method:'POST',headers:{'content-type':'application/json'},
              body:JSON.stringify({name:a.name, role:a.role, daily_call_cap:a.daily_call_cap})});
-           if(!live()) return;
-           this.agentTokens[r.user_id]=r.token; this.newApiKey=null; this.newAgent={...r,org_id:orgId,connected:false,rotated:true}; this.snipAgent=null; await this.loadOrgAdmin(); }
-      catch(e){ if(live()) this.agentErr='Rotate failed: '+(e.detail||e.status); }
+           await this.finishCredentialIssue(issue,{...r,connected:false,rotated:true});
+           if(this.view==='orgs' && this.credentialIssue===issue){ this.snipAgent=null; await this.loadOrgAdmin(); } }
+      catch(e){ this.failCredentialIssue(issue); }
       finally{ if(live()) this.agentBusy=false; } },
-showAgentSetup(a){ this.newAgent=null; this.agentSnip='prompt';
+showAgentSetup(a){ if(this.credentialIssue) return; this.agentSnip='prompt';
       this.snipAgent=(this.snipAgent && this.snipAgent.user_id===a.user_id) ? null : a; },
-async revokeAgent(a){ const mark='revoke-'+a.user_id; if(this.confirmAgent!==mark){ this.confirmAgent=mark; return; }
+async revokeAgent(a){ if(this.credentialIssue) return; const mark='revoke-'+a.user_id; if(this.confirmAgent!==mark){ this.confirmAgent=mark; return; }
       this.confirmAgent=null;
       try{ await this.api('/orgs/'+this.activeOrgId+'/agents/'+a.user_id,{method:'DELETE'}); await this.loadOrgAdmin();
         this.orgMsg=a.name+' was removed and all its keys were revoked. Its Activity history remains; create and configure it again to restore it.'; }

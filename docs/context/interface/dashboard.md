@@ -7,6 +7,10 @@ sources:
   - frontend/src/state/controller.js
   - frontend/src/state/agents.js
   - frontend/src/state/agentsComputed.js
+  - frontend/src/state/credentialIssues.js
+  - frontend/src/state/data.js
+  - frontend/src/state/keys.js
+  - frontend/src/state/session.js
   - frontend/src/state/team.js
   - frontend/src/pages/TeamPage.vue
   - frontend/tests/agents.test.ts
@@ -88,8 +92,28 @@ selected org, validates the active key's agent membership, and uses an indexed `
 `TeamPage` resumes unfinished detection on mount and aborts it on unmount. Closing or replacing a
 card, switching teams, and unmounting the controller also cancel it. A request captures its card,
 team, and polling session; a late response cannot mark a replacement card connected or restart a
-cancelled loop. Pending create/rotate responses are discarded after a team switch. Authentication
-or missing-key errors stop detection; transient failures retry within the same attempt limit.
+cancelled loop. Authentication or missing-key errors stop detection and remove an inaccessible
+credential from the setup card; transient failures retry within the same attempt limit.
+
+Credential writes have a different lifetime from these reads. `credentialIssues` holds one
+unacknowledged issuance per org in the dashboard instance's memory, keyed by org ID and identified
+by its operation object. Creating an Agent, either rotation control, and additional-key creation
+retain successful results even after navigation. `newAgent` / `newApiKey` expose only the active
+org's result. A second issuance in the same org waits for acknowledgement, including when the
+first POST is pending across a switch; other orgs can issue independently. Writes are never
+aborted or automatically retried. An uncertain write reports that it may have completed.
+
+`resumeCredentialIssue` checks a retained key before revealing it on receipt or return: the
+lightweight connection endpoint for Agents, active key metadata for additional keys, and the
+current derived bearer for Default keys. A revoked/inaccessible result is cleared with a notice;
+a transient read failure preserves it and offers a read-only retry. Read sessions are guarded and
+aborted on navigation so an older check cannot erase or replace a later result. A key can still be
+changed in another session after its most recent check; this is not continuous validity monitoring.
+
+The setup card's Done / I've updated action clears the retained secret. There is no separate
+Agent-token cache, local/session storage, or persisted queue. Logout and application teardown
+clear all retained issuances; closing/reloading the browser tab or losing the POST response before
+it is received cannot recover a hash-stored key. The UI tells the user to save it before closing.
 
 ## Catalog, Connections, a provider
 

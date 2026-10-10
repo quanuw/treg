@@ -3,8 +3,8 @@ import { useDashboard } from '../state/context'
 // The new agent's check-in poll lives as long as this page (state/agents.js).
 export default {
   setup: useDashboard,
-  mounted() { this.resumeAgentPoll() },
-  beforeUnmount() { this.stopAgentPoll() },
+  mounted() { this.resumeCredentialIssue(); this.resumeAgentPoll() },
+  beforeUnmount() { this.parkCredentialIssue() },
 }
 </script>
 
@@ -30,6 +30,15 @@ export default {
             <div v-if="orgMsg" class="tut-notice" style="margin-bottom:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
               <span>{{orgMsg}}</span><button class="btn sm ico" @click="orgMsg=''" aria-label="Dismiss">✕</button>
             </div>
+            <div v-if="credentialIssue" class="tut-notice" role="status" style="margin-bottom:12px">
+              <template v-if="credentialIssue.status==='pending'">Your key request is in progress. You can switch teams and return here for the result. Keep this browser tab open.</template>
+              <template v-else-if="credentialIssue.status==='checking'">Checking that your issued key is still active before showing it…</template>
+              <template v-else-if="credentialIssue.error">{{credentialIssue.error}}</template>
+              <template v-else>Save this key before issuing another one. It is kept only in this browser tab until you close the key card; closing or reloading the tab loses it.</template>
+              <button v-if="credentialIssue.status==='held'" class="btn sm" @click="resumeCredentialIssue">Check key status</button>
+              <button v-if="credentialIssue.status==='ready' && orgTab!==(credentialIssue.type==='agent'?'members':'keys')" class="btn sm" @click="orgTab=credentialIssue.type==='agent'?'members':'keys'">Open issued key</button>
+              <button v-if="['failed','unavailable'].includes(credentialIssue.status)" class="btn sm" @click="dismissCredentialIssue">Dismiss</button>
+            </div>
 
             <template v-if="canAdmin && orgTab==='members'">
               <div v-if="agentErr" class="banner" style="margin-top:8px">{{agentErr}}</div>
@@ -41,15 +50,14 @@ export default {
               <button v-if="!newAgent" class="btn sm" style="margin-left:auto" @click="snipAgent=null">Close</button>
             </div>
             <p v-if="newAgent && newAgent.rotated" class="tut-notice" style="margin:2px 0 10px"><b>The previous key stopped working immediately.</b> Update <b>{{newAgent.name}}</b> everywhere it runs before closing this card.</p>
-            <p v-if="newAgent" class="sub" style="margin:2px 0 10px">This is the only time it is shown. Put it in the agent's <code>TREG_TOKEN</code>. Anyone holding it can act as {{newAgent.name}}, so keep it in an environment variable or secret manager — never commit or share it.
+            <p v-if="newAgent" class="sub" style="margin:2px 0 10px">Save this key before closing the card or browser tab. Put it in the agent's <code>TREG_TOKEN</code>. Anyone holding it can act as {{newAgent.name}}, so keep it in an environment variable or secret manager — never commit or share it.
               <span v-if="agentConnected" class="chip ok" style="margin-left:8px">✓ connected — {{newAgent.name}} called in as itself</span>
               <span v-else class="muted" style="margin-left:8px">waiting for its first check-in…</span></p>
-            <p v-else-if="agentTokens[snipAgent.user_id]" class="sub" style="margin:2px 0 10px">Snippets carry the real token (minted this page-load — the server only keeps a hash).</p>
-            <p v-else class="sub" style="margin:2px 0 10px">The server stores only a hash of the token, so it can't be shown again — these snippets use <span class="mono">$TREG_TOKEN</span>. <button class="btn sm" @click="rotateAgent(snipAgent,true)">⟳ Rotate &amp; fill real token</button> <span class="muted">(the old token stops working)</span></p>
+            <p v-else class="sub" style="margin:2px 0 10px">The server stores only a hash of the token, so it can't be shown again — these snippets use <span class="mono">$TREG_TOKEN</span>. <button class="btn sm" :disabled="!!credentialIssue" @click="rotateAgent(snipAgent,true)">⟳ Rotate &amp; fill real token</button> <span class="muted">(the old token stops working)</span></p>
             <div v-if="newAgent" class="field">
               <input :value="newAgent.token" readonly style="font-family:var(--mono)" @focus="$event.target.select()"/>
               <button class="btn primary" @click="copy(newAgent.token,'agenttok')">{{copied==='agenttok'?'Copied':'Copy'}}</button>
-              <button class="btn" @click="newAgent=null">{{newAgent.rotated?'I’ve updated '+newAgent.name:'Done'}}</button>
+              <button class="btn" @click="dismissCredentialIssue">{{newAgent.rotated?'I’ve updated '+newAgent.name:'Done'}}</button>
             </div>
             <!-- a bare token is a dead end: hand over the paste-ready thing, like the Tools snippets do -->
             <div class="tabs" style="margin:14px 0 8px">
@@ -109,7 +117,7 @@ export default {
                   <td style="text-align:right;white-space:nowrap">
                     <template v-if="m.is_agent">
                       <span class="row-actions"><button class="btn sm" @click="showAgentSetup(m)" title="how to give this agent its identity">Setup</button>
-                      <button class="btn sm" :class="{danger:confirmAgent==='rotate-'+m.user_id}" @click="rotateAgent(m)" title="issue a new token — the old one stops working immediately">{{confirmAgent==='rotate-'+m.user_id?'Confirm rotate':'Rotate'}}</button>
+                      <button class="btn sm" :disabled="!!credentialIssue" :class="{danger:confirmAgent==='rotate-'+m.user_id}" @click="rotateAgent(m)" title="issue a new token — the old one stops working immediately">{{confirmAgent==='rotate-'+m.user_id?'Confirm rotate':'Rotate'}}</button>
                       <button class="btn sm" :class="{danger:confirmAgent==='revoke-'+m.user_id}" @click="revokeAgent(m)">{{confirmAgent==='revoke-'+m.user_id?'Confirm revoke':'Revoke'}}</button></span>
                     </template>
                     <button v-else-if="m.role!=='owner'" class="btn sm" :class="{danger:confirmRemove===m.user_id}" @click="removeMember(m)">{{confirmRemove===m.user_id?'Confirm remove':'Remove'}}</button>
@@ -157,7 +165,7 @@ export default {
             <input v-model="agentName" placeholder="ci-bot" @keyup.enter="createAgent"/>
             <select v-model="agentRole" class="msel"><option>viewer</option><option>member</option><option v-if="isOwner">admin</option></select>
             <input :value="capField(agentCap)" @input="agentCap=capValue($event.target.value)" type="number" min="0" step="1" class="msel" style="width:96px" placeholder="No limit" aria-label="Daily call cap" title="Daily call cap; empty = no limit"/>
-            <button class="btn primary" @click="createAgent" :disabled="agentBusy||!agentAccessMode">{{agentBusy?'…':'Create'}}</button>
+            <button class="btn primary" @click="createAgent" :disabled="agentBusy||!!credentialIssue||!agentAccessMode">{{agentBusy?'…':'Create'}}</button>
           </div>
           <div style="max-width:620px;margin:4px 0 8px">
             <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
@@ -228,8 +236,8 @@ export default {
                 <div class="lbl"><template v-if="newApiKey.kind==='default_human'">Default key rotated — copy the new key</template><template v-else-if="newApiKey.assigned_type==='agent'">New key for {{newApiKey.assigned_name}}</template><template v-else>{{newApiKey.name}} — copy it now</template></div>
                 <p v-if="newApiKey.kind==='default_human'" class="tut-notice" style="margin:2px 0 10px"><b>The previous key stopped working immediately.</b> Update every CLI, MCP installation, or other client using this team's Default key.</p>
                 <p v-if="newApiKey.assigned_type==='agent' && newApiKey.rotated" class="tut-notice" style="margin:2px 0 10px"><b>The previous key stopped working immediately and is now hidden from this list.</b> Update {{newApiKey.assigned_name}} everywhere it runs before closing this card.</p>
-                <p class="sub" style="margin:2px 0 10px"><template v-if="newApiKey.kind==='default_human'">This team-specific key remains revealable on Getting Started.</template><template v-else>This is the only time treg shows the full key. The server stores only its hash.<template v-if="newApiKey.assigned_type==='agent'"> Anyone holding it can act as {{newApiKey.assigned_name}}, so keep it in an environment variable or secret manager — never commit or share it.</template></template></p>
-                <div class="field"><input :value="newApiKey.secret" readonly class="mono" @focus="$event.target.select()"/><button class="btn primary" @click="copy(newApiKey.secret,'managedkey')">{{copied==='managedkey'?'Copied':'Copy'}}</button><button class="btn" @click="newApiKey=null">{{newApiKey.assigned_type==='agent'?'I’ve updated '+newApiKey.assigned_name:'Done'}}</button></div>
+                <p class="sub" style="margin:2px 0 10px"><template v-if="newApiKey.kind==='default_human'">This team-specific key remains revealable on Getting Started.</template><template v-else>The server stores only its hash. Save the full key before closing this card or browser tab.<template v-if="newApiKey.assigned_type==='agent'"> Anyone holding it can act as {{newApiKey.assigned_name}}, so keep it in an environment variable or secret manager — never commit or share it.</template></template></p>
+                <div class="field"><input :value="newApiKey.secret" readonly class="mono" @focus="$event.target.select()"/><button class="btn primary" @click="copy(newApiKey.secret,'managedkey')">{{copied==='managedkey'?'Copied':'Copy'}}</button><button class="btn" @click="dismissCredentialIssue">{{newApiKey.assigned_type==='agent'?'I’ve updated '+newApiKey.assigned_name:'Done'}}</button></div>
                 <p v-if="newApiKey.kind==='default_human'" class="sub" style="margin:6px 0 0;font-size:11.5px">CLI users can run <code>treg login</code> again to save the new key. Update MCP and other clients manually.</p>
                 <template v-if="newApiKey.assigned_type==='agent'">
                   <p class="sub" style="margin:6px 0 0"><span v-if="agentConnected" class="chip ok">✓ connected — {{newApiKey.assigned_name}} called in as itself</span><span v-else class="muted">waiting for its first check-in…</span></p>
@@ -238,7 +246,7 @@ export default {
                   <p class="sub" style="margin:6px 0 0;font-size:11.5px">Replace <code>TREG_TOKEN</code> in every environment, CI secret, secret manager, or agent config where {{newApiKey.assigned_name}} runs.</p>
                 </template>
               </div>
-              <div v-if="activeRole!=='viewer'" class="field" style="max-width:620px;margin-bottom:18px"><input v-model="keyName" :class="{'field-invalid':keyNameInvalid}" :aria-invalid="keyNameInvalid" placeholder="New key name" maxlength="80" @input="keyNameInvalid=false" @keyup.enter="createApiKey"/><button class="btn primary" :disabled="keyBusy" @click="createApiKey">{{keyBusy?'…':'Create key'}}</button></div>
+              <div v-if="activeRole!=='viewer'" class="field" style="max-width:620px;margin-bottom:18px"><input v-model="keyName" :class="{'field-invalid':keyNameInvalid}" :aria-invalid="keyNameInvalid" placeholder="New key name" maxlength="80" @input="keyNameInvalid=false" @keyup.enter="createApiKey"/><button class="btn primary" :disabled="keyBusy||!!credentialIssue" @click="createApiKey">{{keyBusy?'…':'Create key'}}</button></div>
               <template v-for="group in apiKeyGroups" :key="group.identity">
                 <div class="lbl" style="margin-top:16px">{{group.name}} <span class="chip">{{group.type}}</span><span v-if="group.type==='agent' && group.name!==group.identity" class="muted mono" style="margin-left:8px;text-transform:none">{{group.identity}}</span></div>
                 <table class="key-table"><tr><th>Key</th><th>Status</th><th>Created</th><th>Last used</th><th></th></tr>
@@ -247,7 +255,7 @@ export default {
                     </td>
                     <td><span class="badge" :class="k.state==='active'?'ok':'invalid'">{{k.state}}</span></td><td class="muted">{{k.created_at?when(k.created_at):'Unknown'}}</td><td class="muted">{{k.last_used_at?when(k.last_used_at):'Never'}}</td>
                     <td style="text-align:right;white-space:nowrap"><span v-if="editKey===k.id" class="row-actions"><button class="btn sm primary" @click="renameApiKey(k)">Save</button><button class="btn sm" @click="editKey=null">Cancel</button></span><span v-else class="row-actions">
-                      <button class="btn sm" @click="showKeyActivity(k)">Activity</button><button v-if="k.can_rotate" class="btn sm" @click="requestKeyAction(k,'rotate')">Rotate</button><button v-if="keyHasMore(k)" class="btn sm ico" aria-haspopup="menu" :aria-expanded="keyMenu&&keyMenu.key.id===k.id" :aria-label="'More actions for '+k.name" @click.stop="toggleKeyMenu(k,$event)">⋮</button>
+                      <button class="btn sm" @click="showKeyActivity(k)">Activity</button><button v-if="k.can_rotate" class="btn sm" :disabled="!!credentialIssue" @click="requestKeyAction(k,'rotate')">Rotate</button><button v-if="keyHasMore(k)" class="btn sm ico" aria-haspopup="menu" :aria-expanded="keyMenu&&keyMenu.key.id===k.id" :aria-label="'More actions for '+k.name" @click.stop="toggleKeyMenu(k,$event)">⋮</button>
                     </span></td>
                   </tr>
                 </table>
