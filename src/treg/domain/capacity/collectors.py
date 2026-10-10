@@ -1008,6 +1008,8 @@ NO_BALANCE_API = {
                    "allowance is visible in the QuickEnrich dashboard only",
     "octen": "no account balance or usage endpoint in the published OpenAPI; "
              "PAYG USD balance and usage are visible in the provider dashboard",
+    "parallel": "GET /account/service/v1/balance needs an Account API OAuth access token, "
+                "not an API key; the USD balance is visible in the Parallel Platform",
     "valyu": "no documented API endpoint for remaining credits or account usage; "
              "the subscription balance is visible in Valyu's dashboard",
     "perplexity": "no API credit-balance endpoint in the published API reference; "

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import time
@@ -32,7 +33,8 @@ from .bootstrap_http import (
     _SecurityHeadersMiddleware,
 )
 from .config import TREG_USER_AGENT, get_settings
-from .infra import kv
+from .infra import kv, money_timing
+from .infra.money_trace_runner import start_money_trace, stop_money_trace
 from .infra.db import background_session_maker, verify_db
 from .infra.catalog_observations import (
     CachedEndpointObservationReader,
@@ -277,6 +279,7 @@ _CONTROL_ROUTE_KEYS: frozenset[RouteKey] = frozenset({
     ('/orgs/{org_id}/public-token', ('DELETE',), 'delete_public_token'),
     ('/orgs/{org_id}/agents', ('POST',), 'create_agent'),
     ('/orgs/{org_id}/agents', ('GET',), 'list_agents'),
+    ('/orgs/{org_id}/agents/{user_id}/connection', ('GET',), 'agent_connection'),
     ('/agents/checkin', ('POST',), 'agent_checkin'),
     ('/orgs/{org_id}/agents/observed', ('GET',), 'list_observed_agents'),
     ('/orgs/{org_id}/agents/{user_id}', ('DELETE',), 'revoke_agent'),
@@ -584,6 +587,23 @@ _POOL_GAUGE_SAMPLE_S = 1.0
 _POOL_GAUGE_EMIT_S = 60.0
 
 
+def _emit_money_timings() -> None:
+    """One bounded aggregate and at most one slow sample per operation/window, with no DB I/O."""
+    try:
+        for props, slowest in money_timing.snapshot():
+            analytics.capture(analytics.SERVER_DISTINCT_ID, "money_operation_gauge", props)
+            if slowest is not None:
+                logging.getLogger("treg.ledger").warning(
+                    "slow money session sample %s", json.dumps({
+                        "operation": props["operation"],
+                        "process_instance": props["process_instance"], **slowest,
+                    }, separators=(",", ":")))
+    except Exception:  # noqa: BLE001 - diagnostics must not break a gauge or shutdown
+        pass
+    from .infra.money_admission_reporting import emit_snapshot
+    emit_snapshot(role="web")
+
+
 async def pool_gauge(*, sample_s: float = _POOL_GAUGE_SAMPLE_S,
                      emit_s: float = _POOL_GAUGE_EMIT_S) -> None:
     """Every minute, one `db_pool_gauge` event: the peak connections each pool had checked out in
@@ -603,13 +623,15 @@ async def pool_gauge(*, sample_s: float = _POOL_GAUGE_SAMPLE_S,
             samples += 1
             if time.monotonic() - opened >= emit_s:
                 snapshot = pool_snapshot()
-                props: dict = {"samples": samples, "window_s": round(time.monotonic() - opened)}
+                props: dict = {"samples": samples, "window_s": round(time.monotonic() - opened),
+                               "process_instance": money_timing.PROCESS_INSTANCE}
                 for name, row in snapshot.items():
                     props[f"{name}_peak"] = peaks.get(name, 0)
                     props[f"{name}_capacity"] = row["capacity"]
                     props[f"{name}_headroom"] = row["capacity"] - peaks.get(name, 0)
                 if snapshot:
                     analytics.capture(analytics.SERVER_DISTINCT_ID, "db_pool_gauge", props)
+                _emit_money_timings()
                 peaks, samples, opened = {}, 0, time.monotonic()
         except asyncio.CancelledError:
             raise
@@ -664,6 +686,8 @@ def _lifespan(role: AppRole):
                 else None
             )
             gauge_task = asyncio.create_task(pool_gauge()) if analytics.enabled() else None
+            # Local transaction diagnostics run even when the analytics transport is disabled.
+            trace_runner = start_money_trace(role=role)
             # The archive's refresh worker (docs/context/architecture/archive.md): serve mode only,
             # and a zero daily cap disables it without touching serving. Same discipline as the ads
             # task — in-process, cancelled on shutdown, a bad pass never kills the loop.
@@ -719,11 +743,17 @@ def _lifespan(role: AppRole):
                     # left those events queued behind a cancelled flusher.
                     await audit.drain()
                     await archive.drain()
+                    if gauge_task is not None:
+                        _emit_money_timings()
+                    await stop_money_trace(trace_runner)
                     await analytics.drain()
                     await app.state.http.aclose()
                     await kv.close()
                 finally:
-                    analytics.remove_fault_handler(fault_handler)
+                    try:
+                        await stop_money_trace(trace_runner)
+                    finally:
+                        analytics.remove_fault_handler(fault_handler)
 
     return lifespan
 

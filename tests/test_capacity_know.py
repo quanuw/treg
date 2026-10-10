@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import httpx
+import pytest
 from sqlalchemy import select
 
 from treg import ratestore
@@ -27,20 +28,27 @@ async def test_policy_population_covers_every_platform_slot_and_both_aggregators
     assert "tomba_secret" not in pop  # the second half of a credential pair is not an account
 
 
-async def test_octen_platform_account_has_a_known_dashboard_only_capacity_policy(monkeypatch):
+@pytest.mark.parametrize(("provider", "rate_limit", "where"), [
+    ("octen", {"limit": 5, "window_s": 1, "source": "policy"}, "dashboard"),
+    # The balance route takes an Account API OAuth token, never the API key treg holds.
+    ("parallel", {"limit": 600, "window_s": 60, "source": "docs"}, "Platform"),
+])
+async def test_platform_account_has_a_known_dashboard_only_capacity_policy(
+    monkeypatch, provider, rate_limit, where,
+):
     from treg.config import get_settings
 
-    monkeypatch.setenv("TREG_PLATFORM_KEY_OCTEN", "TEST-OCTEN-KEY")
+    monkeypatch.setenv(f"TREG_PLATFORM_KEY_{provider.upper()}", "TEST-KEY")
     get_settings.cache_clear()
     try:
-        policy = default_policy("octen", has_key=True)
+        policy = default_policy(provider, has_key=True)
         assert (policy.capacity_type, policy.funding_mode, policy.source) == (
             "cash", "manual", "manual",
         )
-        assert policy.rate_limit == {"limit": 5, "window_s": 1, "source": "policy"}
-        balance = await collectors.provider_balance("octen")
+        assert policy.rate_limit == rate_limit
+        balance = await collectors.provider_balance(provider)
         assert balance["no_api"] is True
-        assert "dashboard" in balance["note"]
+        assert where in balance["note"]
     finally:
         get_settings.cache_clear()
 

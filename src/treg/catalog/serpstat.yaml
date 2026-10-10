@@ -262,6 +262,7 @@ endpoints:
         `SerpstatKeywordProcedure.getKeywordFullTop` returns the same SERP with the full element set.
         RESPONSE SHAPE: rows are nested one level deeper than elsewhere in this file — they arrive
         at `result.data.top[]`, not `result.data[]`.
+    test_request: {body: {id: "1", method: SerpstatKeywordProcedure.getKeywordTop, params: {keyword: running shoes, se: g_us, size: 3}}}
     cost:
       type: per_result
       value: 1

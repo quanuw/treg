@@ -56,6 +56,17 @@ def browsable(ep: dict) -> bool:
     "treg", which the brand rules say must never appear as a vendor."""
     return ep["kind"] not in HIDDEN_KINDS and ep.get("kind") != "routed"
 
+def paused_providers() -> frozenset[str]:
+    from ...config import get_settings
+    return get_settings().paused_providers_set
+
+
+def paused(ep: dict) -> bool:
+    """The endpoint's provider is paused on this deployment (TREG_PAUSED_PROVIDERS): out of every
+    search and find answer, while `by_id` keeps it so a direct lookup can say why."""
+    return ep.get("provider", "") in paused_providers()
+
+
 # How much the recorded PRICE is worth as evidence (cost.confidence). It is a claim about the
 # price, not about the endpoint: `verified: 2026-07-28` says the route answered, `confidence:
 # verified` says the money figure was confirmed against something re-checkable.
@@ -756,6 +767,9 @@ def _normalize(raw: dict, provider: str, directory: Path) -> dict:
         # 404s a person it has no record of). Only endpoints with evidenced miss semantics carry
         # it; for everything else an error status means what it says.
         "miss": raw.get("miss") or None,
+        # {status, when?, means} — the provider's answer for "the target itself does not exist" (a
+        # scraped site's own 404): a routed call ends with it instead of asking the next provider.
+        "not_found": raw.get("not_found") or None,
         # A provider can retire/move a route after an agent has cached its id. Keep that id in
         # `by_id`, but remove it from discovery and return the migration story on direct lookup.
         "status": str(raw.get("status") or "").strip().lower(),
@@ -848,6 +862,8 @@ def endpoint_view(ep: dict, provider_display: str, cat: Catalog | None = None) -
         # "no match" semantics, when the endpoint has them — an agent that reads `miss` stops
         # treating an expected empty answer as a failed call (and stops retrying it).
         "miss": ({k: v for k, v in ep["miss"].items() if k != "when"} if isinstance(ep.get("miss"), dict) else ep.get("miss")),
+        # "the target does not exist" semantics, only on the tools that declare them
+        **({"not_found": {k: v for k, v in ep["not_found"].items() if k != "when"}} if isinstance(ep.get("not_found"), dict) else {}),
         # Only direct-id lookups can return a marked row; discovery surfaces never include one.
         "status": ep.get("status") or None,
         "status_note": ep.get("status_note") or None,
@@ -1140,13 +1156,29 @@ def _haystacks(ep: dict, cat: Catalog) -> list[tuple[int, str]]:
     ]
 
 
+_CJK = re.compile(r"[\u3400-\u9fff]")
+
+
+def _padded(text: str) -> str:
+    """A haystack as space-separated words with a leading space, so a word can be matched at its start."""
+    return " " + _SPLIT.sub(" ", text.lower())
+
+
+def _needles(variants: list[str]) -> list[str]:
+    """Each variant as it must appear at the START of a word: " search" matches "search" and
+    "searches", never "research" (2026-10-10: a research-task status row tied with every search
+    tool on "web search" and its measured success put it first). CJK has no spaces between words,
+    so a CJK variant keeps matching anywhere."""
+    return [v if _CJK.search(v) else " " + _SPLIT.sub(" ", v.lower()).strip() for v in variants]
+
+
 def _search_fields(cat: Catalog) -> list[tuple[dict, list[tuple[int, str]]]]:
     """Every endpoint's weighted haystacks, built once per Catalog instance — search runs two
     passes (document frequency, then scoring) and rebuilding the joined strings per query per
-    pass was the only real cost in either."""
+    pass was the only real cost in either. Stored word-padded (`_padded`)."""
     cached = cat._search_fields
     if cached is None:
-        cached = [(ep, _haystacks(ep, cat)) for ep in cat.endpoints]
+        cached = [(ep, [(w, _padded(text)) for w, text in _haystacks(ep, cat)]) for ep in cat.endpoints]
         object.__setattr__(cat, "_search_fields", cached)  # frozen dataclass, deliberate
     return cached
 
@@ -1167,13 +1199,15 @@ def _match(query: str, cat: Catalog):
     tokens = [t for t in raw if t not in _STOPWORDS and len(t) > 1] or raw
     if not tokens:
         return None
-    variants = [[tok, *cat.aliases.get(tok, ())] for tok in tokens]
+    variants = [_needles([tok, *cat.aliases.get(tok, ())]) for tok in tokens]
     # A token that IS a platform slug ("tiktok", "linkedin") is the caller's hard filter, but idf
     # prices it low — half the catalog serves the big platforms — so rows matching a rarer facet
     # word ("followers") outranked rows matching the asked-for platform. Double the weight where a
     # platform token matches: same-pattern rows still sum identical floats, ties survive.
     boost = [2 if tok in cat.platforms else 1 for tok in tokens]
     rows = _search_fields(cat)
+    if hidden := paused_providers():
+        rows = [row for row in rows if row[0]["provider"] not in hidden]
     total = len(rows)
     best: list[list[int]] = []
     df = [0] * len(tokens)
@@ -1282,10 +1316,11 @@ def score_extra(query: str, cat: Catalog,
     if m is None or not extra:
         return []
     tokens, _rows, _best, idf, required, need = m
-    variants = [[tok, *cat.aliases.get(tok, ())] for tok in tokens]
+    variants = [_needles([tok, *cat.aliases.get(tok, ())]) for tok in tokens]
     boost = [2 if tok in cat.platforms else 1 for tok in tokens]
     out: list[tuple[dict, float]] = []
     for ep, fields in extra:
+        fields = [(w, _padded(text)) for w, text in fields]
         per_tok = [b * max((w for w, text in fields if any(v in text for v in vs)), default=0)
                    for vs, b in zip(variants, boost)]
         if sum(1 for i in required if per_tok[i]) < need:
@@ -1437,7 +1472,7 @@ def added_rows(query: str, cat: Catalog, opts: AddedOptions) -> tuple[list[tuple
     if query.strip():
         rows, total = search(query, cat, len(cat.endpoints), keep=keep)
     else:
-        rows = [(ep, 0.0) for ep in cat.endpoints if keep(ep)]
+        rows = [(ep, 0.0) for ep in cat.endpoints if keep(ep) and not paused(ep)]
         total = len(rows)
     return (newest_first(rows) if opts.newest or not query.strip() else rows), total
 
@@ -1667,3 +1702,11 @@ def headline_counts(cat: Catalog) -> tuple[str, int]:
     direct = [e for e in cat.by_id.values() if e.get("kind") != "routed"]
     providers = {e.get("provider") for e in direct if e.get("provider")}
     return f"{len(direct) // 100 * 100:,}+", len(providers)
+
+
+def empty_is_failure(endpoint_id: str) -> bool:
+    """True when this endpoint's capability contract counts an empty 2xx as a failure."""
+    cat = load()
+    cap = (cat.by_id.get(endpoint_id) or {}).get("capability")
+    contract = cat.contracts.get(cap) if cap else None
+    return bool(contract is not None and contract.empty_is_failure)

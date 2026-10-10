@@ -170,6 +170,30 @@ path or an exhausted reading from the sweep lets one call a minute through as a 
 its 2xx, so the `message` says a retry in a minute may succeed; otherwise it lasts until `resets_at`. Not the pool-saturation 503
 (`treg_saturated`), which is a different exit. See `architecture/proxy-model.md` § Platform capacity.
 
+## `503 provider_paused` - this deployment paused the provider
+
+`TREG_PAUSED_PROVIDERS` (comma-separated service ids) pauses a provider on one deployment. Every
+call that would reach it is refused **before any hold, token refresh or upstream request** with
+`{"detail": {"error": "provider_paused", "provider", "endpoint_id"?, "message"}}`, `X-Treg-Error: 1`,
+no `X-Treg-Cost-Micro`, `refused_by="paused"` on the audit row. That covers a catalog id
+(`resolve_marketplace_target`), a connection's own tool, and a URL passthrough to its hosts (both
+resolve to the tool bound to the provider's connection; refused once its secrets load in
+`service._execute_call`), plus `GET /catalog/endpoints/{id}/access`. `message` is the default
+sentence or the service's entry in `TREG_PAUSED_PROVIDER_MESSAGES`.
+
+The rest of the surface agrees: catalog search, `/catalog/find`, the MCP `catalog_search` tools,
+routed plans and the alternatives named in refusals leave the provider's endpoints out;
+`GET /catalog/endpoints/{id}` and MCP `catalog_get` answer `provider_paused` instead of the entry;
+`GET /oauth/providers` leaves the provider out; `POST /oauth/start`, `POST /connections/token`,
+the resource routes and the extra-credential route refuse with the same 503 body. Existing
+connections are never changed: `GET /connections` returns them with `paused: true`,
+`paused_message` and `provider_display_name`, and the health sweep skips them. `GET /meta` carries
+`paused_providers` (`{service: {display_name, message}}`), so the dashboard can say why where the
+provider is still reachable: its catalog tile reads Paused, its shelf and every tool panel show the
+message in place of the call line and the connect and copy buttons, and its provider page shows the
+message and the team's kept connections. The public platform and provider pages still list the
+provider's endpoints.
+
 ## `X-Treg-Served-Via` - this answer came through an overflow relay
 
 `GET/PATCH /orgs/{id}/settings` carries `platform_overflow` (default `true`); `false` opts the team out -
@@ -232,9 +256,11 @@ with the names of the colliding usable tools and the explicit `/call/<name>/<pat
 Each successful identity dependency commits its read-only transaction before the handler runs, so an
 application use case can open its own session without waiting behind the request's pool slot. The
 dependency-cached session remains usable because every session maker sets `expire_on_commit=False`.
-`require_superadmin` is the one gate on a different pool - it takes `get_admin_session`, and so must
-every `/admin/*` handler under it (FastAPI caches dependencies by identity; see
-[super-admin](../architecture/super-admin.md)).
+`require_superadmin` stays on the admin primary pool through `get_admin_session`, shared with
+primary admin handlers. `/admin/errors` uses `get_admin_read_session` for evidence and org names
+after the gate releases its connection: a configured reader, otherwise the original admin pool.
+It accepts replication lag for the report, never for authorization, and never retries a failed
+reader on the primary (see [super-admin](../architecture/super-admin.md)).
 Authz = org scoping + a role gate: `_can_manage` lets admin/owner manage any org resource, a member only
 what they created; `_require_admin_of` gates the org-admin endpoints. See
 [multi-tenancy](../architecture/multi-tenancy.md).
@@ -295,7 +321,12 @@ validated before resolving the shared HTTP client. `/auth/logout` remains an HTT
   `require_identity` and can never be an owner. **Re-POSTing the same name ROTATES, and a field the
   caller omits is left as it is** - a rotate changes the token, never the limits. `AgentIn` also takes
   `project_access` (slugs or ids), so an agent can be project-scoped at mint time; `created_by` stamps
-  the minting admin. `GET /orgs/{id}/agents/observed` (admin+) lists the agents **detected in member
+  the minting admin. Creation and rotation return `api_key_id` alongside the one-time token.
+  `GET /orgs/{id}/agents/{user_id}/connection?api_key_id=...` (admin+) returns only `connected`
+  with `Cache-Control: no-store`: an indexed existence check for this active key's check-in or
+  call, scoped to its live agent membership and org. An old key's history cannot confirm a new
+  key after rotation; unknown, foreign, disabled, revoked, or removed agent keys return 404.
+  `GET /orgs/{id}/agents/observed` (admin+) lists the agents **detected in member
   traffic** - one row per (member, runtime) from `CallRecord.client`/`RunRecord.client` over 30 days,
   excluding plain-terminal (`''`/`cli`) and machine-identity traffic; attribution, never a gate. See
   [multi-tenancy](../architecture/multi-tenancy.md).
@@ -395,7 +426,8 @@ validated before resolving the shared HTTP client. `/auth/logout` remains an HTT
     virtual-memory cap crashes Go CLIs (gh/stripe/doctl) and `RLIMIT_NPROC` is per-uid, shared with the
     server. Full **filesystem/network** isolation needs a container deploy and is a planned follow-up.
 - **Meta:** `meta` (`GET /meta`, open) → `{public_url, github, google, app_version, treg_version,
-  posthog_key/posthog_host, intercom_app_id, hub, referral}` for the dashboard. `referral` carries the
+  posthog_key/posthog_host, intercom_app_id, hub, referral, paused_providers}` for the dashboard.
+  `paused_providers` is `{service: {display_name, message}}` for `TREG_PAUSED_PROVIDERS`, empty by default. `referral` carries the
   two configured reward amounts so the top-bar entry can name them without `GET /referrals`. `hub`
   is `TREG_HUB_ENABLED`, so the dashboard asks no hub route that could only answer 404. The last three are the opt-in
   third-party keys (analytics, support chat): empty on a deployment that didn't set them, so
@@ -613,7 +645,8 @@ validated before resolving the shared HTTP client. `/auth/logout` remains an HTT
     SQL excludes `kind=async_poll` before pagination. Failure evidence is neither selected nor
     returned. Counts and fees in this feed are analytics, not an invoice.
   - `GET /calls/{call_ref}` returns the audit record, ledger entries and async-task view. Hidden
-    poll records remain inspectable here; admin diagnostics retain failure evidence.
+    poll records remain inspectable here. `get_call` defers `error_request` and `error_response`
+    with lazy loading forbidden; neither field is returned. Admin diagnostics retain failure evidence.
   - Both routes derive async status, final charge and result from `async_task_app.views_for`.
     `_async_charged` returns null while pending and the settled amount afterward, including
     zero for a refund. The original submission is the Activity row for the task.
@@ -911,7 +944,7 @@ if returning the hold itself fails, the money comes back when the hold is reaped
 | `GET /orgs/{id}/usage/by-tag?key=&days=` | per-value spend for one tag key. **Money from the ledger**; admin+ |
 | `GET/PUT/DELETE /orgs/{id}/budgets[/{dim}/{val}]` | per-tag limits and blocking; admin+ |
 | `PATCH /orgs/{id}` | (admin+) rename the team: `name` and/or `slug`; the old slug stays an alias so existing keys keep working |
-| `GET/PATCH /orgs/{id}/settings` | the team's daily spend cap, budget dimensions and primary dimension |
+| `GET/PATCH /orgs/{id}/settings` | the team's daily spend cap, budget dimensions, primary dimension, overflow opt-out and archive opt-out (`archive`; architecture/archive.md, "Opting out") |
 
 `PUT /orgs/{id}/budgets/{dim}/{val}` is an upsert that leaves unsent fields alone - a PUT that only
 sets `status` does not wipe the caps. Body: `daily_cap_micro`, `monthly_cap_micro`, `calls_per_day`,

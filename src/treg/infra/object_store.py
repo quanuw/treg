@@ -19,6 +19,7 @@ class ObjectStore(Protocol):
     async def put(self, body: bytes, *, content_hash: str | None = None) -> ObjectInfo: ...
     async def get(self, content_hash: str) -> bytes | None: ...
     async def head(self, content_hash: str) -> ObjectInfo | None: ...
+    async def delete(self, content_hash: str) -> None: ...
 
 
 class NamedObjectStore(Protocol):
@@ -131,6 +132,19 @@ class R2ObjectStore:
         if body is not None and hashlib.sha256(body).hexdigest() != key:
             raise ObjectStoreError("hash_mismatch")
         return body
+
+    async def delete(self, content_hash: str) -> None:
+        """Remove one archive body. The only delete the store offers, used by the erasure sweep
+        alone (application/archive_erasure.py): a content-addressed object may carry bytes for
+        several snapshots, so the caller proves no row still points at it before calling.
+        A missing object is already deleted, not an error."""
+        key = _key(content_hash)
+        try:
+            await self._client.delete_async(key)
+        except FileNotFoundError:
+            return
+        except Exception as exc:
+            raise self._failure(exc) from None
 
     async def put_named(self, name: str, body: bytes) -> None:
         """A named object has no content address to verify on read: its body must carry its own

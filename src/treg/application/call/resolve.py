@@ -324,6 +324,8 @@ class MarketplaceCall:
     max_cost_micro: int | None = None  # remaining caller ceiling, inherited by overflow
     params_hash: str = ""
     call_id: str | None = None      # the ledger hold, once reserved (metered calls only)
+    payer_org_id: int | None = None  # captured from the trusted caller when reserving
+    reserved_micro: int | None = None  # the held amount; None for legacy in-memory callers
     # The call rides a REGISTRY OAUTH CONNECT of a provider that bills treg's app per use (X's
     # pay-per-use: the app owner pays whoever's token made the call). Orthogonal to `tier` — the
     # credential is genuinely the org's own (tier 1/2), but the upstream bill is ours, so the call
@@ -1135,7 +1137,7 @@ def _capability_alternatives(ep: dict, *, limit: int = 3) -> list[str]:
     settings = get_settings()
     ranked = []
     for alt in cat.for_capability(capability):
-        if alt["id"] == ep["id"]:
+        if alt["id"] == ep["id"] or catalog_store.paused(alt):
             continue
         cost = cat.cost_view(alt.get("cost"), alt["provider"])
         usd = cost.get("usd") if cost else None
@@ -2329,6 +2331,13 @@ def _provider_capacity_unavailable(ep: dict, service: str, resets, *,
     })
 
 
+def provider_paused(service: str, endpoint_id: str | None = None) -> ResolutionFailed:
+    """This deployment paused `service` (TREG_PAUSED_PROVIDERS): refused before any hold, charge
+    or upstream request, on the catalog road and on a connection's own tool alike."""
+    return ResolutionFailed("provider_paused", status_code=503,
+                            detail=oauth_providers.paused_detail(service, endpoint_id))
+
+
 async def resolve_marketplace_target(
     ep: dict,
     *,
@@ -2341,6 +2350,8 @@ async def resolve_marketplace_target(
     request_headers=None,
     authorization_method: str = "",
 ) -> MarketplaceCall:
+    if oauth_providers.is_paused(ep.get("provider")):
+        raise provider_paused(ep["provider"], ep["id"])
     # The exhausted view is refreshed here — before the resolution session opens, so at most one
     # connection is held at a time, and before any hold exists. Cached 60 s; a stale or empty view
     # never refuses (plan §4.1: blocking fires on confirmed signals only).

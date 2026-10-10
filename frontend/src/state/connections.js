@@ -167,6 +167,7 @@ async chooseCapability(cap){
 connProvider(c){ return this.providerIndex.get(c.provider)||null; },
 // The one thing a connection needs from a person, if anything: the card's status and its action.
     connState(c){
+      if(c.paused) return {key:'paused', tone:'quiet', label:'Paused', title:c.paused_message};
       if(c.expiry_state==='expired') return {key:'reconnect', tone:'bad', label:'Expired', title:'This credential has expired. Reconnect to keep calling.'};
       if(c.needs_reconnect) return {key:'reconnect', tone:'warn', label:'Expires soon', title:'treg cannot renew this one. Reconnect before '+(c.expires_at||'it expires')+'.'};
       if(c.needs_extra_credential) return {key:'second', tone:'warn', label:'Needs a second credential', title:c.extra_credential_note};

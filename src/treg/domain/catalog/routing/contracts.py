@@ -67,6 +67,11 @@ class Contract:
     verdict_map: dict[str, str] = field(default_factory=dict)
     # The check a caller may ask for with `X-Treg-Route-Verify`; None = the header is refused.
     check: Check | None = None
+    # True where a 2xx with nothing in it is the provider failing the job, not "no result": an
+    # empty scraped page, an empty results list. Measured success then counts such an answer
+    # against the endpoint (`stats.Tally.fold`), so a provider that answers 200 to everything
+    # cannot rank on a success rate it did not earn.
+    empty_is_failure: bool = False
 
     @property
     def required_output(self) -> tuple[str, ...]:
@@ -205,6 +210,7 @@ def parse_contracts(doc: dict) -> dict[str, Contract]:
             scoping=tuple(str(k) for k in scoping),
             prefer=tuple(str(p).lower() for p in c.get("prefer") or ()),
             check=_parse_check(cap, c.get("check"), c.get("output") or {}),
+            empty_is_failure=bool(c.get("empty_is_failure", False)),
             **_parse_verdict(cap, c.get("verdict")))
     return out
 
@@ -277,7 +283,29 @@ def declared_miss(endpoint: dict, status: int, body: Any) -> bool:
     predicate that raises reads as "not a miss"."""
     if status != miss_status(endpoint):
         return False
-    when = (endpoint.get("miss") or {}).get("when")
+    return _body_matches((endpoint.get("miss") or {}).get("when"), body)
+
+
+def declared_not_found(endpoint: dict, status: int, body: Any) -> bool:
+    """True when a child's answer is the endpoint's declared "the target does not exist" answer
+    (`not_found: {status, when?, means}`): the page or record is gone at its source, so another
+    provider can only find the same nothing, or answer an empty page that looks like a success.
+    `status` is one status or a list (a 2xx is allowed: some providers answer 200 and name the
+    target's 404 in the body); `when` narrows it with a body predicate, as for `miss:`."""
+    nf = endpoint.get("not_found")
+    if not isinstance(nf, dict) or nf.get("status") is None:
+        return False
+    wanted = nf["status"] if isinstance(nf["status"], list) else [nf["status"]]
+    try:
+        if status not in {int(s) for s in wanted}:
+            return False
+    except (TypeError, ValueError):
+        return False
+    return _body_matches(nf.get("when"), body)
+
+
+def _body_matches(when: Any, body: Any) -> bool:
+    """No predicate matches every body; a predicate matches only a JSON object it evaluates true on."""
     if not when:
         return True
     doc = body

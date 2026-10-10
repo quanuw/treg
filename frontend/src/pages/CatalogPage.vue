@@ -58,7 +58,8 @@ export default { components: { FindAnswer, CatalogSearch }, setup: useDashboard 
             <span v-if="!publicCatalog && platOwn(pl).length" class="cat-own" role="img"
                   :title="platConnTitle(pl)" :aria-label="platConnTitle(pl)">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></span></span>
-          <span class="pl-meta">{{pl.endpoints}} tool{{pl.endpoints===1?'':'s'}}<template v-if="platPrice(pl)"> · <span :title="platPriceTitle(pl)">{{platPrice(pl).free ? platPrice(pl).text : 'from '+platPrice(pl).text}}</span></template></span>
+          <span v-if="platPaused(pl)" class="pl-meta" :title="providerPaused(pl.providers[0]).message">Paused</span>
+          <span v-else class="pl-meta">{{pl.endpoints}} tool{{pl.endpoints===1?'':'s'}}<template v-if="platPrice(pl)"> · <span :title="platPriceTitle(pl)">{{platPrice(pl).free ? platPrice(pl).text : 'from '+platPrice(pl).text}}</span></template></span>
         </span>
       </button>
     </div>

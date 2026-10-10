@@ -29,12 +29,12 @@ export default function data(){
       editAccess:null, accessDraft:{}, inviteCustomize:false, inviteLocalRun:true, inviteToolSel:{}, accessNote:'',
       // agents (machine identities), projects (sub-scope) and deny rules (policy)
       orgTab:'members', showInvite:false, showAddAgent:false,
-      apiKeys:[], keyName:'', keyNameInvalid:false, keyBusy:false, keyErr:'', keyMsg:null, newApiKey:null, editKey:null, editKeyName:'', keyMenu:null, keyConfirm:null, activityKey:'',
+      apiKeys:[], keyName:'', keyNameInvalid:false, keyBusy:false, keyErr:'', keyMsg:null, editKey:null, editKeyName:'', keyMenu:null, keyConfirm:null, activityKey:'',
       agentSnip:'prompt',   // which paste-ready snippet the agent card shows (prompt = hand-to-agent, first)
       snipAgent:null,    // an EXISTING agent whose setup snippets are open (no token — placeholder)
       agents:[], agentName:'', agentRole:'member', agentCap:-1, agentBusy:false, agentErr:'', agentProjSel:{}, agentAccessMode:null, agentToolSel:{},
-      observedAgents:[], promoteHint:'', promotePending:null, agentTokens:{},  // minted tokens, THIS page-load only — the server stores hashes
-      newAgent:null, confirmAgent:null,
+      observedAgents:[], promoteHint:'', promotePending:null,
+      credentialIssues:{}, confirmAgent:null, // unacknowledged key results, memory only and scoped by org
       projects:[], projectName:'', projBusy:false, confirmProj:null, projDraft:{},
       editProj:null, projToolDraft:{}, projToolBusy:false,
       denyRules:[], denyForm:{host:'',path_prefix:'',method:'',user_id:null,project_id:null,note:''}, denyBusy:false, confirmDeny:null, cliDeny:[],
@@ -47,6 +47,7 @@ export default function data(){
       billing:null, billingBusy:false, topupAmount:10, autoAmount:10, autoThreshold:5, autoPerHour:5, autoConsent:false, autoOpen:false,
       topupOpen:false, topupPick:10, topupOther:null, topupAuto:true, topupErr:'',
       capCfg:null, capUsd:0, capBusy:false, capErr:'',
+      archiveBusy:false, archiveErr:'',
       renameName:'', renameSlug:'', renameBusy:false, renameErr:'',
       budgets:[], budDims:[], budDim:'', budVal:'', budDaily:'', budBusy:false, budErr:'',
       bhist:{items:[],loading:false,ok:true},   // past top-ups + their invoice/receipt links; ok=false means Stripe was unreachable, amounts are still right
@@ -87,7 +88,6 @@ export default function data(){
       verdictKinds:['useful','partly','not_useful'],   // an endpoint's agent verdicts, in bar order
       platCap:null,        // the compared capability a platform URL names, by its key (`compare`)
       drawerTool:null,       // endpoint id open in the tool drawer
-      catalogArm:'',         // the catalog-v2 arm this load was dealt (state/catalogExperiment.js)
       epInfo:{},         // endpoint id → {loading, data} from /catalog/endpoints/<id>
       platComparisonLead:null,    // the endpoint whose detail carries the open comparison's siblings and plan
       platComparisonSort:{key:'price', dir:'asc'},   // the comparison's order (DataTable v-model:sort)

@@ -123,11 +123,15 @@ Notes:
   fresh: verbatim provider bytes, `X-Treg-Cache: hit`, `X-Treg-Fetched-At`, `X-Treg-Age`. Your
   team's first call on a question costs full price either way; from your second call on, a hit
   costs 10%, and a hit on your own key is free. `Cache-Control: no-cache` forces a live call;
-  `X-Treg-Max-Age: <seconds>` accepts only a younger answer.
+  `X-Treg-Max-Age: <seconds>` accepts only a younger answer. A team admin can opt the team out
+  of the archive (`treg org archive off`): new calls are then neither answered from nor stored
+  in it, so metered calls lose the repeat price.
 - HTTP **503** `provider_capacity_unavailable` = treg's own account for that provider is out
   (not your balance; nothing charged). Body has `resets_at` and `alternatives` (same capability,
   other providers) — choose one, or use your own key. treg never switches providers for you.
   treg re-checks the provider about once a minute, so a retry after a minute can succeed.
+- HTTP **503** `provider_paused` = this deployment paused that provider (nothing charged, nothing
+  sent). Read `message`. The existing connection is kept; do not reconnect, it works again when resumed.
 - An org tool or secret for the provider always wins over an anonymous route or treg's key,
   automatically — the catalog is the fallback, not a replacement for keys the team already has.
 - **Choosing between providers of one capability — the procedure.** `treg catalog get <id>` lists

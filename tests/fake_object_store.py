@@ -49,6 +49,13 @@ class MemoryObjectStore:
         body = self.objects.get(content_hash)
         return ObjectInfo(content_hash, len(body)) if body is not None else None
 
+    async def delete(self, content_hash: str) -> None:
+        self.check_io()
+        self.delete_calls = getattr(self, "delete_calls", 0) + 1
+        if getattr(self, "fail_deletes", False):
+            raise ObjectStoreError('store_error')
+        self.objects.pop(content_hash, None)
+
     async def put_named(self, name: str, body: bytes) -> None:
         self.check_io()
         self.put_calls += 1
@@ -90,3 +97,7 @@ class MemoryObstoreSDK:
     async def get_async(self, path):
         self.calls.append('get')
         return self.Result(self.body)
+
+    async def delete_async(self, path):
+        self.calls.append('delete')
+        self.body = None

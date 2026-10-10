@@ -142,7 +142,8 @@ class Index:
 
 def shown_endpoints(cat: store.Catalog) -> list[dict]:
     """What find may answer with: the browse surface, routed parents out."""
-    return [e for e in cat.endpoints if store.browsable(e) and e.get("kind") != "routed"]
+    return [e for e in cat.endpoints
+            if store.browsable(e) and e.get("kind") != "routed" and not store.paused(e)]
 
 
 def short_label(label: str) -> str:

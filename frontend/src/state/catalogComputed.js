@@ -16,9 +16,8 @@ const COL_TIPS = {
 }
 
 export default {
-// The catalog-v2 control arm (state/catalogExperiment.js): the ledger, and no comparison pages anywhere.
-    catalogLegacy(){ return this.catalogArm==='control'; },
 mkProvider(){ return this.providers.find(p=>p.service===this.mkService)||null; },
+mkPaused(){ return this.providerPaused(this.mkService); },
 mkAccounts(){ return this.connAccounts.filter(a=>a.service===this.mkService); },
 // Which capabilities ANY account here already holds — a page-level "you have this" summary,
     // since the permission list describes the integration, not one account.
@@ -109,7 +108,6 @@ mkTabs(){
         return {...g, items:feat, rest:items.filter(p=>p.featured==null), total:items.length};
       });
     },
-mkPlatforms(){ return this.plats.list.filter(pl=>(pl.providers||[]).includes(this.mkService)); },
 platRow(){ return this.plats.list.find(pl=>pl.slug===this.platSlug)||null; },
 platLabel(){ return (this.platData&&this.platData.platform&&this.platData.platform.label)
       || (this.platRow&&this.platRow.label)
@@ -243,6 +241,7 @@ drawerIds(){
 // What stands between your agent and this tool: an account to connect (OAuth), a key to add (a tool
     // only your own key can call), or nothing, and the line can go to the agent as it is.
     drawerNext(){ const e=this.drawerEp; if(!e) return '';
+      if(this.providerPaused(e.provider)) return 'paused';
       if(this.catEndpointConnected(e)) return 'copy';
       if(this.provAuthKind(e.provider)==='oauth') return 'connect';
       return e.platform_eligible===false ? 'key' : 'copy'; },

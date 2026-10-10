@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from functools import lru_cache
 from typing import Literal
@@ -68,6 +69,13 @@ class Settings(BaseSettings):
     review_budget_per_hour: int = Field(default=5, ge=1)
     # The shared key-value store (Redis protocol). Empty = an in-process fallback; see infra/kv.py.
     kv_url: str = ""
+
+    # Optional database-external admission for CreditBlock consumers. Keep accounting protected
+    # by database transactions even when a lease expires or the shared store is unavailable.
+    money_admission_enabled: bool = False
+    money_admission_org_ids: list[PositiveInt] = Field(default_factory=list)
+    money_admission_wait_s: float = Field(default=5.0, gt=0, le=60)
+    money_admission_lease_s: float = Field(default=15.0, ge=3, le=300)
 
     # SQLite locally, Postgres on Render — same code path, just swap the URL.
     database_url: str = "sqlite+aiosqlite:///./treg.db"
@@ -276,6 +284,7 @@ class Settings(BaseSettings):
     platform_key_search1api: str = ""  # Bearer; prepaid credits, free GET /usage balance check
     platform_key_octen: str = ""      # x-api-key; PAYG search and extraction usage settles per response
     platform_key_linkup: str = ""     # Bearer; prepaid USD balance, request-priced Search/Fetch/Research
+    platform_key_parallel: str = ""   # x-api-key; USD balance, Search/Extract settle from usage SKUs
     platform_key_you: str = ""        # X-API-Key; prepaid USD balance across You.com web APIs
     platform_key_valyu: str = ""      # X-API-Key; subscription credits shared across Valyu APIs
     platform_key_serper: str = ""     # X-API-KEY; prepaid Google search credits, exact charge in response.credits
@@ -649,6 +658,15 @@ class Settings(BaseSettings):
     # read their campaign data, and the two must not share a credential or a consent screen. Empty
     # = the whole feature is OFF. See docs/context/architecture/ads-conversions.md.
     ads_conv_refresh_token: str = ""
+    # Enhanced Conversions for Leads. OFF: the outbox only ever holds click-attributed teams and the
+    # upload carries click ids alone (the pre-2026-09 shape). ON: every human-owned team's signup,
+    # first call and first payment is queued, and each upload event also carries the SHA-256 of the
+    # team creator's normalised email as a `userData` identifier, so Google can match a conversion
+    # to a signed-in viewer who watched or clicked an ad on ANOTHER device (a YouTube pre-roll on a
+    # phone, the signup on a laptop) — the journey a click id can never connect. Turn on only after
+    # the Ads account has accepted the Customer Data Terms and enabled Enhanced conversions for
+    # leads; until then Google rejects the identifiers and the rows would dead-letter.
+    ads_conv_user_data: bool = False
 
     linkedin_client_id: str = ""
     linkedin_client_secret: str = ""
@@ -673,6 +691,15 @@ class Settings(BaseSettings):
     # Comma-separated registry review keys that do not yet have production access. Remove one key
     # when its review is approved; set an explicit empty value when all reviews are complete.
     oauth_review_pending: str = "instagram-login,page-messages"
+    # Comma-separated provider service ids this deployment has paused (TREG_PAUSED_PROVIDERS), e.g.
+    # one whose upstream access this deployment's app has lost. A paused provider leaves catalog
+    # search and the connect listing, and its calls and connects are refused with a typed 503
+    # `provider_paused` before any hold or upstream request. Existing connections are kept as they
+    # are and work again once the id is removed. Empty (the default) pauses nothing.
+    paused_providers: str = ""
+    # Optional JSON object {service: message} (TREG_PAUSED_PROVIDER_MESSAGES) replacing the default
+    # paused message for a service. Malformed JSON fails at boot rather than showing nothing.
+    paused_provider_messages: str = ""
     # Advertising OAuth platforms — unset by default, so these providers list as "not configured"
     # until this deployment registers its own developer app on each network.
     microsoft_ads_client_id: str = ""
@@ -719,6 +746,19 @@ class Settings(BaseSettings):
             email, sep, digest = part.partition("=")
             if not sep or "@" not in email or not re.fullmatch(r"[0-9a-fA-F]{64}", digest.strip()):
                 raise ValueError("fixed_login_codes entries must be email=<64-hex sha256>")
+        return v
+
+    @field_validator("paused_provider_messages")
+    @classmethod
+    def _paused_provider_messages_shape(cls, v: str) -> str:
+        if v.strip():
+            try:
+                parsed = json.loads(v)
+            except ValueError:
+                raise ValueError("paused_provider_messages must be a JSON object") from None
+            if not isinstance(parsed, dict) or not all(
+                    isinstance(k, str) and isinstance(m, str) and m.strip() for k, m in parsed.items()):
+                raise ValueError("paused_provider_messages must map service ids to non-empty strings")
         return v
 
     @property
@@ -825,6 +865,22 @@ class Settings(BaseSettings):
         return frozenset(
             key.strip().lower() for key in self.oauth_review_pending.split(",") if key.strip()
         )
+
+    @property
+    def paused_providers_set(self) -> frozenset[str]:
+        """Provider service ids this deployment has paused."""
+        return frozenset(
+            key.strip().lower() for key in self.paused_providers.split(",") if key.strip()
+        )
+
+    def paused_provider_message(self, service: str, display_name: str) -> str:
+        """What a caller or a user is told about a paused provider."""
+        if self.paused_provider_messages.strip():
+            custom = json.loads(self.paused_provider_messages).get(service)
+            if custom:
+                return custom.strip()
+        return (f"{display_name} is temporarily paused on treg. Your existing connection is saved "
+                "and starts to work again when it is resumed. No action is needed from you.")
 
     @property
     def expose_dev_code(self) -> bool:

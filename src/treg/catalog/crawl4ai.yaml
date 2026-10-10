@@ -67,6 +67,7 @@ endpoints:
   - id: crawl4ai.web.scrape
     async: false
     capability: web.extract
+    not_found: {status: [404, 410], when: "starts_with(reason, 'origin-error')", means: "the site itself answered 404 or 410: the page does not exist"}
     platform: web
     domain: extract
     scope: any_account
@@ -109,8 +110,8 @@ endpoints:
     scope: any_account
     method: GET
     path: /search
-    name: Search the web, fast multi-engine web search
-    summary: "Browser-free, multi-engine web search with ranked, cleaned results (title, url, snippet, source)."
+    name: "Search the web: live ranked results with title, URL, snippet"
+    summary: "Live web search across several engines, ranked and cleaned: each result has a title, URL and snippet. When the live web returns fewer than 10 results, results from the Crawl4AI index fill the list. For follow-up questions, related queries and an entity card, use crawl4ai.web.search.rich."
     input:
       queryParams:
         q: {type: string, required: true, note: "max 512 characters", example: "rust web crawler"}
@@ -118,15 +119,15 @@ endpoints:
     test_request: {queryParams: {q: "rust web crawler"}}
     cost:
       type: per_success
-      value: 1
+      value: 0.15
       currency: credit
       per: 1
       unit: call
       source: observed
       source_url: https://api.crawl4ai.com/v1/prices
-      checked: '2026-10-05'
+      checked: '2026-10-09'
       confidence: verified
-      note: "1 credit base times the effort; a cached search cost 0.5 live. The x-c4-cost header settles the actual charge."
+      note: "treg's account price: a flat 0.15 credits per search (observed live 2026-10-09). The x-c4-cost header settles the actual charge."
     verified: '2026-10-05'
     added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
@@ -149,15 +150,15 @@ endpoints:
     test_request: {queryParams: {q: "why is the sky blue", rich: 1}}
     cost:
       type: per_success
-      value: 2
+      value: 0.15
       currency: credit
       per: 1
       unit: call
       source: observed
       source_url: https://api.crawl4ai.com/v1/prices
-      checked: '2026-10-05'
+      checked: '2026-10-09'
       confidence: verified
-      note: "A rich search cost 2 credits live. The x-c4-cost header settles the actual charge."
+      note: "treg's account price: a flat 0.15 credits per rich search (observed live 2026-10-09). The x-c4-cost header settles the actual charge."
     verified: '2026-10-05'
     added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
@@ -227,15 +228,15 @@ endpoints:
     test_request: {queryParams: {q: "who founded stripe"}}
     cost:
       type: per_success
-      value: 3
+      value: 2.15
       currency: credit
       per: 1
       unit: call
       source: observed
       source_url: https://api.crawl4ai.com/v1/prices
-      checked: '2026-10-07'
+      checked: '2026-10-09'
       confidence: verified
-      note: "1 credit for the web's own answer (source google_ai_*), 3 for a written answer (prose or JSON, with or without a schema), 0.5 cached; no answer, a 400 or a 503 is free. The 3-credit hold is a written answer; the x-c4-cost header settles the actual charge (1, 3, 0.5 and 0 observed live 2026-10-07)."
+      note: "treg's account price: 0.15 credits for the web's own answer (source google_ai_*), 2.15 for a written answer (0.15 plus the model); no answer, a 400 or a 503 is free. The 2.15-credit hold is a written answer; the x-c4-cost header settles the actual charge (0.15 and 2.15 observed live 2026-10-09)."
     verified: '2026-10-07'
     added: '2026-10-06'
     docs_url: https://crawl4ai.com/llms.txt
@@ -262,19 +263,57 @@ endpoints:
     test_request: {queryParams: {q: "what is a stock split", deep: "0"}}
     cost:
       type: per_success
-      value: 1
+      value: 0.15
       currency: credit
       per: 1
       unit: call
       source: observed
       source_url: https://api.crawl4ai.com/v1/prices
-      checked: '2026-10-07'
+      checked: '2026-10-09'
       confidence: verified
-      note: "1 credit for Google's answer, 0.5 cached, 0 when there is none; the x-c4-cost header settles the charge (1 and 0 observed live 2026-10-07)."
+      note: "treg's account price: 0.15 credits for Google's answer, 0 when there is none; the x-c4-cost header settles the charge (0.15 observed live 2026-10-09)."
     verified: '2026-10-07'
     added: '2026-10-07'
     docs_url: https://crawl4ai.com/llms.txt
     example_response: examples/crawl4ai.google.serp.ai_mode.json
+
+  - id: crawl4ai.google.serp.organic
+    async: false
+    capability: google.serp.organic
+    platform: google
+    domain: serp
+    scope: any_account
+    method: GET
+    path: /serp
+    name: "Google organic results with true rank and page blocks"
+    summary: "One Google results page as JSON: every organic result with its rank (position, and position_absolute counting the blocks above it), and each block Google showed (AI Overview, People also ask, local pack, videos, ...). Localised to a country, a language and optionally a city. When results is empty, empty_reason says why: google_no_results (Google matched nothing) or rescue_no_results (another provider may still have results)."
+    strict_query: true
+    input:
+      queryParams:
+        q: {type: string, required: true, note: "the query, up to 512 characters", example: "best crm software"}
+        country: {type: string, required: false, note: "two-letter Google country (gl), default us"}
+        language: {type: string, required: false, note: "Google interface language (hl), e.g. en or pt-br; default en"}
+        location: {type: string, required: false, note: "a city or region, e.g. Austin, TX; an unknown place answers 400 with the closest names"}
+        num: {type: integer, required: false, note: "results to return: a multiple of 10 from 10 to 100 (num/10 Google pages); default 10"}
+        page: {type: integer, required: false, note: "page over num, 1 to 30: num=10&page=2 is results 11-20"}
+        time: {type: string, required: false, enum: [hour, day, week, month, year], note: "Google's time filter"}
+        fresh: {type: string, required: false, enum: ["1"], note: "1 skips the cache"}
+    test_request: {queryParams: {q: "best crm software", country: us}}
+    cost:
+      type: per_success
+      value: 0.15
+      currency: credit
+      per: 1
+      unit: page
+      source: observed
+      source_url: https://api.crawl4ai.com/v1/prices
+      checked: '2026-10-09'
+      confidence: verified
+      note: "treg's account price: 0.15 credits per Google page of 10 results, so num=30 costs 0.45; a 4xx or 5xx is free. The hold is one page; the x-c4-cost header settles the actual charge (0.150 for num=10 and 0.450 for num=30 observed live 2026-10-09)."
+    verified: '2026-10-09'
+    added: '2026-10-09'
+    docs_url: https://crawl4ai.com/llms.txt
+    example_response: examples/crawl4ai.google.serp.organic.json
 
   # --- Many URLs ---------------------------------------------------------------------------------
   - id: crawl4ai.web.extract.batch

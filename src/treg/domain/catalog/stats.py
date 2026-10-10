@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Protocol, TypeAlias
 
-from sqlalchemy import case, func
+from sqlalchemy import case, func, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -92,7 +92,8 @@ class Tally:
 
     def fold(self, *, status_code: int, created_at: datetime, duration_ms: int | None,
              hit: bool | None, cost_observed_micro: int | None, refused_by: str | None,
-             verdict: str | None = None, rng: random.Random | None = None) -> bool:
+             verdict: str | None = None, rng: random.Random | None = None,
+             empty_fails: bool = False) -> bool:
         """Fold one audit row in. Returns False when the row is not evidence about the endpoint.
 
         Mirrors the predicates in `observed()` exactly; see its docstring for why each one is
@@ -101,7 +102,12 @@ class Tally:
         if refused_by is not None:
             return False     # treg said no before a byte went upstream: the caller's account, not the endpoint
         self.n += 1
-        success = status_code < 300
+        # `empty_fails` (the capability's `empty_is_failure`): a 2xx the adapter judged empty is the
+        # provider failing the job, counted as bad, never as a success.
+        empty = empty_fails and status_code < 300 and hit is False
+        success = status_code < 300 and not empty
+        if empty:
+            self.bad += 1
         if success:
             self.ok += 1
             if self.last_ok is None or created_at > self.last_ok:
@@ -305,12 +311,18 @@ async def observed(
     if not ids:
         return {}
     since = _now() - timedelta(days=days)
+    from .store import empty_is_failure
+    strict = [e for e in ids if empty_is_failure(e)]
+    # The same `empty_fails` rule as `Tally.fold`: a 2xx judged empty on a strict capability.
+    empty = (CallRecord.endpoint_id.in_(strict) & (CallRecord.status_code < 300)
+             & CallRecord.hit.is_(False)) if strict else literal(False)
+    good = (CallRecord.status_code < 300) & ~empty
 
     rows = (await db.execute(
         select(
             CallRecord.endpoint_id,
             func.count().label("n"),
-            func.sum(case((CallRecord.status_code < 300, 1), else_=0)).label("ok"),
+            func.sum(case((good, 1), else_=0)).label("ok"),
             # 5xx, plus the one 4xx the caller cannot possibly have caused: 405. On a CATALOG call
             # the method is not the caller's to choose — `_resolve_marketplace_call` refuses a
             # mismatch with a 400 BEFORE anything is relayed — so a 405 that came back from the
@@ -319,13 +331,13 @@ async def observed(
             # surface, and lumping it in with "the caller sent bad parameters" is what let seven
             # straight 405s keep reading as `WORKS — (7)` — the exact row the 2026-08-17 report
             # could not interpret.
-            func.sum(case(((CallRecord.status_code >= 500) | (CallRecord.status_code == 405), 1),
+            func.sum(case(((CallRecord.status_code >= 500) | (CallRecord.status_code == 405) | empty, 1),
                           else_=0)).label("bad"),
             # LAST OK means last SUCCESS. This was `max(created_at)` over every row, success or
             # not — so an endpoint that had been called seven times today and failed every one
             # read "LAST OK: today", which is the opposite of the truth and exactly how a broken
             # row passes for a merely new one.
-            func.max(case((CallRecord.status_code < 300, CallRecord.created_at))).label("last_ok"),
+            func.max(case((good, CallRecord.created_at))).label("last_ok"),
             # HIT RATE: the adapter's verdict (`hit`), plus — for per-success endpoints, which bill
             # only when they found something — the provider's own zero-cost signal on rows written
             # before the column existed. `per_success` says which endpoints the fallback applies to.
@@ -347,7 +359,7 @@ async def observed(
     lat = (await db.execute(
         select(CallRecord.endpoint_id, CallRecord.duration_ms)
         .where(CallRecord.endpoint_id.in_(ids), CallRecord.created_at >= since,
-               CallRecord.duration_ms.is_not(None), CallRecord.status_code < 300)
+               CallRecord.duration_ms.is_not(None), good)
         .limit(_MAX_ROWS)
     )).all()
     by_id: dict[str, list[int]] = {}

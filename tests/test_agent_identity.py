@@ -23,7 +23,7 @@ from sqlmodel import select
 
 from conftest import make_upstream
 
-from treg import crypto
+from treg import audit, crypto
 from treg.api import app
 from treg.infra.db import reset_db, session_maker
 from treg.models import IdempotentCall, Membership, Org, User
@@ -228,10 +228,15 @@ async def test_agent_inherits_its_own_daily_cap(env):
     assert (await env.c.get("/call/alpha/ok", headers=_h(env.owner))).status_code == 200
 
 
-async def test_agent_traffic_is_attributed_to_the_agent(env):
+@pytest.mark.parametrize("defer_audit", [False, True])
+async def test_agent_traffic_is_attributed_to_the_agent(env, monkeypatch, defer_audit):
     """Per-agent logging falls out of identity: CallRecord already stamps user_email."""
+    if defer_audit:
+        # A call can finish before its background audit writer gets a turn.
+        monkeypatch.setattr(audit, "_schedule", lambda coro: coro.close())
     a = await _agent(env, name="logger")
     assert (await env.c.get("/call/alpha/ok", headers=_h(a["token"]))).status_code == 200
+    await audit.drain()  # Attribution reads persisted audit rows, not response completion.
     calls = (await env.c.get("/calls", headers=_h(env.owner))).json()
     assert any(c["user_email"] == a["email"] and c["tool_name"] == "alpha" for c in calls), calls
 

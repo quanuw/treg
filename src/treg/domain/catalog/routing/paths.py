@@ -118,6 +118,15 @@ def at_least(v: Any, floor: Any) -> Any:
         return floor
 
 
+def ceil_to(v: Any, step: Any) -> Any:
+    """Round a caller's limit UP to a provider's step (results come in pages of 10): 25 -> 30."""
+    try:
+        s = int(step)
+        return max(s, -(-int(v) // s) * s)
+    except (TypeError, ValueError):
+        return step
+
+
 def at_most(v: Any, ceiling: Any) -> int:
     """Cap a provider's page size while keeping the routed quote at that same maximum."""
     try:
@@ -297,7 +306,7 @@ def starts_with(v: Any, prefix: Any) -> bool:
 
 TRANSFORMS = {"values": values, "get": get_path, "null_if": null_if, "choose": choose, "split_first": split_first, "split_last": split_last, "join": join, "has_type": has_type, "len": length,
               "dfs_location": dfs_location, "seranking_source": seranking_source, "lower": lower, "upper": upper,
-              "list": as_list, "at_least": at_least, "at_most": at_most, "linkedin_handle": linkedin_handle, "linkedin_url": linkedin_url,
+              "list": as_list, "at_least": at_least, "at_most": at_most, "ceil_to": ceil_to, "linkedin_handle": linkedin_handle, "linkedin_url": linkedin_url,
               "email_domain": email_domain, "host": host, "fmt": fmt, "obj": obj, "tca_filter": tca_filter, "csv": csv, "country_name": country_name,
               "e164_digits": e164_digits, "starts_with": starts_with, "with_country_code": with_country_code}
 

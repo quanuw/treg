@@ -52,9 +52,10 @@ class PostgresEndpointObservationReader:
     """Authoritative reader whose session exists only for one small read.
 
     Once `treg-worker catalog stats` has caught up with the audit table (the cursor row says so),
-    a synchronous observation is thirty `EndpointDayStat` rows per endpoint, summed and published
-    through the same floors as the live aggregate. Async endpoints still read `CallRecord` live
-    because their terminal hit can arrive after the fold cursor passes the submission. Until then,
+    an observation is read from `EndpointDayStat` rows, summed and published through the same floors
+    as the live aggregate. Async endpoints with result adapters still read `CallRecord` live because
+    their terminal hit can arrive after the fold cursor passes the submission. Async endpoints
+    without adapters have no terminal hit correction and use the day buckets too. Until then,
     on any deployment that never schedules the
     worker, and whenever the worker has not run for `STALE_AFTER_S` (it stopped, or every run is
     failing), it is the live thirty-day aggregate over `callrecord` it always was, so the numbers
@@ -73,14 +74,15 @@ class PostgresEndpointObservationReader:
         from ..models import EndpointDayStat, EndpointStatCursor
         from ..timeutil import utcnow_naive
         cat = catalog_store.load()
-        async_ids = [i for i in ids if (cat.by_id.get(i) or {}).get("async")]
-        folded_ids = [i for i in ids if i not in async_ids]
-        # An async submission can finish after the fold cursor has consumed its audit row.
-        # Read those endpoints live so the terminal correction is visible to routing.
+        async_ids = {i for i in ids if (cat.by_id.get(i) or {}).get("async")}
+        # Only an async endpoint with a result adapter can correct its hit after submission.
+        # Keep it live even if the adapter loses verification, to retain recorded terminal hits.
+        live_async_ids = [i for i in ids if i in async_ids and i in cat.adapters]
+        folded_ids = [i for i in ids if i not in live_async_ids]
         # Async per-success endpoints use the terminal verdict exclusively. A completed
         # hit can report zero credits, so charge-based miss inference would skew routing.
-        per_success = {i for i in folded_ids
-                       if ((cat.by_id.get(i) or {}).get("cost") or {}).get("type") == "per_success"}
+        per_success = {i for i in ids if i not in async_ids
+                       and ((cat.by_id.get(i) or {}).get("cost") or {}).get("type") == "per_success"}
         async with self._session_factory() as db:
             cursor = await db.get(EndpointStatCursor, "callrecord")
             if cursor is None or cursor.caught_up_at is None:
@@ -92,8 +94,8 @@ class PostgresEndpointObservationReader:
             rows = (await db.execute(
                 select(EndpointDayStat).where(EndpointDayStat.endpoint_id.in_(folded_ids),
                                               EndpointDayStat.day >= stats.window_days()))).scalars().all()
-            live_async = (await stats.observed(db, async_ids, per_success=set())
-                          if async_ids else {})
+            live_async = (await stats.observed(db, live_async_ids, per_success=set())
+                          if live_async_ids else {})
         # `observed_from` on an entry drops the days before it: the provider replaced the service,
         # and those calls measured the old one.
         since = {i: str((cat.by_id.get(i) or {}).get("observed_from") or "") for i in folded_ids}

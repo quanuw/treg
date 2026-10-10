@@ -72,6 +72,8 @@ def test_fetch_reads_nested_markdown_and_markdown_content_from_catalog_adapters(
         ("branddev.web.scrape", {"url": "https://example.com", "markdown": {
             "requested": True, "success": True, "data": "# Example Domain"}}),
         ("olostep.web.scrape", {"result": {"markdown_content": "# Example Domain"}}),
+        ("parallel.web.extract", {"results": [{"url": "https://example.com", "excerpts": ["Example"],
+                                               "full_content": "# Example Domain"}]}),
     )
     for endpoint, response in examples:
         output = adapters[endpoint].from_upstream(response)
@@ -253,7 +255,10 @@ def test_public_task_previews_show_verified_search_providers(monkeypatch):
     try:
         tasks = {row["id"]: row for row in app.tasks()}
         search = {row["provider"] for row in tasks["search"]["provider_previews"]}
-        assert {"crawl4ai", "exa", "firecrawl", "tavily", "tinyfish", "serper", "spidercloud", "octen"} <= search
+        assert {"crawl4ai", "exa", "firecrawl", "tavily", "tinyfish", "serper", "spidercloud", "octen",
+                "parallel"} <= search
+        fetch = {row["endpoint_id"] for row in tasks["fetch"]["provider_previews"]}
+        assert "parallel.web.extract" in fetch
         news = {row["provider"] for row in tasks["news"]["provider_previews"]}
         assert news == {"anyapi", "cloro", "dataforseo", "exa", "litescrape", "search1api",
                         "serpapi", "serper", "tavily", "tinyfish"}

@@ -30,12 +30,13 @@ flag (so a web portal can log in with either). Returns a principal string (for a
 The dependency lives in `domain.identity.access` and every consumer imports it from there; the
 transitional `api.py` re-export retired with the rest of the stage-3 compatibility surface.
 
-**On the admin pool.** The gate takes `Depends(get_admin_session)`, and so does every `/admin/*`
-handler it guards — 3 connections, no overflow, separate from the API's
-(`ops/deploy.md` § Database pools). It must be the SAME dependency callable on both: FastAPI caches
-dependencies per request by identity, so a gate on `get_session` would put admin traffic back on the
-API pool through the back door. Staff pages are therefore bounded by construction — a panel that
-polls itself into saturation costs admins their own 503s, not the product's.
+**On the admin primary pool.** The gate takes `Depends(get_admin_session)`, shared by handlers
+that use the primary, with a bounded pool separate from the API's (`ops/deploy.md` § Database
+pools). Successful authorization commits before returning, releasing the primary connection.
+Opted-in reports can then use `get_admin_read_session`: the configured read database, or the
+original admin pool when no read URL is set. Neither path uses the API pool. A configured reader
+failure never retries on the primary. Authorization always checks the primary so replication lag
+does not delay suspension or permission revocation.
 
 The cross-tenant read, mutation, and reconciliation handlers live in three ordered blocks in
 `routers.admin`. The mutation block shares the org deletion and member-rule cleanup helpers from
@@ -55,7 +56,10 @@ endpoints are unaffected (they use `require_superadmin`).
   call volume + success rate, `growth` counts — computed in-process over small result sets),
   `admin_orgs` (every org + member/role/tool/secret/bundle counts), `admin_org_detail`,
   `admin_users` (+ their memberships), `admin_tools`, `admin_calls`, `admin_share` (per job over the
-  last `minutes`: requests asked, and 2xx answers per provider, direct or as a routed attempt),
+  last `minutes`: requests asked, and the answers callers got per provider: a direct call's 2xx
+  that its adapter did not judge a miss, and only the last attempt of a routed parent that
+  succeeded; `teams` gives the same answers per team: teams served per provider, the share
+  averaged over teams, and the direct and routed team counts),
   `admin_health` (non-`ok` secrets).
 - **Failure evidence:** `admin_errors` (`?days=7&limit=100&provider=&status=&tier=`) — failed calls at
   every credential tier, including plain own tools (`tier: null`), with `CallRecord.error_request` /
@@ -64,7 +68,8 @@ endpoints are unaffected (they use `require_superadmin`).
   own tools. Superadmin and not org-admin
   because the rows hold customers' request content; `GET /calls` deliberately does **not** expose
   these columns, and it defers them so they are not even fetched. The route is read-only: the
-  14-day retention purge (blanking both columns to `'<expired>'`) is the `treg-worker admin
+  evidence and org-name queries use `get_admin_read_session` and may reflect replication lag.
+  The 14-day retention purge (blanking both columns to `'<expired>'`) is the `treg-worker admin
   purge-evidence` cron (`application/evidence_retention.py`), in bounded batches. A row past the
   window is listed as `expired` with no evidence even before the cron reaches it.
 - **Reconciliation (Phase 5):** `admin_reconcile_drift|spend|repeats` (`?since_days=30`) — cross-org

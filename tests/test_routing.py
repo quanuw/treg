@@ -190,6 +190,32 @@ def test_you_web_adapters_are_verified_routed_children():
         assert child in cat.by_id[parent]["routed_children"], (parent, child)
 
 
+def test_parallel_adapters_are_routed_and_an_excerpt_only_page_is_a_hit():
+    cat = catalog_store.load()
+    for parent, child in (
+        ("treg.web.search", "parallel.web.search"),
+        ("treg.web.extract", "parallel.web.extract"),
+        ("treg.people.search", "parallel.people.search"),
+        ("treg.companies.search", "parallel.companies.search"),
+    ):
+        assert cat.adapters[child].verified, (child, cat.adapters[child].verify_note)
+        assert child in cat.by_id[parent]["routed_children"], (parent, child)
+    # A direct Extract without full_content still returns billed excerpts; only an empty page or
+    # an unreadable URL (results [], errors[]) is the free miss.
+    extract = cat.adapters["parallel.web.extract"]
+    assert not extract.is_miss({"results": [{"url": "u", "excerpts": ["text"], "full_content": None}]})
+    assert not extract.is_miss({"results": [{"url": "u", "excerpts": [], "full_content": "text"}]})
+    assert extract.is_miss({"results": [{"url": "u", "excerpts": [], "full_content": None}]})
+    assert extract.is_miss({"results": [], "errors": [{"url": "u", "error_type": "connect_error"}]})
+    # A multi-URL call is never judged by its first page: a later page may have text.
+    assert not extract.is_miss({"results": [{"url": "a", "excerpts": [], "full_content": None},
+                                            {"url": "b", "excerpts": ["text"], "full_content": "text"}]})
+    # With several pages, an explicitly empty usage[] is the miss; an absent one is unobserved.
+    empty = {"url": "a", "excerpts": [], "full_content": None}
+    assert extract.is_miss({"results": [empty, empty], "usage": []})
+    assert not extract.is_miss({"results": [empty, empty]})
+
+
 def test_search_adapter_does_not_treat_an_answer_without_results_as_a_miss():
     adapter = catalog_store.load().adapters["linkup.web.search"]
     assert adapter.verified
@@ -1822,6 +1848,52 @@ async def test_crawl4ai_answers_scrape_and_search_first_by_default(clients, monk
         assert seen[0][3] == first_seen
     else:
         assert seen[0][2] == {"q": "rust web crawler"}
+    get_settings.cache_clear()
+
+
+async def test_a_declared_not_found_ends_the_job_and_an_empty_page_is_a_miss(clients, monkeypatch):
+    """A scraped page that does not exist: the first provider's declared "the site answered 404"
+    (`not_found:`) ends the call with that 404, charging nothing, instead of asking providers that
+    answer the same page with an empty "success". An empty page is a miss, so the job goes on."""
+    monkeypatch.setenv("TREG_PLATFORM_KEY_CRAWL4AI", "PLATFORM-C4AI")
+    monkeypatch.setenv("TREG_PLATFORM_KEY_FIRECRAWL", "PLATFORM-FIRECRAWL")
+    monkeypatch.setenv("TREG_PLATFORM_PROVIDERS", "crawl4ai,firecrawl")
+    get_settings.cache_clear()
+    seen = []
+    monkeypatch.setattr(call_service, "relay", _relay_by_provider(
+        {"crawl4ai": [(404, {"ok": False, "reason": "origin-error:404"})], "*": [(200, {"data": {"markdown": ""}})]}, seen))
+    before = await _balance(clients)
+    r = await clients.post("/call/treg.web.extract", json={"url": "https://example.com/gone"})
+    assert r.status_code == 404 and r.json()["detail"]["error"] == "route_not_found", r.text
+    assert [s[0] for s in seen] == ["crawl4ai"], "no other provider is asked"
+    assert [t["outcome"] for t in r.json()["detail"]["tried"]] == ["not_found"]
+    assert await _balance(clients) == before
+    # a 404 that is not the site's own answer keeps its old meaning: the job goes on
+    seen.clear()
+    monkeypatch.setattr(call_service, "relay", _relay_by_provider(
+        {"crawl4ai": [(404, {"ok": False, "reason": "something-else"})], "*": [(200, {"data": {"markdown": ""}})]}, seen))
+    r = await clients.post("/call/treg.web.extract", json={"url": "https://example.com/gone"})
+    assert [s[0] for s in seen] == ["crawl4ai", "*"]
+    assert r.status_code == 502 and r.json()["detail"]["tried"][-1]["outcome"] == "miss", "an empty page is a miss, not a hit"
+    get_settings.cache_clear()
+
+
+async def test_google_organic_asks_crawl4ai_first_and_falls_back_when_it_is_empty(clients, monkeypatch):
+    """The routed Google organic job sends crawl4ai the query, country, language and the depth rounded
+    up to whole Google pages; an empty answer is a miss and the next provider answers."""
+    monkeypatch.setenv("TREG_PLATFORM_KEY_CRAWL4AI", "PLATFORM-C4AI")
+    monkeypatch.setenv("TREG_PLATFORM_KEY_ANYAPI", "PLATFORM-ANYAPI")
+    monkeypatch.setenv("TREG_PLATFORM_PROVIDERS", "crawl4ai,anyapi")
+    get_settings.cache_clear()
+    seen = []
+    monkeypatch.setattr(call_service, "relay", _relay_by_provider({
+        "crawl4ai": [(200, {"results": [], "empty_reason": "rescue_no_results"})],
+        "*": [(200, {"output": {"data": {"results": [{"title": "t", "link": "https://example.com"}]}}})]}, seen))
+    r = await clients.post("/call/treg.google.serp.organic", json={"q": "pizza", "country": "PL", "language": "pl", "limit": 25})
+    assert r.status_code == 200, r.text
+    assert seen[0][0] == "crawl4ai" and seen[0][2] == {"q": "pizza", "country": "pl", "language": "pl", "num": "30"}
+    assert [t["outcome"] for t in r.json()["_treg"]["tried"]] == ["miss", "hit"]
+    assert r.json()["_treg"]["provider"] == "anyapi"
     get_settings.cache_clear()
 
 

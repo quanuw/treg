@@ -4559,6 +4559,27 @@ def cmd_org_overflow(args, cfg) -> None:
           f"aggregator account — disclosed, real price){_R}\n")
 
 
+def cmd_org_archive(args, cfg) -> None:
+    """Show or set whether this team takes part in treg's archive of answers. Off = no new call of
+    the team's is answered from or recorded into the archive, so metered calls lose the repeat
+    price; own keys stay free."""
+    with _client(cfg) as c:
+        org_id = _active_org_id(cfg, c)
+        if org_id is None:
+            sys.exit("no active org")
+        if args.state is None:
+            r = c.get(f"/orgs/{org_id}/settings")
+        else:
+            r = c.patch(f"/orgs/{org_id}/settings", json={"archive": args.state == "on"})
+    if _JSON_OVERRIDE or r.status_code >= 400:
+        _show(r)
+        return
+    on = r.json().get("archive", True)
+    print(f"\n  archive: {_A if on else _AM}{'on' if on else 'off'}{_R}"
+          f"  {_M}(off: new calls are neither answered from nor stored in the archive; metered "
+          f"calls lose the repeat price){_R}\n")
+
+
 def cmd_org_budget_set(args, cfg) -> None:
     """Set (or update) one tag's limit. Unsent fields are left alone, so `--block` keeps the caps."""
     body: dict = {}
@@ -6455,6 +6476,10 @@ def build_parser() -> argparse.ArgumentParser:
                              "relay when treg's own account is out (admin+).",
              "treg org overflow", "treg org overflow off")
     oov.add_argument("state", nargs="?", choices=["on", "off"], help="omit to show"); oov.set_defaults(fn=cmd_org_overflow)
+    oar = mk(og, "archive", "Show or set whether this team takes part in treg's archive of answers; off "
+                            "means new calls are neither answered from nor stored in it (admin+).",
+             "treg org archive", "treg org archive off")
+    oar.add_argument("state", nargs="?", choices=["on", "off"], help="omit to show"); oar.set_defaults(fn=cmd_org_archive)
     osr = mk(og, "set-role", "Change a member's role (owner only).", "treg org set-role 5 admin")
     osr.add_argument("user_id", type=int, help="the member's user id (from `org members`)")
     osr.add_argument("role", choices=["viewer", "member", "admin", "owner"], help="the new role"); osr.set_defaults(fn=cmd_org_set_role)

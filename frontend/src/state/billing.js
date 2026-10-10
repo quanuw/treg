@@ -64,6 +64,14 @@ async toggleBlock(b){ this.budErr='';
 async removeBudget(b){ this.budErr='';
       try{ await this.api(this._budgetUrl(b.dim, b.val), {method:'DELETE'}); await this._reloadBudgets();
       }catch(e){ this.budErr=this._errMsg(e, 'could not remove that'); } },
+// The archive opt-out (archive.md, "Opting out"). `capCfg` is the whole settings document, so the
+// reply replaces it.
+async setArchive(on){ this.archiveBusy=true; this.archiveErr='';
+      try{
+        this.capCfg=await this.api(`/orgs/${this.activeOrgId}/settings`,
+          {method:'PATCH', headers:{'content-type':'application/json'}, body:JSON.stringify({archive:!!on})});
+      }catch(e){ this.archiveErr=this._errMsg(e, 'could not change that'); }
+      finally{ this.archiveBusy=false; } },
 async saveCap(){ this.capBusy=true; this.capErr='';
       try{
         const micro=Math.round(parseFloat(this.capUsd||'0')*1e6);

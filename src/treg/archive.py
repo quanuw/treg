@@ -30,6 +30,7 @@ import hashlib
 import json
 from typing import Any
 from collections import Counter
+from collections.abc import Iterable
 from urllib.parse import parse_qsl
 
 from .config import get_settings
@@ -1480,38 +1481,60 @@ async def _lookup_key(kh: str, *, entry, endpoint_id: str, result_aware: bool,
             "key_hash": kh, "content_hash": newest.content_hash, "version": newest.version}
 
 
-async def note_org_use_in_transaction(db, org_id: int, key_hash: str) -> None:
-    """Remember that `org_id` has now paid for the question `key_hash` - staged in the CALLER's
-    transaction (the metered settle's), so the row lands with the charge or not at all. First
-    write inserts; a later one bumps the counter. Two first calls racing on the same (org, key)
-    are confined to a savepoint: the loser updates instead of failing the settle. An
-    IntegrityError that is NOT that race (nothing to update afterwards) is re-raised: a mark
-    must never be lost silently."""
-    from sqlalchemy import select, update
-    from sqlalchemy.exc import IntegrityError
+_ORG_USE_CHUNK_SIZE = 100  # Bound statement size and stay below SQLite's smaller parameter limits.
+
+
+async def note_org_uses_in_transaction(db, uses: Iterable[tuple[int, str]]) -> None:
+    """Count paid questions in the caller's transaction, without per-question round trips.
+
+    Combine repeats before UPSERT: PostgreSQL cannot update the same conflict key twice in one
+    statement. All chunks lock in the same Org/key order and commit together with the money;
+    errors other than the expected unique-key race must still fail the caller's transaction.
+    """
+    from sqlalchemy import func, select
 
     from .models import ArchiveKeyOrg
 
+    counts = Counter(uses)
+    if not counts:
+        return
+    dialect = db.get_bind().dialect.name
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    elif dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
+    else:
+        raise RuntimeError(f"unsupported database dialect: {dialect}")
     now = _utcnow()
-    existing = (await db.execute(
-        select(ArchiveKeyOrg.id).where(ArchiveKeyOrg.org_id == org_id,
-                                       ArchiveKeyOrg.key_hash == key_hash).limit(1))).first()
-    lost_race: IntegrityError | None = None
-    if existing is None:
-        try:
-            async with db.begin_nested():
-                db.add(ArchiveKeyOrg(org_id=org_id, key_hash=key_hash,
-                                     first_call_at=now, last_call_at=now, calls=1))
-                await db.flush()
-            return
-        except IntegrityError as exc:
-            lost_race = exc  # presumably the other first call won; count this one below
-    bumped = await db.execute(
-        update(ArchiveKeyOrg)
-        .where(ArchiveKeyOrg.org_id == org_id, ArchiveKeyOrg.key_hash == key_hash)
-        .values(calls=ArchiveKeyOrg.calls + 1, last_call_at=now))
-    if bumped.rowcount == 0 and lost_race is not None:
-        raise lost_race  # not the race after all: no row to count, so the failure is real
+    rows = []
+    for (org_id, key_hash), count in sorted(counts.items()):
+        row = dict(org_id=org_id, key_hash=key_hash, first_call_at=now, last_call_at=now,
+                   calls=count)
+        if dialect == "postgresql":
+            # A normal UPSERT consumes the serial sequence even for an existing key. Reuse its
+            # immutable id inside this statement; COALESCE allocates only when the snapshot has
+            # no row. Concurrent first inserts can still consume an id before ON CONFLICT wins.
+            row["id"] = func.coalesce(
+                select(ArchiveKeyOrg.id).where(
+                    ArchiveKeyOrg.org_id == org_id, ArchiveKeyOrg.key_hash == key_hash,
+                ).scalar_subquery(),
+                func.nextval(func.pg_get_serial_sequence("archivekeyorg", "id")),
+            )
+        rows.append(row)
+    for start in range(0, len(rows), _ORG_USE_CHUNK_SIZE):
+        statement = insert(ArchiveKeyOrg).values(rows[start:start + _ORG_USE_CHUNK_SIZE])
+        result = await db.execute(statement.on_conflict_do_update(
+            index_elements=[ArchiveKeyOrg.org_id, ArchiveKeyOrg.key_hash],
+            set_={"calls": ArchiveKeyOrg.calls + statement.excluded.calls,
+                  "last_call_at": statement.excluded.last_call_at},
+        ).returning(ArchiveKeyOrg).execution_options(populate_existing=True))
+        # Refresh any mark already loaded by the caller, just as the previous ORM UPDATE did.
+        result.scalars().all()
+
+
+async def note_org_use_in_transaction(db, org_id: int, key_hash: str) -> None:
+    """Mark one paid question atomically with its caller's settlement."""
+    await note_org_uses_in_transaction(db, [(org_id, key_hash)])
 
 
 def _touch(key_hash: str) -> None:

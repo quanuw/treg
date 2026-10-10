@@ -42,7 +42,7 @@ goByok(service){
     },
 openProvider(service, fromPop){ this.resetConfirms();
       this.detail=null; this.mkService=service; this.view='provider'; this.drawerTool=null;
-      if(!this.catalogLegacy) this.loadProviderTools(service);   // the control arm shows platform chips instead
+      this.loadProviderTools(service);
       if(!fromPop) history.pushState({mk:service}, '', '/app/marketplace/'+encodeURIComponent(service));
       // The consent popup can return before /connections has been re-read, and a deep link may
       // arrive before the first load — either way the page needs the data it renders from.

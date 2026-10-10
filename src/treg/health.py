@@ -15,7 +15,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from . import crypto, oauth
+from . import crypto, oauth, oauth_providers
 from .infra.upstream import injectors
 from .infra.upstream.ssrf import host_is_public, safe_webhook_url
 from .models import Invite, Membership, PendingOAuth, Secret, Tool, User
@@ -150,6 +150,10 @@ async def run_all(db: AsyncSession, client: httpx.AsyncClient, org_id: int | Non
         try:
             smap = {sid: secrets[sid] for b in tool.bindings
                     if (sid := b.get("secret_id")) is not None and sid in secrets}
+            if any(oauth_providers.is_paused(s.provider) for s in smap.values()):
+                # Paused on this deployment: no refresh, no probe, no verdict. The provider would
+                # fail every check, and the connection must be intact when the pause is lifted.
+                continue
             oauth_bad = False
             for sid, s in smap.items():
                 if s.kind == "oauth":
@@ -197,7 +201,8 @@ async def run_all(db: AsyncSession, client: httpx.AsyncClient, org_id: int | Non
     # Expiry is swept over EVERY oauth secret, not just the ones a tool probe touched: a credential
     # can be unbound, unprobed, and perfectly healthy while still days from dying. That is exactly
     # the case the probe path cannot see.
-    expiring = [s for s in secrets.values() if needs_reconnect(s)]
+    expiring = [s for s in secrets.values()
+                if needs_reconnect(s) and not oauth_providers.is_paused(s.provider)]
     await _notify(invalid, db, client)
     return {
         "checked": len(evaluated),

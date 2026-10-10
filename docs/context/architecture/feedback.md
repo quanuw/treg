@@ -68,9 +68,9 @@ CLI `cmd_feedback` sends the same payload to its configured registry, reading a 
 from stdin when the message argument is `-` (a terminal is rejected instead of blocking).
 `cmd_feedback_get` retrieves a report through the same team-scoped HTTP read. The CLI rejects
 empty or oversized messages locally and emits structured errors without echoing rejected input;
-transport failures leave submission outcomes explicitly unconfirmed. Both MCP surfaces expose `feedback` with an enum in
-their input schema, relay to the same HTTP intake, and declare a non-destructive, non-idempotent
-local write. Their existing call permissions and transport boundaries remain distinct.
+transport failures leave submission outcomes explicitly unconfirmed. The team `/mcp/` exposes `feedback` with an enum in
+its input schema, relays to the same HTTP intake, and declares a non-destructive, non-idempotent
+local write. `/mcp/v2/` does not expose it: its tools match the Claude directory submission.
 
 `skill.md` mentions feedback in its description and links to `{BASE}/feedback.md`, served by
 `feedback_md` with the deployment's base URL. Detailed syntax and privacy guidance live in that
@@ -153,8 +153,10 @@ and returns `review`, `feedback` or nothing. The router writes it as `X-Treg-Hin
 emits one `hint_attached` analytics event per invitation actually sent, with `kind`, `call_id`,
 `endpoint_id`, the caller's `X-Treg-Client` and the team group. Every surface only translates the
 header: plain HTTP callers read it themselves, the CLI prints one stderr line per kind next to the
-charge line, and both MCP transports render it into their single hint slot with priority
-replay > 402 > review > feedback. Neither MCP transport samples or records anything of its own.
+charge line, and the team `/mcp/` renders it into its single hint slot with priority
+replay > 402 > review > feedback. `/mcp/v2/` has no `review` or `feedback` tool and renders neither
+invitation, like OpenAI's clients on `/mcp/`; for those callers `hint_attached` counts an invitation
+the agent never saw. Neither MCP transport samples or records anything of its own.
 
 A **review** invitation needs a direct catalog call served on treg's own platform key
 (`context.marketplace` exists and its `tier` is `platform`), a 2xx status, no idempotent replay,
@@ -182,8 +184,19 @@ atomic `INCR` + `EXPIRE NX`. Reads and writes are capped at 100 ms and **fail cl
 that cannot answer is a spent budget, so an outage silently withholds review invitations rather
 than flooding a team, and `hint_attached` events dropping to zero is the signal. `/admin/kv`
 (superadmin) reports `configured` and `reachable`; startup logs a warning when the configured
-store does not answer. The store is the invitation budget's tenant only; a new tenant is one
-more narrow method, not a generic get/set surface.
+store does not answer. Optional [money admission](money.md#optional-admission-before-the-settlement-session)
+is a separate tenant using `acquire_lease`, `renew_lease` and `release_lease`, with explicit
+contention, lost-ownership and unavailable results. Its owner-checked Redis lease operations are
+bounded at twice `_TIMEOUT_S`; the local counter store reports leases unavailable rather than
+claiming cross-process exclusion. Money admission falls back to database protection on store
+failure, whereas invitation budgets still fail closed. New tenants add narrow methods, not a
+generic get/set surface.
+
+Lease failures retain fixed phase/type counts and client-observed maximum elapsed time in at most
+21 in-memory buckets. `kv.drain_lease_errors` hands these to the existing money diagnostic runner
+once per reporting window and at worker exit; no lease call writes logs or sends analytics.
+Exception messages, keys, owner tokens and store URLs are never retained. See
+[diagnostic transport and limits](data-model.md#product-analytics-writer-analyticspy).
 
 Each surface's server `instructions` field also tells agents, in one sentence, to rate an
 invited call with `review(call_id, usefulness, reason?)` after using it and then continue, one

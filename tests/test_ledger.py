@@ -936,7 +936,7 @@ async def test_concurrent_settles_lock_by_id_but_consume_by_business_priority(c,
             return await ledger.settle(db, call_id)
     assert await asyncio.gather(settle('ordered-one'), settle('ordered-two')) == [1000, 1000]
     assert len(statements) == 2
-    assert all('ORDER BY creditblock.id FOR UPDATE' in sql for sql in statements)
+    assert all('ORDER BY creditblock.org_id, creditblock.id FOR UPDATE' in sql for sql in statements)
     async with session_maker() as db:
         blocks = await ledger.blocks_of(db, org_id)
         assert {b.id: b.remaining_micro for b in blocks} == {'a-new': 1000, 'b-old': 0, 'z-promo': 0}

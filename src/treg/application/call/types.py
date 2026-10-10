@@ -50,12 +50,15 @@ _BLAME_BY_KIND: dict[str, Blame] = {
     # treg's OWN vendor account for the provider is out (balance/quota) — a 503 the caller cannot
     # fix, answered before any hold exists, with the same-capability alternatives named.
     "provider_capacity": "treg",
+    # This deployment paused the provider (TREG_PAUSED_PROVIDERS): refused before any hold.
+    "provider_paused": "treg",
     # Routed endpoints (treg.<capability>): the caller's identity fits no provider, or the
     # ceiling they set is below the cheapest candidate, or every candidate failed.
     "route_no_candidate": "caller",
     "route_max_cost": "caller",
     "route_failed": "upstream",
     "route_caller_fault": "caller",
+    "route_not_found": "caller",       # the requested page or record does not exist at its source
     "injection_failed": "treg",
     "ssrf_refused": "treg",
     "connect_failed": "upstream",
@@ -151,6 +154,7 @@ class OrgSnapshot:
     autotopup_monthly_cap_micro: int
     first_call_at: Any
     autotopup_max_per_hour: int = 0
+    archive_opt_out_at: Any = None   # set = the team opted out of the archive (archive.md)
 
 
 @dataclass(frozen=True)
@@ -210,6 +214,7 @@ class CallerSnapshot:
                 autotopup_amount_micro=org.autotopup_amount_micro,
                 autotopup_monthly_cap_micro=org.autotopup_monthly_cap_micro,
                 autotopup_max_per_hour=int(getattr(org, 'autotopup_max_per_hour', 0) or 0),
+                archive_opt_out_at=getattr(org, 'archive_opt_out_at', None),
                 first_call_at=org.first_call_at,
             ),
             api_key_id=key.id if key else None,

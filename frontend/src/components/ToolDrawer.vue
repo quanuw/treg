@@ -42,11 +42,13 @@ export default {
 
     <!-- The primary button is the next step to your agent using this tool (`drawerNext`): connect the
          account or add the key it needs, else hand it the line. Trying it here is optional. -->
-    <div v-if="drawerEp.call_template" class="pl-code"><code>{{drawerEp.call_template}}</code></div>
+    <!-- Paused on this deployment: say so in place of the call line and the buttons that lead to it. -->
+    <p v-if="drawerNext==='paused'" class="mk-notice">{{providerPaused(drawerEp.provider).message}}</p>
+    <div v-else-if="drawerEp.call_template" class="pl-code"><code>{{drawerEp.call_template}}</code></div>
     <div class="td-act">
       <button v-if="drawerNext==='connect'" class="pl-btn" @click="catalogConnect(drawerEp)">{{endpointConnectLabel(drawerEp)}}</button>
       <button v-else-if="drawerNext==='key'" class="pl-btn" @click="catalogByok(drawerEp.provider, drawerEp)">Add your {{drawerEp.provider_display||drawerEp.provider}} key</button>
-      <button v-if="drawerEp.call_template" class="pl-btn pl-copy" :class="{ghost:drawerNext!=='copy'}" @click="catalogCopy(drawerEp)">{{platCopied===drawerEp.id ? 'Copied' : 'Copy for your agent'}}</button>
+      <button v-if="drawerEp.call_template && drawerNext!=='paused'" class="pl-btn pl-copy" :class="{ghost:drawerNext!=='copy'}" @click="catalogCopy(drawerEp)">{{platCopied===drawerEp.id ? 'Copied' : 'Copy for your agent'}}</button>
       <button v-if="drawerNext==='copy'" class="pl-btn" :class="{ghost:!!drawerEp.call_template}" @click="catalogTry(drawerEp)">Try it</button>
       <a v-if="drawerEp.docs_url || provFact(drawerEp.provider,'pricing_url')" class="pl-link" :href="drawerEp.docs_url || provFact(drawerEp.provider,'pricing_url')"
          target="_blank" rel="noopener" @click="catalogDocs(drawerEp)">{{drawerEp.docs_url ? 'Docs' : 'Pricing'}} ↗</a>

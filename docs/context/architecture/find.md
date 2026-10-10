@@ -82,7 +82,8 @@ none, and the page lists only the vendors the lexical order happened to reach.
   has none. The long-term fix for a member that does another job is its own capability.
 - **uncatalogued endpoint**: no capability; its own unit.
 
-Only the browse surface (`store.browsable`, no routed parents). A first-party endpoint may share its
+Only the browse surface (`store.browsable`, no routed parents, no paused provider: `store.paused`,
+see catalog.md § Paused providers). A first-party endpoint may share its
 capability's id, so the index keeps jobs (`job_pos`) and endpoints (`pos`) apart.
 
 **Channels.** A lexical channel scores each unit with the idf of every query word its card holds as

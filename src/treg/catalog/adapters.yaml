@@ -767,6 +767,13 @@ adapters:
     const: {body.category: people}
     out: {people: results, count: "len(results)"}
     miss: "results == []"
+  parallel.people.search:
+    accepts: [[q]]
+    in: {q: body.objective}
+    in_expr: {body.objective: "join(q, csv(keywords))", body.match_limit: "at_least(at_most(limit, 100), 5)"}
+    const: {body.entity_type: people}
+    out: {people: entities, count: "len(entities)"}
+    miss: "coalesce(entities, []) == []"
   icypeas.people.search:
     accepts: [[company_domain, title], [company_domain], [title]]
     in:  {company_domain: body.query.currentCompanyWebsite.include, title: body.query.currentJobTitle.include}
@@ -1107,6 +1114,13 @@ adapters:
     const: {body.category: company}
     out: {companies: results, count: "len(results)"}
     miss: "results == []"
+  parallel.companies.search:
+    accepts: [[q]]
+    in: {q: body.objective}
+    in_expr: {body.match_limit: "at_least(at_most(limit, 100), 5)"}
+    const: {body.entity_type: companies}
+    out: {companies: entities, count: "len(entities)"}
+    miss: "coalesce(entities, []) == []"
   oceanio.companies.search:
     # Domain only: industries take Ocean.io's exact vocabulary (free text is a false miss) and
     # technologies is an object, not a list.
@@ -2735,6 +2749,12 @@ adapters:
           followers: output.data.followerCount, connections: output.data.connectionsCount,
           about: output.data.about, linkedin_url: output.data.url}
     miss: "output.found == false"
+  crawl4ai.google.serp.organic:
+    accepts: [[q]]
+    in: {q: queryParams.q}
+    in_expr: {queryParams.country: "lower(country)", queryParams.language: "lower(language)", queryParams.num: "at_most(ceil_to(limit, 10), 100)"}
+    out: {results: results, count: "len(results)"}
+    miss: "coalesce(results, []) == []"
   anyapi.google.serp.organic:
     accepts: [[q]]
     in:  {q: body.query}
@@ -2920,6 +2940,13 @@ adapters:
     in_expr: {body.count: limit}
     out: {results: data.results, count: "len(data.results)"}
     miss: "coalesce(data.results, []) == []"
+  parallel.web.search:
+    accepts: [[q]]
+    in_expr: {body.search_queries: "list(q)", body.advanced_settings.max_results: "at_most(limit, 20)"}
+    test_identity: {q: "python requests library", limit: 2}
+    const: {body.mode: fast}
+    out: {results: results, count: "len(results)"}
+    miss: "coalesce(results, []) == []"
   crawl4ai.web.search:
     accepts: [[q]]
     in: {q: queryParams.q}
@@ -2942,48 +2969,57 @@ adapters:
     accepts: [[url]]
     in: {url: body.url}
     out: {pages: "list(results)", count: "len(list(results))"}
-    miss: "results == null"
+    miss: "coalesce(results.content, '') == ''"
   you.web.contents:
     accepts: [[url]]
     in_expr: {body.urls: "list(url)"}
     test_identity: {url: "https://example.com"}
     const: {body.formats: [markdown]}
     out: {pages: ".", count: "len(.)"}
-    miss: ". == []"
+    miss: "coalesce([0].markdown, '') == ''"
   tinyfish.web.fetch:
     accepts: [[url]]
     in_expr: {body.urls: "list(url)"}
     test_identity: {url: "https://example.com"}
     const: {body.format: markdown, body.links: true, body.ttl: 0}
     out: {pages: results, count: "len(results)"}
-    miss: "coalesce(results, []) == []"
+    miss: "coalesce(results[0].text, '') == ''"
   exa.web.contents.get:
     accepts: [[url]]
     in_expr: {body.urls: "list(url)"}
     test_identity: {url: "https://en.wikipedia.org/wiki/Hierarchical_navigable_small_world"}
     const: {body.text: true}
     out: {pages: results, count: "len(results)"}
-    miss: "coalesce(results, []) == []"
+    miss: "coalesce(results[0].text, '') == ''"
+  parallel.web.extract:
+    accepts: [[url]]
+    in_expr: {body.urls: "list(url)"}
+    test_identity: {url: "https://example.com"}
+    const: {body.advanced_settings.full_content: true}
+    out: {pages: results, count: "len(results)"}
+    # One page decides alone. With several, an explicitly empty usage[] is the free miss; an
+    # absent usage field is unobserved and keeps the base-price fallback.
+    miss: "choose(results[1] == null, coalesce(results[0].full_content, results[0].excerpts, '') == '', usage == [])"
   olostep.web.scrape:
     accepts: [[url]]
     in: {url: body.url_to_scrape}
     const: {body.formats: [markdown], body.max_age: 604800}
     out: {pages: "list(result)", count: "len(list(result))"}
-    miss: "result == null"
+    miss: "coalesce(result.markdown_content, '') == ''"
   scrapegraphai.web.scrape:
     accepts: [[url]]
     in: {url: body.url}
     test_identity: {url: "https://example.com"}
     const: {body.formats: [{type: markdown}], body.allowedTypes: [text/html]}
     out: {pages: "results.markdown.data", count: "len(results.markdown.data)"}
-    miss: "coalesce(results.markdown.data, []) == []"
+    miss: "coalesce(results.markdown.data[0], '') == ''"
   tavily.web.extract:
     accepts: [[url]]
     in_expr: {body.urls: "list(url)"}
     test_identity: {url: "https://example.com"}
     const: {body.extract_depth: basic}
     out: {pages: results, count: "len(results)"}
-    miss: "coalesce(results, []) == []"
+    miss: "coalesce(results[0].raw_content, '') == ''"
   linkup.web.fetch:
     accepts: [[url]]
     in: {url: body.url}
@@ -2996,7 +3032,7 @@ adapters:
     in: {url: queryParams.url}
     const: {queryParams.live: false}
     out: {pages: "list(.)", count: "len(list(.))"}
-    miss: ". == null"
+    miss: "coalesce(content, '') == ''"
   serper.web.extract:
     accepts: [[url]]
     in: {url: body.url}
@@ -3035,19 +3071,19 @@ adapters:
     in: {url: body.url}
     const: {body.format: md}
     out: {pages: "list(.)", count: "len(list(.))"}
-    miss: "coalesce(markdown, '') == null"
+    miss: "coalesce(markdown, '') == ''"
   firecrawl.web.scrape:
     accepts: [[url]]
     in: {url: body.url}
     const: {body.formats: [markdown], body.parsers: []}
     out: {pages: "list(data)", count: "len(list(data))"}
-    miss: "coalesce(data.markdown, '') == null"
+    miss: "coalesce(data.markdown, '') == ''"
   branddev.web.scrape:
     accepts: [[url]]
     in: {url: body.url}
     const: {body.formats: {markdown: true}}
     out: {pages: "list(.)", count: "len(list(.))"}
-    miss: "markdown.success == false"
+    miss: "coalesce(markdown.data, '') == ''"
 
   search1api.web.sitemap:
     accepts: [[url]]
@@ -3214,3 +3250,109 @@ adapters:
     cost_units: "at_most(limit, 10)"
     out: {companies: results, count: total_result_count}
     miss: "results == []"
+
+  # ---- judge-only: scrape, search and Google organic tools outside the routed jobs -------------
+  # `route: false`: these never join `treg.web.extract` / `treg.web.search` / `treg.google.serp.organic`;
+  # their `miss` judges each answer's hit verdict so `empty_is_failure` holds for every provider
+  # of those capabilities, not only the routed ones.
+  litescrape.web.fetch:
+    route: false
+    accepts: [[url]]
+    in: {url: queryParams.url}
+    out: {pages: "list(.)", count: "len(list(.))"}
+    miss: "coalesce(content, '') == ''"
+  scrapegraphai.web.extract:
+    route: false
+    accepts: [[url]]
+    in: {url: body.url}
+    out: {pages: "list(json)", count: "len(list(json))"}
+    miss: "json == null"
+  valyu.web.contents:
+    route: false
+    accepts: [[url]]
+    in_expr: {body.urls: "list(url)"}
+    test_identity: {url: "https://example.com"}
+    out: {pages: results, count: "len(results)"}
+    miss: "coalesce(results[0].content, '') == ''"
+  limadata.web.extract:
+    route: false
+    accepts: [[url]]
+    in_expr: {body.urls: "list(url)"}
+    test_identity: {url: "https://example.com"}
+    out: {pages: results, count: "len(results)"}
+    miss: "coalesce(results[0].content, '') == ''"
+  spidercloud.web.scrape:
+    route: false
+    accepts: [[url]]
+    in: {url: body.url}
+    out: {pages: ".", count: "len(.)"}
+    miss: "coalesce([0].content, '') == ''"
+  crawl4ai.web.search.rich:
+    route: false
+    accepts: [[q]]
+    in: {q: queryParams.q}
+    out: {results: results, count: "len(results)"}
+    miss: "coalesce(results, []) == []"
+  parallel.web.search.advanced:
+    route: false
+    accepts: [[q]]
+    in_expr: {body.search_queries: "list(q)"}
+    test_identity: {q: "python requests library"}
+    out: {results: results, count: "len(results)"}
+    miss: "coalesce(results, []) == []"
+  perplexity.web.search:
+    route: false
+    accepts: [[q]]
+    in: {q: body.query}
+    out: {results: results, count: "len(results)"}
+    miss: "coalesce(results, []) == []"
+  scrapegraphai.web.search.extract:
+    route: false
+    accepts: [[q]]
+    in: {q: body.query}
+    out: {results: results, count: "len(results)"}
+    miss: "coalesce(results, []) == []"
+  you.web.search.highlights:
+    route: false
+    accepts: [[q]]
+    in: {q: body.query}
+    out: {results: results.web, count: "len(results.web)"}
+    miss: "coalesce(results.web, []) == []"
+  you.web.search.full_page.cache:
+    route: false
+    accepts: [[q]]
+    in: {q: body.query}
+    out: {results: results.web, count: "len(results.web)"}
+    miss: "coalesce(results.web, []) == []"
+  cloro.google.serp.organic:
+    route: false
+    accepts: [[q]]
+    in: {q: body.query}
+    out: {results: result.organicResults, count: "len(result.organicResults)"}
+    miss: "coalesce(result.organicResults, []) == []"
+  limadata.google.serp.organic:
+    route: false
+    accepts: [[q]]
+    in: {q: body.query}
+    out: {results: organic, count: "len(organic)"}
+    miss: "coalesce(organic, []) == []"
+  litescrape.google.serp.organic:
+    route: false
+    accepts: [[q]]
+    in: {q: queryParams.q}
+    out: {results: organic_results, count: "len(organic_results)"}
+    miss: "coalesce(organic_results, []) == []"
+  serpstat.google.serp.organic:
+    route: false
+    accepts: [[q]]
+    in: {q: body.params.keyword}
+    const: {body.id: "1", body.method: SerpstatKeywordProcedure.getKeywordTop, body.params.se: g_us, body.params.size: 3}
+    out: {results: result.data.top, count: "len(result.data.top)"}
+    miss: "coalesce(result.data.top, []) == []"
+  octen.web.extract:
+    route: false
+    accepts: [[url]]
+    in_expr: {body.urls: "list(url)"}
+    test_identity: {url: "https://example.com"}
+    out: {pages: data.results, count: "len(data.results)"}
+    miss: "coalesce(data.results[0].full_content, data.results[0].highlights, '') == ''"

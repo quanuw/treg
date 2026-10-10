@@ -128,8 +128,8 @@ The workflow skills run on treg, so set it up first (the Quickstart above, or po
 ### Claude.ai connector
 
 The Claude Connectors Directory surface is `https://treg.to/mcp/v2/`. It exposes only curated
-catalog endpoints and separates read calls from write calls so Claude receives accurate safety
-signals. The existing `/mcp/` surface remains available for catalog endpoints, team-owned tools,
+catalog endpoints, without image, video or audio generation, and separates read calls from write
+calls so Claude receives accurate safety signals. The existing `/mcp/` surface remains available for catalog endpoints, team-owned tools,
 and imported skills. See the [MCP and OAuth architecture](docs/context/architecture/mcp-oauth.md)
 for the boundary and implementation, and the
 [submission runbook](https://github.com/superdesigndev/treg-internal/blob/main/docs/distribution/CLAUDE-CONNECTOR-SUBMISSION.md) for release gates.

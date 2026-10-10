@@ -27,6 +27,9 @@ sources:
   - src/treg/application/referrals.py
   - src/treg/domain/governance/budgets.py
   - src/treg/infra/__init__.py
+  - src/treg/infra/money_admission.py
+  - src/treg/infra/money_session.py
+  - src/treg/application/hub/runner.py
   - src/treg/infra/stripe.py
   - src/treg/reconcile.py
   - src/treg/domain/referrals.py
@@ -40,6 +43,12 @@ sources:
   - src/treg/routers/orgs.py
   - src/treg/routers/referrals.py
   - tests/test_call_architecture.py
+  - tests/test_money_lock_order.py
+  - tests/test_money_admission.py
+  - tests/test_money_admission_application.py
+  - tests/test_money_admission_postgres.py
+  - tests/test_archive_batch_postgres.py
+  - scripts/bench_money_admission.py
   - tests/test_marketplace_call.py
   - tests/test_asynctasks.py
 related:
@@ -212,11 +221,108 @@ marketing expense and never refundable; purchased credit is a deferred-revenue l
 refundable and disputable - so spending promo first keeps the refundable pool as small as possible
 for as long as possible.
 
-`_consume_blocks` acquires `CreditBlock` row locks with `ORDER BY CreditBlock.id FOR UPDATE`.
-The unique primary-key order is shared by concurrent settlements and prevents opposite scan-order
-locking. It is independent of consumption priority: the subsequent `blocks.sort` still selects
-promotional credit first, then age and ID. Keep both the row lock (which prevents lost deductions)
-and that business sort. This is the repository's sole explicit CreditBlock row-lock query.
+`_consume_blocks` uses `_lock_blocks` to acquire `CreditBlock` row locks with
+`ORDER BY CreditBlock.org_id, CreditBlock.id FOR UPDATE`. The query refreshes any objects already
+in the session's identity map from the locked rows, so a previously read balance cannot overwrite
+a concurrent committed deduction. Lock order is independent of consumption priority: the
+subsequent `blocks.sort` still selects promotional credit first, then age and ID.
+
+### Composing money operations without reversing locks
+
+A single settlement claims its Hold, locks its blocks, and updates Org only when the refund or
+daily-spend delta requires it. Reserve and release keep their existing balance-update timing;
+there is no general Org lock at the start of every money operation.
+
+Several closes in one transaction must use `close_holds_in_transaction` with `HoldClose` items.
+The helper claims all Hold IDs in sorted order before taking any block or balance locks, then
+locks all blocks needed by positive settlements in the order above. It applies the closes in Org
+ID order while preserving each org's original operation and consumption order. It reuses the
+locked block collection: querying again after a balance update could lock a concurrently added
+block in reverse order. Duplicate Hold IDs keep the first operation and later occurrences return
+zero, just as repeated conditional claims did. The caller still owns the one commit or rollback;
+enter this helper before other money writes in the transaction.
+
+`close_deferred` uses that helper, then passes its archive-use marks together to
+`archive.note_org_uses_in_transaction`. The writer combines repeated keys and performs bounded
+upserts in `(org_id, key_hash)` order in the same transaction, reducing database round trips
+after balance locks have been acquired. Every repeated mark still increments the usage counter;
+failure in any chunk rolls back the charges and all marks. Mark ordering also matters for
+zero-cost batches, which may acquire neither block nor balance locks. Cancellation
+compensation closes the parent and overflow holds through the same batch helper.
+
+Hub payments consume the payer's blocks before balance writes. If both payer and payee need a
+balance update, `settle_to_in_transaction` acquires those Org rows in ID order with
+`FOR NO KEY UPDATE`, compatible with foreign-key checks. An exact-cost payment does not add a
+payer balance lock. Referral payouts likewise stage their actual grants in Org ID order; their
+existing claim and payout commit boundaries remain separate.
+
+Real PostgreSQL tests exercise competing batches, single settlements, transfers, claims and
+rollbacks. These rules cover the application compositions above, not arbitrary transactions that
+write other tables first. During rollout, retire old batch and cross-org writers before relying
+on consistent ordering. Lock ordering removes these circular waits; it does not bound the time
+a slow transaction may hold a lock.
+
+Public money entries attach local transaction identity and stage labels through
+`infra.money_trace`, without extra queries or earlier connection acquisition. Application call
+scopes additionally label preflight and bookkeeping after settlement. Active slow-transaction
+snapshots can correlate a PostgreSQL blocker PID to an open money transaction before it finishes;
+the actual commit/rollback boundary, rather than the public function return, ends the trace.
+See [transaction diagnostics](data-model.md#product-analytics-writer-analyticspy) for coverage,
+bounded logging, worker lifecycle and evidence limitations. Tracing changes neither lock order
+nor accounting behavior.
+
+### Optional admission before the settlement session
+
+`infra.money_admission.admit` optionally queues CreditBlock consumers by payer Org before their
+application opens a database session. A process-local async lock limits Redis polling within that
+process; contended Redis acquisition retries after a random 3–10 ms async delay. A token-owned,
+expiring Redis lease coordinates participating processes. Multi-org batches
+acquire eligible Org leases in sorted ID order. The scope surrounds session acquisition, ledger
+work, commit or rollback, and session cleanup; it releases leases only after that scope exits.
+`infra.money_session.money_session` joins the session's close/rollback task even under repeated
+cancellation before allowing the admission scope to exit, then propagates cancellation or the
+original failure. It does not introduce a commit or change the application's commit boundaries.
+Waiting for admission holds no database connection.
+
+The application supplies the already-known payer identity through `MarketplaceCall` and
+`DeferredSettle`, an asynchronous task snapshot, or the Hub caller. The gate covers ordinary
+positive settlements, charged deferred batches, potentially billable asynchronous terminal
+settlement, and the Hub payer's positive seller payment. Async admission is conservative: the
+locked task row still decides whether and how much to charge. Reserve, pure release, grants and
+top-ups do not acquire this gate, and a Hub payee is not an additional admission key. Direct
+ledger callers retain their existing database behavior.
+
+The feature defaults off; `money_admission_org_ids` selects an opt-in subset, or all orgs when
+empty and enabled. Non-selected operations supply the disabled timing baseline. Admission never
+replaces Hold claims, CreditBlock locks or transaction atomicity. A missing identity, unavailable
+Redis, or expired acquisition budget releases any partially acquired gates and executes the
+original database path. Lost renewal does not cancel or restart a money transaction already in
+progress. These paths preserve database correctness but give up admission isolation; they are
+counted separately. Owner-checked renewal and deletion prevent an old lease holder from extending
+or deleting a newer owner's lease. TTL and renewal cannot prove that an old database transaction
+has stopped, which is why database locks remain necessary.
+
+Lease cleanup retries a transient timeout/connection failure at most once, always with the same
+token-checked Lua delete. Each attempt keeps its 200 ms deadline within a shared 400 ms per-key
+budget; authentication/permission errors and cancellation do not retry. These are asyncio time
+budgets, not hard wall-clock guarantees under scheduler stalls or cancellation cleanup. Multiple
+Org leases are cleaned up in reverse order, so a batch's cleanup budget scales with its keys.
+A retry finding no matching token reports `not_owned`: an earlier delete may have succeeded
+without its response, or the lease expired/changed owners. It cannot delete a replacement owner's
+lease and does not manufacture a new lease-loss observation. Repeated failures leave expiry as
+the backstop. Cleanup still follows database session closure and never repeats accounting or
+upstream work. The admission acquisition budget remains five seconds; cleanup is observed
+separately from execution in the existing scope totals.
+
+This is best-effort contention isolation, not a global money concurrency cap, durable queue or
+promise of FIFO across processes. Serializing the entire application session also serializes work
+such as Hold claims and session cleanup that previously could overlap; even without polling
+delay, hot-org throughput can regress. Moving waiters out of the database reduces their connection
+occupancy, not necessarily their total latency. Redis round trips add cost, and fallback traffic
+can still exhaust the original pool. It neither increases a hot org's serial settlement capacity
+nor bounds an existing transaction's lock duration. Default-off, per-org rollout and measured
+end-to-end performance are therefore part of adoption. See [deployment controls](../ops/deploy.md#optional-money-admission)
+and [aggregate telemetry](data-model.md#product-analytics-writer-analyticspy) for rollout and measurement.
 
 **Margin is applied inside the module** (`with_margin`), at reserve AND settle, and the rate in force
 is recorded on every entry - so a rate change cannot retroactively rewrite what a call cost, and two

@@ -141,7 +141,8 @@ def name_rows(query: str, cat: catalog_store.Catalog, provider_display,
     q = query.strip().lower()
     if not q:
         return "", []
-    shown = [e for e in (cat.for_platform(platform) if platform else cat.endpoints) if catalog_store.browsable(e)]
+    shown = [e for e in (cat.for_platform(platform) if platform else cat.endpoints)
+             if catalog_store.browsable(e) and not catalog_store.paused(e)]
     jobs_first = _jobs_first(shown)
     on: dict[str, list[dict]] = {}
     for e in shown:

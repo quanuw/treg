@@ -16,23 +16,44 @@ async enableDefaultKey(){ if(!this.defaultKeyId) return; this.keyBusy=true; this
       catch(e){ this.keyErr='Could not enable key: '+(e.detail||e.status); } finally{ this.keyBusy=false; } },
 keyKind(kind){ return ({default_human:'Default',additional_human:'Additional',legacy_human:'Legacy',agent:'Agent'})[kind]||kind; },
 maskedKey(k){ return k.safe_prefix ? k.safe_prefix+'••••••••' : (k.kind==='legacy_human'?'prefix unavailable — older key':'prefix unavailable'); },
-async createApiKey(){ const name=(this.keyName||'').trim(); if(!name){ this.keyErr=''; this.keyNameInvalid=true; return; } this.keyBusy=true; this.keyErr='';
-      try{ this.newApiKey=await this.api('/orgs/'+this.activeOrgId+'/api-keys',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name})}); this.keyName=''; this.keyNameInvalid=false; await this.loadApiKeys(); }
-      catch(e){ this.keyErr='Could not create key: '+(e.detail||e.status); } finally{ this.keyBusy=false; } },
+async createApiKey(){ const name=(this.keyName||'').trim(); if(!name){ this.keyErr=''; this.keyNameInvalid=true; return; }
+      const issue=this.beginCredentialIssue('key'); if(!issue) return; const live=this.ticket('keyAction');
+      this.keyBusy=true; this.keyErr='';
+      try{ const r=await this.api('/orgs/'+issue.org_id+'/api-keys',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name})});
+        await this.finishCredentialIssue(issue,r);
+        if(live()){ this.keyName=''; this.keyNameInvalid=false; }
+        if(this.view==='orgs' && this.credentialIssue===issue) await this.loadApiKeys(); }
+      catch(e){ this.failCredentialIssue(issue); } finally{ if(live()) this.keyBusy=false; } },
 async renameApiKey(k){ const name=(this.editKeyName||'').trim(); if(!name){ this.keyErr='Enter a key name.'; return; } this.keyBusy=true;
       try{ await this.api('/orgs/'+this.activeOrgId+'/api-keys/'+k.id,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({name})}); this.editKey=null; await this.loadApiKeys(); }
       catch(e){ this.keyErr='Could not rename key: '+(e.detail||e.status); } finally{ this.keyBusy=false; } },
 keyHasMore(k){ return k.can_rename||k.can_disable||k.can_enable||k.can_revoke||(k.can_hide&&k.state==='revoked'); },
+keyActionBlockReason(){ return this.credentialIssue
+      ? "Handle this team's retained key result first: save and close its card, or follow its status notice." : ''; },
+blockKeyAction(){ const reason=this.keyActionBlockReason(); if(!reason) return false;
+      this.keyErr=reason; return true; },
 toggleKeyMenu(k,e){ if(this.keyMenu&&this.keyMenu.key.id===k.id){ this.keyMenu=null; return; } const r=e.currentTarget.getBoundingClientRect(); this.keyMenu={key:k,top:r.bottom+6,right:Math.max(12,innerWidth-r.right)}; },
-requestKeyAction(k,action){ this.keyMenu=null; if(['rotate','disable','revoke','hide'].includes(action)){ this.keyConfirm={key:k,action}; return; } this.keyAction(k,action); },
-confirmKeyAction(){ if(!this.keyConfirm)return; const c=this.keyConfirm; this.keyConfirm=null; this.keyAction(c.key,c.action); },
-async keyAction(k,action){ this.keyBusy=true; this.keyErr=''; this.keyMsg=null;
-      try{ const r=await this.api('/orgs/'+this.activeOrgId+'/api-keys/'+k.id+'/'+action,{method:'POST'});
-        if(r.secret && k.kind==='default_human'){ this.myToken=r.secret; this.defaultKeyId=k.id; this.defaultKeyState='active'; this._myTokenOrg=this.activeSlugNow; this.startTokenShow=false; this.newApiKey={...r,rotated:true}; }
-        else if(r.secret){ this.newAgent=null; this.snipAgent=null; this.agentSnip='prompt'; this.newApiKey={...r, assigned_name:k.assigned_name, assigned_type:k.assigned_type, user_id:k.user_id, org:this.activeSlugNow, rotated:true}; }
+requestKeyAction(k,action){ if(this.blockKeyAction()) return;
+      this.keyMenu=null; if(['rotate','disable','revoke','hide'].includes(action)){ this.keyConfirm={key:k,action}; return; } return this.keyAction(k,action); },
+confirmKeyAction(){ if(!this.keyConfirm || this.blockKeyAction()) return;
+      const c=this.keyConfirm; this.keyConfirm=null; return this.keyAction(c.key,c.action); },
+async keyAction(k,action){ if(this.blockKeyAction()) return;
+      const issue=action==='rotate'?this.beginCredentialIssue('key'):null;
+      if(action==='rotate' && !issue) return;
+      const orgId=this.activeOrgId, live=this.ticket('keyAction');
+      this.keyBusy=true; this.keyErr=''; this.keyMsg=null;
+      try{ const r=await this.api('/orgs/'+orgId+'/api-keys/'+k.id+'/'+action,{method:'POST'});
+        if(issue){
+          await this.finishCredentialIssue(issue,{...r, kind:k.kind, api_key_id:r.id, connected:false,
+            assigned_name:k.assigned_name, assigned_type:k.assigned_type, user_id:k.user_id, rotated:true});
+          if(this.view==='orgs' && this.credentialIssue===issue){ this.snipAgent=null; this.agentSnip='prompt'; await this.loadApiKeys(); }
+          return;
+        }
+        if(!live()) return;
         if(r.agent_revoked) this.keyMsg={agent:true,text:k.assigned_name+' was removed from this team, and all its keys were revoked. Historical Activity remains available.'};
         if(k.kind==='default_human' && action!=='rotate') await this.loadDefaultToken();
+        if(!live()) return;
         if(r.agent_revoked) await this.loadOrgAdmin(); else await this.loadApiKeys(); }
-      catch(e){ this.keyErr='Key action failed: '+(e.detail||e.status); } finally{ this.keyBusy=false; } },
+      catch(e){ if(issue) this.failCredentialIssue(issue); else if(live()) this.keyErr='Key action failed: '+(e.detail||e.status); } finally{ if(live()) this.keyBusy=false; } },
 showKeyActivity(k){ this.activityKey=String(k.id); this.go('activity'); }
 }

@@ -21,6 +21,8 @@ from ..domain.catalog import store as catalog_store
 from ..domain.catalog.results import classify, has_result_rules, verdict
 from ..domain.money import settlement
 from ..infra.db import session_maker
+from ..infra import money_admission
+from ..infra.money_session import money_session
 from ..infra.upstream.relay import relay
 from ..models import AsyncResourceRecord, AsyncTaskRecord, Hold, Tool
 from ..timeutil import utcnow_naive
@@ -309,7 +311,7 @@ async def _poll(row: AsyncTaskRecord, client: httpx.AsyncClient) -> tuple[int, b
 async def _finish(call_id: str, outcome: str, document: object | None, now, *,
                   require_usage: bool = False, expected_attempt: int | None = None,
                   terminal_hit: bool | None = None, terminal_verdict: str | None = None) -> str:
-    async with session_maker() as db:
+    async with money_session(session_maker()) as db:
         row = await db.get(AsyncTaskRecord, call_id, with_for_update=True)
         if row is None or row.status != asynctasks.PENDING:
             return "noop"
@@ -405,9 +407,17 @@ async def _finish_terminal(snapshot: AsyncTaskRecord, outcome: str, document: ob
                     False if has_result_rules(snapshot.endpoint_id) else None)
     # Only a finished answer carries a verdict word; a failure has nothing to judge.
     terminal_verdict = verdict(snapshot.endpoint_id, status_code, body) if outcome == "success" else None
-    result = await _finish(snapshot.call_id, outcome, document, now, require_usage=require_usage,
-                           expected_attempt=expected_attempt, terminal_hit=terminal_hit,
-                           terminal_verdict=terminal_verdict)
+    # The snapshot only selects admission. _finish rechecks the locked row and remains the
+    # authority for charging; a successful zero-cost task may conservatively pass the gate.
+    awaiting_usage = (require_usage and snapshot.settlement_basis["amount"]["kind"] == "usage"
+                      and settlement.usage_evidence(snapshot.settlement_basis, {"terminal": document}) is None)
+    admission_orgs = [snapshot.org_id] if (
+        outcome in ("success", "billed_failure") and not awaiting_usage
+        and not asynctasks.expired(snapshot.created_at, now)) else []
+    async with money_admission.admit(admission_orgs, operation="async"):
+        result = await _finish(snapshot.call_id, outcome, document, now, require_usage=require_usage,
+                               expected_attempt=expected_attempt, terminal_hit=terminal_hit,
+                               terminal_verdict=terminal_verdict)
     expected = asynctasks.SETTLED if outcome in ("success", "billed_failure") else asynctasks.RELEASED
     if result == expected:
         if terminal_hit is not None:

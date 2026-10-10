@@ -12,5 +12,5 @@ welcomeSetupCmd(){ return this.buildAgentPrompt('agent', true); },
 welcomeSetupMasked(){ const t=this.myToken?(this.startTokenShow?this.myToken:(this.myToken.slice(0,14)+'••••••••••••••••')):'<YOUR_TOKEN>';
       return this.welcomeSetupCmd+'\n\nwith team '+(this.activeSlugNow||'<team-slug>')+' token: '+t; },
 tryExamples(){ return TregAgentSetup.examples; },
-tryOauth(){ return TregAgentSetup.oauthGroups; }
+tryOauth(){ return TregAgentSetup.listedOauthGroups(this.providers); }
 }

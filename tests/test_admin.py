@@ -314,7 +314,8 @@ async def test_admin_calls_reads_new_rows_after_a_cursor_by_provider(c):
 
 async def test_admin_share_counts_requests_per_job_and_answers_per_provider(c):
     """A routed call counts once as a request, and its successful attempt credits the provider that
-    answered; a direct call credits its own provider; a failed attempt credits nobody."""
+    answered; a direct call credits its own provider; a failed attempt, a 200 its adapter judged
+    empty, an attempt the job moved on from, and any attempt of a failed job credit nobody."""
     from treg.models import CallRecord
     async with session_maker() as s:
         def add(ep, prov, status, ref):
@@ -326,8 +327,41 @@ async def test_admin_share_counts_requests_per_job_and_answers_per_provider(c):
         add("treg.web.extract", "treg", 200, "p2")
         add("crawl4ai.web.scrape", "crawl4ai", 200, "p2:r0")
         add("crawl4ai.web.scrape", "crawl4ai", 200, "d1")
+        add("treg.web.extract", "treg", 200, "p3")
+        s.add(CallRecord(org_id=1, user_email="u@example.com", tool_name="tinyfish.web.fetch", method="POST",
+                         path="/call/x", status_code=200, endpoint_id="tinyfish.web.fetch", provider="tinyfish",
+                         call_ref="p3:r0", hit=False))   # a 200 its adapter judged empty: not an answer
+        add("crawl4ai.web.scrape", "crawl4ai", 200, "p3:r1")
+        add("treg.web.extract", "treg", 502, "p4")
+        add("tinyfish.web.fetch", "tinyfish", 200, "p4:r0")     # no verdict, but the job failed: not served
+        add("treg.web.extract", "treg", 200, "p5")
+        add("tinyfish.web.fetch", "tinyfish", 200, "p5:r0")     # no verdict, and the job moved on from it
+        add("crawl4ai.web.scrape", "crawl4ai", 200, "p5:r1")
         await s.commit()
     body = (await c.get("/admin/share?minutes=60", headers=_a())).json()
     job = next(j for j in body["jobs"] if j["capability"] == "web.extract")
-    assert job["requests"] == 3 and job["answered"] == 3
-    assert job["by_provider"] == {"crawl4ai": 2, "tinyfish": 1}
+    assert job["requests"] == 6 and job["answered"] == 5
+    assert job["by_provider"] == {"crawl4ai": 4, "tinyfish": 1}
+
+
+async def test_admin_share_counts_teams_so_one_heavy_team_is_one_vote(c):
+    """`teams`: one team with nine direct crawl4ai answers and one team with one routed tinyfish
+    answer are one vote each: team-weighted 50/50, while volume says 90/10."""
+    from treg.models import CallRecord
+    async with session_maker() as s:
+        for i in range(9):
+            s.add(CallRecord(org_id=1, user_email="u@example.com", tool_name="crawl4ai.web.scrape", method="POST",
+                             path="/call/x", status_code=200, endpoint_id="crawl4ai.web.scrape",
+                             provider="crawl4ai", call_ref=f"h{i}"))
+        s.add(CallRecord(org_id=2, user_email="v@example.com", tool_name="treg.web.extract", method="POST",
+                         path="/call/x", status_code=200, endpoint_id="treg.web.extract", provider="treg", call_ref="q1"))
+        s.add(CallRecord(org_id=2, user_email="v@example.com", tool_name="tinyfish.web.fetch", method="POST",
+                         path="/call/x", status_code=200, endpoint_id="tinyfish.web.fetch", provider="tinyfish",
+                         call_ref="q1:r0"))
+        await s.commit()
+    body = (await c.get("/admin/share?minutes=60", headers=_a())).json()
+    teams = next(j for j in body["jobs"] if j["capability"] == "web.extract")["teams"]
+    assert teams["total"] == 2 and teams["by_provider"] == {"crawl4ai": 1, "tinyfish": 1}
+    assert teams["weighted"] == {"crawl4ai": 0.5, "tinyfish": 0.5}
+    assert teams["direct"] == {"total": 1, "by_provider": {"crawl4ai": 1}}
+    assert teams["routed"] == {"total": 1, "by_provider": {"tinyfish": 1}}

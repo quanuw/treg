@@ -80,6 +80,9 @@ async welcomeCreate(){ const name=(this.welcome.name||'').trim(); if(!name){ thi
         this.onboarded=true; try{ await this.api('/onboard/skip',{method:'POST'}); }catch(e){}  // don't re-prompt
         await this.loadAll(); this.switchOrg({slug:o.org});
         this.analyticsIdentify(); this.intercomUpdate(); this.track('onboarding_team_created',{team:o.org});
+        // Google Ads `treg Signup (web)`: the browser-side twin of the server outbox row, for Google's
+        // cross-device and modeled attribution; secondary in the account, so it never double counts.
+        try{ if(typeof window.tregSignupConversion==='function') window.tregSignupConversion(o.org_id||o.org); }catch(e){}
         this.welcome.step=1; }  // stay in the modal: pick your agent → get the setup line
       catch(e){ this.welcome.err='Could not create the team: '+(e.detail||e.status); }
       finally{ this.welcome.busy=false; } },

@@ -441,14 +441,22 @@ async def _pay(db: AsyncSession, row: Referral) -> bool:
 
     meta = {"referral_id": row.id, "code": row.code}
     # Only if the instant grant did not already land it — see the docstring.
-    referred_block = None
+    awards = []
     if not row.referred_block_id:
-        referred_block = await ledger.grant(
-            db, referred_org.id, amount_micro=int(s.referral_referred_micro), kind="referral",
-            once=False, meta={**meta, "side": "referred"})
-    referrer_block = await ledger.grant(
-        db, referrer_org.id, amount_micro=int(s.referral_referrer_micro), kind="referral",
-        once=False, meta={**meta, "side": "referrer"})
+        awards.append((referred_org.id, "referred", int(s.referral_referred_micro)))
+    awards.append((referrer_org.id, "referrer", int(s.referral_referrer_micro)))
+    referred_block = None
+    referrer_block = None
+    # Each grant updates its Org. Match cross-org money writers' row order; stable sorting
+    # retains the original referred-then-referrer order when both rewards land on one Org.
+    for org_id, side, amount in sorted(awards, key=lambda award: award[0]):
+        block = await ledger.grant(
+            db, org_id, amount_micro=amount, kind="referral", once=False,
+            meta={**meta, "side": side})
+        if side == "referred":
+            referred_block = block
+        else:
+            referrer_block = block
 
     fresh = await db.get(Referral, row.id)
     if fresh is not None:

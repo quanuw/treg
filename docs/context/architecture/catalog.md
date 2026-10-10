@@ -59,6 +59,13 @@ sources:
   - src/treg/catalog/examples/linkup.web.fetch.structured.json
   - src/treg/catalog/examples/linkup.web.answer.json
   - src/treg/catalog/examples/linkup.web.answer.status.json
+  - src/treg/catalog/parallel.yaml
+  - src/treg/web/logos/parallel.svg
+  - src/treg/catalog/examples/parallel.web.search.json
+  - src/treg/catalog/examples/parallel.web.search.advanced.json
+  - src/treg/catalog/examples/parallel.web.extract.json
+  - src/treg/catalog/examples/parallel.people.search.json
+  - src/treg/catalog/examples/parallel.companies.search.json
   - src/treg/catalog/keenable.yaml
   - src/treg/catalog/olostep.yaml
   - src/treg/catalog/spidercloud.yaml
@@ -376,6 +383,14 @@ tasks after the owned
 `GET /v1/research/{id}` poll reports completion. The polling read is free and restricted to the
 team that submitted the task on the shared key. Account-wide task listing, mixed batch Tasks,
 closed-beta Extract, and the undocumented Responses route are outside the shared-key catalog.
+
+Parallel's Search and Extract responses list billed SKUs in `usage[]`, so their rows settle through
+generic `settle: usage` terms with a `[name=...]` selector. Search's turbo/fast and basic/advanced
+modes report the same `sku_search` name at different prices, so each price is its own row with a
+`mode` enum. Each row holds its base price, as Exa does; usage settles results past ten and each
+further Extract URL. An unreadable URL returns 200 under `errors[]` with an empty `usage[]`, and the
+routing miss releases the hold. Entity Search reports no usage: its people and companies rows settle
+the documented flat price and allow `match_limit` up to the 100 included results.
 
 Spider's `spidercloud.yaml` curates Scrape, Crawl, Search, Links, Unblocker and Screenshot. The
 standard routes are live-verified with public targets. Only the bounded Search listing is offered
@@ -1409,6 +1424,15 @@ the provider's OpenAPI bundle without a live probe and says so with `skipped` an
 hand-maintained (no ingester reads Lusha's client-rendered reference), so the "regenerated wholesale"
 caveat above does not apply to it and the tombstone survives.
 
+### Paused providers — a deployment setting, not a row
+
+`TREG_PAUSED_PROVIDERS` names providers this deployment cannot serve right now. `store.paused(ep)`
+takes their rows out of `_match` (so `search`, `candidates`, `near_misses`, `rank_band`), out of
+`added_rows`, out of find's recall and name rows, out of `_capability_alternatives`, and out of
+routed plans. `by_id` keeps them, so a direct lookup or call answers `503 provider_paused` rather
+than "unknown endpoint" (`interface/api.md`). The rows themselves do not change: lifting the pause
+restores them as they were.
+
 ### `platform_blocked:` — works upstream, but not on treg's plan
 
 A third state sits between "offer" and "tombstone": the route works and the price is real, but
@@ -1698,7 +1722,9 @@ transaction under the cursor row's lock and re-reads every bucket it touches ins
 nothing about a bucket is carried between batches, so two overlapping runs (a slow backfill
 still going when the next schedule fires) serialize cleanly instead of one erasing the other's
 fold with the cursor already past the rows.
-Once caught up, an observation is the sum of that endpoint's day buckets from the day of the
+Once caught up, endpoints without mutable terminal evidence read the sum of their day buckets,
+including async endpoints without result adapters. Async endpoints with adapters retain live reads
+so late terminal hits are visible. The folded observation covers buckets from the day of the
 window's start onward (`stats.window_days`, at most one day more evidence than the live cut,
 never less), published through the same `stats.publish` floors the live path uses; the fold and
 the SQL are held equal by `tests/test_catalog_stats_refresh.py`. Merging days weights each
@@ -1726,6 +1752,15 @@ Five rules worth keeping:
   a daily-cap 429 — see the data-model fragment) never reached the provider; they are excluded even
   from `samples`, or a burst of refused calls dresses itself up as traffic. The 2026-08-12 Hunter
   incident — 309 refusals next to 488 real calls — is why.
+- **`not_found` ends a routed call.** A miss says "this provider has no answer"; `not_found:
+  {status, when?, means}` says "the target itself does not exist" (a scraped site answered 404 or
+  410), so every other provider can only find the same nothing or answer an empty page that reads
+  as a success. `routing.contracts.declared_not_found` reads it (`status` is one status or a list,
+  a 2xx allowed only with a `when` predicate, for providers that answer 200 and name the target's
+  404 in the body); `route.py` ends the call with `route_not_found` at that status (404 for a 2xx
+  declaration), charging nothing and asking no one else. `endpoint_view` shows `status` and
+  `means` on the tools that declare it. Each scrape adapter's `miss` predicate reads that
+  provider's own text field, so an empty page is a miss for every provider, not a hit.
 - **`miss` semantics ride on the endpoint.** Some providers answer "asked and answered: no result"
   with an error status (PDL 404s a person it has no record of; Hunter's combined-find does the
   same). Endpoints with evidenced miss behaviour carry a `miss: {status, means}` block in their
@@ -1783,12 +1818,29 @@ Five rules worth keeping:
   endpoint look broken to every other tenant — precisely the failure the 4xx rule prevents. It was
   removed. "Never worked" is read off `ok_rate == 0`, which is computed from DECIDED samples only,
   so no volume of caller errors can produce it.
+- **An empty answer is a failure where the job demands content.** A contract marked
+  `empty_is_failure` (web.extract, web.search, google.serp.organic) counts a 2xx whose
+  `CallRecord.hit` is False as bad, in `Tally.fold` and in the live `observed` query alike
+  (`store.empty_is_failure`). `results.Result.hit` is False for a 2xx that names its own error in
+  the body (`provider_error`), so a provider answering 200 with `errors: [page_not_found]` counts
+  too. Without it a provider that answers 200 to everything ranks on a success rate it did not
+  earn; other capabilities keep "a miss is an answer". The judgement exists only where the
+  endpoint has a verified adapter `miss`, so every tool of these capabilities callable on treg's
+  key carries one; tools outside the routed jobs carry a judge-only adapter (`route: false`). A
+  test fails on any such tool without one (an own-key answer is not read, so tools treg's key
+  cannot call are exempt).
 
 ### Search scoring — most words must match, and the rare ones decide
 
 This is the shipped ranker: what `/catalog/search` and the CLI answer, the lexical page the
 discovery experiment measures against, and the page an agent's MCP search falls back to when the
 job-first answer abstains ([search-experiment](search-experiment.md)).
+
+A query word matches only at the START of a word in a field (`store._needles`, haystacks stored
+word-padded by `_padded`): "search" matches "searches" but not "research", "ads" not "leads". A
+substring match tied a research-task status row with every search tool on "web search", and the
+evidence sort then put the free, always-200 status row first. CJK variants keep matching anywhere,
+since CJK text has no spaces between words.
 
 `catalog_store.search` demanded EVERY query token match (AND). Right for the 2–3 word refinement
 ("tiktok comments" must not return every tiktok endpoint), and fatal for how agents actually query:
@@ -2117,8 +2169,12 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   counts until the word mappings are proven. Showing them means publishing them under the hit
   floor and, like `hit`, reading async endpoints live, since an async word can land after the
   fold cursor has passed its submission.
-  Async endpoints read their `CallRecord` observations live: the daily fold may consume a
-  submission before its terminal poll changes the hit, and its one-way cursor cannot revise it.
+  Async endpoints with result adapters read their `CallRecord` observations live: the daily fold
+  may consume a submission before its terminal poll changes the hit, and its one-way cursor cannot
+  revise it. Adapter presence selects that path even when verification is lost, preserving recorded
+  terminal evidence. Without an adapter, terminal classification never corrects `hit`, so the reader
+  uses the existing day buckets for all published observations. HTTP success and request latency
+  describe the submission, as on the live path; they do not claim to measure job completion.
   `stats.observed` publishes `hit_rate`/`hit_samples` (floor 20) and, for synchronous
   per-success endpoints, reads historical rows too (a 2xx with `cost_observed_micro == 0` is a miss).
   Async per-success endpoints use only the terminal verdict: a found result can cost zero credits.

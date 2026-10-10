@@ -315,6 +315,7 @@ _UNRECORDED_SIGNATURE = {
     "you",  # funded wallet remains; no provider-specific empty-balance response was forced
     "valyu",  # subscription credits remain; no provider-specific empty-balance response was forced
     "octen",  # PAYG balance remains; no provider-specific empty-balance response was forced
+    "parallel",  # funded balance remains; documented 402 insufficient credit was not forced
     "enrichlayer",  # PAYG auto top-up remains funded; the docs name 403 but not its response body
 
     "serpapi", "serpstat", "spyfu", "tiingo", "tikhub", "tomba", "twelvedata",

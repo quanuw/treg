@@ -11,7 +11,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
-from sqlalchemy import case, func, or_, text
+from sqlalchemy import and_, case, func, or_, text
 from sqlalchemy.orm import defer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -20,7 +20,7 @@ from .. import reconcile
 from ..application import evidence_retention
 from ..config import get_settings
 from ..infra import kv
-from ..infra.db import get_admin_session
+from ..infra.db import get_admin_read_session, get_admin_session
 from ..domain import money
 from ..models import ArchiveEndpointStat, ArchiveKey, ArchiveSnapshot, Bundle, CallRecord, EndpointDayStat, LedgerEntry, Membership, Org, Referral, Secret, Tool, User
 from ..timeutil import as_naive as _as_naive
@@ -192,19 +192,29 @@ async def admin_share(
     minutes: int = 60, _: str = Depends(require_superadmin), db: AsyncSession = Depends(get_admin_session)
 ) -> dict:
     """Who served each job over the last `minutes` (at most 360). `requests` counts what callers
-    asked (direct calls and routed parents, never a routed attempt); `by_provider` counts the 2xx
-    answers each provider gave, directly or as a routed attempt. One read over an id range."""
+    asked (direct calls and routed parents, never a routed attempt). `by_provider` credits the
+    answer a caller actually got: a direct call's 2xx that its adapter did not judge a miss
+    (`CallRecord.hit` False), and, for a routed call, only the LAST attempt of a parent that
+    succeeded - the attempt whose answer the job returned. An earlier attempt the job moved on
+    from is not credited, whatever its status: a free provider's body is often streamed without
+    a `hit` verdict, so its empty 200s would otherwise count. Two reads over an id range.
+
+    `teams` counts the same answers per team, so one heavy team cannot stand for the market:
+    `total` teams with an answer, `by_provider` teams a provider served, `weighted` each
+    provider's share averaged over teams (every team one vote), and `direct` / `routed` the same
+    team counts for calls that named a provider and for calls treg's job served."""
     from ..application import catalog_stats
     from ..domain.catalog import store as catalog_store
     minutes = max(1, min(minutes, 360))
     since = _utcnow_naive() - timedelta(minutes=minutes)
     first = await catalog_stats._first_id_at(db, since)
     attempt = CallRecord.call_ref.like("%:r%")
-    ok = case((CallRecord.status_code.between(200, 299), 1), else_=0)
+    ok = case((and_(CallRecord.status_code.between(200, 299), or_(CallRecord.hit.is_(None), CallRecord.hit.is_(True))), 1),
+              else_=0)
     rows = (await db.execute(
-        select(CallRecord.endpoint_id, CallRecord.provider, attempt, func.count(), func.sum(ok))
-        .where(CallRecord.id >= first, CallRecord.endpoint_id.is_not(None))
-        .group_by(CallRecord.endpoint_id, CallRecord.provider, attempt))).all()
+        select(CallRecord.endpoint_id, CallRecord.provider, CallRecord.org_id, func.count(), func.sum(ok))
+        .where(CallRecord.id >= first, CallRecord.endpoint_id.is_not(None), ~attempt)
+        .group_by(CallRecord.endpoint_id, CallRecord.provider, CallRecord.org_id))).all()
     by_id = catalog_store.load().by_id
 
     def capability(endpoint_id: str) -> str:
@@ -212,13 +222,63 @@ async def admin_share(
         return cap or (endpoint_id[len("treg."):] if endpoint_id.startswith("treg.") else "(none)")
 
     jobs: dict[str, dict] = {}
-    for endpoint_id, provider, is_attempt, n, n_ok in rows:
+    # (capability, org, provider, routed?) -> answers served
+    served: dict[tuple[str, int, str, bool], int] = {}
+
+    def credit(cap: str, org: int, provider: str, routed: bool, n: int) -> None:
+        job = jobs.setdefault(cap, {"requests": 0, "answered": 0, "by_provider": {}})
+        job["by_provider"][provider] = job["by_provider"].get(provider, 0) + n
+        served[(cap, org, provider, routed)] = served.get((cap, org, provider, routed), 0) + n
+
+    for endpoint_id, provider, org, n, n_ok in rows:
         job = jobs.setdefault(capability(endpoint_id), {"requests": 0, "answered": 0, "by_provider": {}})
-        if not is_attempt:
-            job["requests"] += n
-            job["answered"] += int(n_ok or 0)
+        job["requests"] += n
+        job["answered"] += int(n_ok or 0)
         if provider and provider != "treg" and n_ok:
-            job["by_provider"][provider] = job["by_provider"].get(provider, 0) + int(n_ok)
+            credit(capability(endpoint_id), org, provider, False, int(n_ok))
+    # Routed attempts: the last attempt of each parent that answered 2xx is the one served.
+    parents_ok = {ref for (ref,) in (await db.execute(
+        select(CallRecord.call_ref).where(
+            CallRecord.id >= first, CallRecord.endpoint_id.like("treg.%"), ~attempt,
+            CallRecord.status_code.between(200, 299)))).all()}
+    last: dict[str, tuple[int, str, str | None, int, bool | None, int]] = {}
+    for ref, endpoint_id, provider, status, hit, org in (await db.execute(
+            select(CallRecord.call_ref, CallRecord.endpoint_id, CallRecord.provider,
+                   CallRecord.status_code, CallRecord.hit, CallRecord.org_id)
+            .where(CallRecord.id >= first, CallRecord.endpoint_id.is_not(None), attempt))).all():
+        parent, _, n = ref.rpartition(":r")
+        if parent not in parents_ok or not n.isdigit():
+            continue
+        if parent not in last or int(n) > last[parent][0]:
+            last[parent] = (int(n), endpoint_id, provider, status, hit, org)
+    for _, endpoint_id, provider, status, hit, org in last.values():
+        if provider and provider != "treg" and 200 <= status < 300 and hit is not False:
+            credit(capability(endpoint_id), org, provider, True, 1)
+    for cap, job in jobs.items():
+        per_org: dict[int, dict[str, int]] = {}
+        sides: dict[bool, dict[str, set]] = {False: {}, True: {}}
+        side_orgs: dict[bool, set] = {False: set(), True: set()}
+        for (c, org, provider, routed), n in served.items():
+            if c != cap:
+                continue
+            per_org.setdefault(org, {})[provider] = per_org.get(org, {}).get(provider, 0) + n
+            sides[routed].setdefault(provider, set()).add(org)
+            side_orgs[routed].add(org)
+        weighted: dict[str, float] = {}
+        for split in per_org.values():
+            total = sum(split.values())
+            for provider, n in split.items():
+                weighted[provider] = weighted.get(provider, 0.0) + n / total / len(per_org)
+        users: dict[str, int] = {}
+        for split in per_org.values():
+            for provider in split:
+                users[provider] = users.get(provider, 0) + 1
+        job["teams"] = {
+            "total": len(per_org), "by_provider": users,
+            "weighted": {p: round(w, 4) for p, w in weighted.items()},
+            "direct": {"total": len(side_orgs[False]), "by_provider": {p: len(o) for p, o in sides[False].items()}},
+            "routed": {"total": len(side_orgs[True]), "by_provider": {p: len(o) for p, o in sides[True].items()}},
+        }
     ordered = sorted(jobs.items(), key=lambda kv: -kv[1]["requests"])
     return {"since": since.isoformat(), "minutes": minutes,
             "jobs": [{"capability": cap, **job} for cap, job in ordered]}
@@ -281,7 +341,7 @@ _ERROR_EVIDENCE_EXPIRED = evidence_retention.ERROR_EVIDENCE_EXPIRED
 async def admin_errors(
     days: int = 7, limit: int = 100, provider: str | None = None, status: int | None = None,
     tier: str | None = None,
-    _: str = Depends(require_superadmin), db: AsyncSession = Depends(get_admin_session),
+    _: str = Depends(require_superadmin), db: AsyncSession = Depends(get_admin_read_session),
 ) -> dict:
     """Failed calls with the evidence to explain them — the caller's request and the provider's own
     answer (see models.CallRecord.error_request).
@@ -292,6 +352,8 @@ async def admin_errors(
     Read-only. Ageing is the `treg-worker admin purge-evidence` cron's job
     (application/evidence_retention.py); until it has run, a row older than the window is shown as
     expired with no evidence, so a late schedule never widens what this view reveals.
+    Evidence and org names may lag when a read database is configured; authorization stays on
+    the primary.
     """
     cutoff = evidence_retention.cutoff()
     since = _utcnow_naive() - timedelta(days=max(1, min(days, 90)))

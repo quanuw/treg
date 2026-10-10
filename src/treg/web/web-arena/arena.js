@@ -465,7 +465,7 @@
         const page=Array.isArray(pages)?pages[0]:pages;
         if(typeof page==='string')return page.replace(/\s+/g,' ').trim().slice(0,280);
         if(!page||typeof page!=='object')return '';
-        const text=[page.markdown?.data,page.markdown,page.markdown_content,page.text,page.raw_content,page.content]
+        const text=[page.markdown?.data,page.markdown,page.markdown_content,page.text,page.raw_content,page.content,page.full_content]
           .find(value=>typeof value==='string'&&value.trim());
         return text?text.replace(/\s+/g,' ').replace(/^#+\s*/,'').trim().slice(0,280):'';
       },

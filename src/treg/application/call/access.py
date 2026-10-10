@@ -26,6 +26,7 @@ from .resolve import (
     _platform_offer,
     _provider_tool_grant,
     _resolve_call,
+    provider_paused,
     resolve_call_target,
 )
 from .route import RouteOptions, build_plan
@@ -45,6 +46,8 @@ async def catalog_endpoint_access(
         )
     _enforce_catalog_status(endpoint)
     service = endpoint["provider"]
+    if oauth_providers.is_paused(service):
+        raise provider_paused(service, endpoint_id)
     if endpoint.get("kind") == "routed":
         return await _routed_access(endpoint, caller, catalog)
 

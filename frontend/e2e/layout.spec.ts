@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { fitsWidth, sidewaysCulprits, signIn, stubPostHog, textCollisions } from './helpers'
+import { fitsWidth, sidewaysCulprits, signIn, textCollisions } from './helpers'
 
 // Every main page, at desktop and phone width: the page never scrolls sideways, and no text in a
 // row, card or cell paints over other text or past its edge. This is the class of bug every table
@@ -44,20 +44,6 @@ for (const [width, height] of [[1440, 1000], [390, 844]] as const) {
       await page.locator('.ui-data-table .ui-tbody .ui-tr').first().click()
       await expect(page.getByRole('complementary', { name: 'Tool details' })).toBeVisible()
       await expectClean(page, 'the tool drawer')
-    })
-
-    // The control arm is production's page as it is, bugs included: at phone width an opened row's
-    // chips and parameter table overlap exactly as they do in production, and fixing them would
-    // change the arm being measured. It goes when the experiment does.
-    test('the catalog-v2 control arm (the ledger) lays out cleanly, a row open', async ({ page }) => {
-      test.skip(width < 760, "the ledger's phone layout is production's, left as it is")
-      await stubPostHog(page, 'control')
-      await page.goto('/catalog/companies')
-      await expect(page.locator('table.ledger')).toBeVisible()
-      await page.locator('tr.lrow.merged').first().click()
-      await page.locator('button.lsub').first().click()
-      await expect(page.locator('.lep').first()).toBeVisible()
-      await expectClean(page, 'the ledger')
     })
 
     test('a search answer keeps a long price in its column', async ({ page }) => {

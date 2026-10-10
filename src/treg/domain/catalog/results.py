@@ -21,9 +21,17 @@ STRICT_ENDPOINTS = frozenset({
 class Result:
     state: Literal["found", "empty", "error", "unknown"]
     reason: str
+    # A 2xx that names its own error AND that the adapter judges empty: nothing was found. Kept
+    # beside `state` so cache admission still reads `error`, while the hit verdict reads a miss.
+    empty: bool = False
 
     @property
     def hit(self) -> bool | None:
+        # A 200 whose body names its own error (`errors: [{"error": "page_not_found"}]`) and carries
+        # nothing found is a miss for the hit verdict; one that names an error beside real results
+        # (one failed page of several) stays undecided. The state stays `error` for cache admission.
+        if self.state == "error" and self.empty:
+            return False
         return {"found": True, "empty": False}.get(self.state)
 
 
@@ -80,7 +88,14 @@ def classify(endpoint_id: str, status: int, body: bytes) -> Result:
     except (ValueError, RecursionError):
         return Result("unknown", "invalid_json")
     if isinstance(doc, dict) and (doc.get("error") or doc.get("errors")):
-        return Result("error", "provider_error")
+        empty = False
+        if endpoint_id not in STRICT_ENDPOINTS:
+            from .store import load
+            try:
+                empty = bool(load().adapters[endpoint_id].is_miss(doc))
+            except Exception:  # noqa: BLE001 - a predicate failure is no verdict
+                empty = False
+        return Result("error", "provider_error", empty=empty)
     if endpoint_id not in STRICT_ENDPOINTS:
         from .store import load
 

@@ -63,10 +63,6 @@ platUrl(slug, cap){ const tail=cap ? '/'+encodeURIComponent(cap) : '';
       if(r.slug) this.openPlatform(r.slug, true); else this.go('catalog', true); },
 openPlatform(slug, fromPop, cap){ this.resetConfirms();
       if(cap===undefined) cap = fromPop ? this.platCapFromLocation() : null;
-      // The ledger has no comparison pages: the control arm reads one's address as its shelf.
-      if(this.catalogLegacy) cap=null;
-      this.catalogEnroll(cap).then(()=>{ if(this.view==='platform' && this.platSlug===slug)
-        this.catalogTrack(cap ? 'catalog_comparison_viewed' : 'catalog_platform_viewed', cap ? {compare:cap} : {}); });
       // Moving between a shelf and one of its comparisons keeps the loaded shelf: the page is the same
       // payload read another way, so only the address and the view state change.
       const same = this.view==='platform' && this.platSlug===slug && (this.platData || this.platLoading);
@@ -76,6 +72,7 @@ openPlatform(slug, fromPop, cap){ this.resetConfirms();
       if(!same){ this.platEx={}; this.platQ=''; this.epInfo={};
         if(this.find.scope) this.findExit(); }     // a shelf's answer belongs to that shelf
       this.platComparisonSort={key:'price', dir:'asc'};
+      this.catalogTrack(cap ? 'catalog_comparison_viewed' : 'catalog_platform_viewed', cap ? {compare:cap} : {});
       // A public visitor stays on the indexable /catalog/<slug> URL; a signed-in one keeps the
       // in-app hash route. Same view either way — only the address bar differs.
       if(!fromPop) history.pushState({platform:slug}, '', this.platUrl(slug, cap));
@@ -277,6 +274,10 @@ endpointConnectLabel(e){
 // A platform is callable today if ANY provider serving it is connected — the card is browsing,
     // not routing, so which one it is stays a question for the platform page.
     // The platform's providers the team holds its own credential for.
+    // A provider this deployment paused (/meta `paused_providers`): its name and message, or null.
+    providerPaused(service){ return ((this.meta&&this.meta.paused_providers)||{})[service]||null; },
+// A platform every provider of which is paused: its tile and shelf say so instead of selling it.
+    platPaused(pl){ const ps=(pl&&pl.providers)||[]; return ps.length>0 && ps.every(s=>this.providerPaused(s)); },
     platOwn(pl){ return ((pl&&pl.providers)||[]).filter(s=>this.catConnected(s)); },
 // What a platform's personal mark means when the team holds a credential for one of its providers:
     // not that the platform works (every platform works, on treg's key) but that calls there use yours.
@@ -454,11 +455,4 @@ setEpTab(e, tab){
       // is otherwise one word, and a phone-width price cell cannot hold it.
       if(typeof c.usd_min==='number' && c.usd_min<c.usd) return '$'+this.usdNum(c.usd_min)+'-\u200b$'+this.usdNum(c.usd)+'/'+unit;
       return '$'+this.usdNum(c.usd)+'/'+unit; },
-costTitle(c){ if(!c) return 'The catalog has no price for this endpoint';
-      if(c.display_unit) return this.costLabel(c)+(c.note ? ' — '+c.note : '');
-      const nat=this.nativeAmount(c);
-      return [c.note,
-              nat ? 'billed as '+nat+'/'+this.priceUnit(c.type)+', converted at the catalog’s FX rate' : '',
-              c.value==null&&c.type!=='free' ? 'billed '+c.type.replace(/_/g,' ')+' — the provider does not publish the rate, check your plan in their dashboard' : ''].filter(Boolean).join(' — ')
-        || 'What this endpoint costs at the provider'; }
 }

@@ -152,7 +152,10 @@ agents then built against a constitution that was wrong.
   an `own_account` endpoint, and reach other teams only where the endpoint itself declares
   `cache.sharing: public`; a provider's storage licence never decides that. A hit on an own key
   is free; a metered hit settles through the same hold, at `archive_hit_repeat_price_percent`
-  once the team has paid for that question. See `docs/context/architecture/archive.md`.
+  once the team has paid for that question. A team that has opted out (`Org.archive_opt_out_at`)
+  is neither served from nor recorded into the archive on any tier; erasing what it stored is a
+  separate act (team deletion, `treg-worker admin erase-archive`), never a side effect of the
+  switch. See `docs/context/architecture/archive.md`.
 
 ### Security guards that look redundant on purpose
 
@@ -198,7 +201,8 @@ so parallel runs and side-by-side runs never share one.
   `fix: ...`, `docs: ...`); one logical change per commit; the PR says what changed and why and
   names the fragments it updated.
 - `/mcp/` and `/mcp/v2/` differ on purpose. A change to either or to shared MCP code is reviewed
-  against both; do not unify them in passing.
+  against both; do not unify them in passing. `/mcp/v2/`'s tools and hidden platforms match the
+  Claude directory submission: change them only with a resubmission. New features go to `/mcp/`.
 - **Every tool row carries `added:`**, the UTC day it reached main (`scripts/catalog_added.py`
   writes today's where it is missing). Never change an existing one without the
   `added-date-change` label; CI compares every tool id with the base branch.

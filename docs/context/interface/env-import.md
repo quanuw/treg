@@ -20,6 +20,7 @@ Bare `treg upload` does **both** sides of the dir; `treg upload env` / `treg upl
 - **env side** (`providers.py`): scans a `.env`, detects third-party **provider API keys**, and
   registers the chosen ones as secrets + tools.
   Octen's `OCTEN` token uses an `x-api-key` header on `https://api.octen.ai`.
+  Parallel's `PARALLEL` token uses an `x-api-key` header on `https://api.parallel.ai`.
 - **skill side** (`skills.py`): scans a directory of skills (each a subdir with SKILL.md) and registers
   each as a tool (+ recipe) or a recipe-only bundle — see "Skill directories" below.
 

@@ -2609,6 +2609,35 @@ OCTEN = OAuthProvider(
     probe_deferred_statuses=(400,),
 )
 
+PARALLEL = OAuthProvider(
+    service="parallel",
+    display_name="Parallel",
+    auth_kind="key",
+    token_label="API key",
+    token_placeholder="your Parallel API key",
+    token_header="x-api-key",
+    token_format="{secret}",
+    setup_url="https://platform.parallel.ai",
+    setup_action_label="Get your Parallel API key",
+    setup_steps=(
+        "Sign in to the Parallel Platform and open API Keys.",
+        "Create or copy a key.",
+    ),
+    setup_note=(
+        "Search, Extract and Entity Search spend your Parallel balance. Connecting reads "
+        "the free monitor count, which spends nothing."
+    ),
+    auth_uri="", token_uri="",
+    scopes={},
+    client_id_setting="", client_secret_setting="",
+    category="SEO",
+    summary="Search the web, extract pages, and find people or companies from a description.",
+    base_url="https://api.parallel.ai",
+    docs_url="https://docs.parallel.ai/getting-started/overview",
+    # Free read: a bogus key answers 401 {"code":16,"message":"Invalid API key (C.1)"}.
+    probe_path="/v1/monitors/stats",
+)
+
 LINKUP = OAuthProvider(
     service="linkup",
     display_name="Linkup",
@@ -3930,7 +3959,7 @@ REGISTRY: dict[str, OAuthProvider] = {
         TIKHUB, BRIGHTDATA, SEMRUSH, JUSTONEAPI,
         SCRAPECREATORS,
         # SEO API-key providers
-        DATAFORSEO, SERANKING, MOZ, MAJESTIC, SERPSTAT, EXA, SEARCH1API, TAVILY, OCTEN, LINKUP, YOU, VALYU, KEENABLE, OLOSTEP, FIRECRAWL, CRAWL4AI, SPIDERCLOUD, PERPLEXITY,
+        DATAFORSEO, SERANKING, MOZ, MAJESTIC, SERPSTAT, EXA, SEARCH1API, TAVILY, OCTEN, LINKUP, PARALLEL, YOU, VALYU, KEENABLE, OLOSTEP, FIRECRAWL, CRAWL4AI, SPIDERCLOUD, PERPLEXITY,
         SCRAPEGRAPHAI, SERPER, LITESCRAPE, CLORO,
         # more Enrichment API-key providers
         LUSHA, CORESIGNAL, DIFFBOT, THECOMPANIESAPI, LEADMAGIC, ENRICHLAYER, FIBER_AI, CRUSTDATA, AVIATO,
@@ -3955,6 +3984,33 @@ CATEGORY_ORDER = ("AI generation", "SEO", "Advertising", "Social media", "Enrich
 
 def get(service: str) -> OAuthProvider | None:
     return REGISTRY.get(service)
+
+
+def is_paused(service: str | None) -> bool:
+    """Whether this deployment has paused `service` (TREG_PAUSED_PROVIDERS). A paused provider is
+    hidden from search and connect and refused at call time; its connections are kept untouched."""
+    return bool(service) and service.strip().lower() in get_settings().paused_providers_set
+
+
+def paused_message(service: str) -> str:
+    provider = REGISTRY.get(service)
+    return get_settings().paused_provider_message(
+        service, provider.display_name if provider else service)
+
+
+def paused_listing() -> dict[str, dict]:
+    """Every paused provider with its name and message, for the dashboard (`/meta`): `listing()`
+    leaves them out, and a page reached by a link or a catalog row still has to say why."""
+    return {service: {"display_name": getattr(REGISTRY.get(service), "display_name", service),
+                      "message": paused_message(service)}
+            for service in sorted(get_settings().paused_providers_set)}
+
+
+def paused_detail(service: str, endpoint_id: str | None = None) -> dict:
+    """The typed body every paused refusal carries: calls, connects and catalog_get alike."""
+    return {"error": "provider_paused", "provider": service,
+            **({"endpoint_id": endpoint_id} if endpoint_id else {}),
+            "message": paused_message(service)}
 
 
 def legacy_aliases(url: str) -> list[str]:
@@ -4196,7 +4252,7 @@ def listing() -> list[dict]:
         # Grouped first, alphabetical within a shelf — so the dashboard can render the shelves by
         # walking the list once instead of re-sorting what the registry already knows.
         for p in sorted(
-            REGISTRY.values(),
+            (p for p in REGISTRY.values() if not is_paused(p.service)),
             key=lambda p: (
                 CATEGORY_ORDER.index(p.category) if p.category in CATEGORY_ORDER else len(CATEGORY_ORDER),
                 p.display_name,

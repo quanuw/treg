@@ -42,6 +42,7 @@ export default {
 
   <p class="cn-what">
     <template v-if="a.s">{{authLabel(a.p)}}, saved as a secret<template v-if="a.st.tone==='quiet'">. The connected one is used instead</template></template>
+    <template v-else-if="a.st.key==='paused'">{{a.c.paused_message}}</template>
     <template v-else>
       <template v-if="manage && (a.c.resource_name || a.c.resource_ref)">{{a.c.resource_name || a.c.resource_ref}} · </template>
       {{a.pasted ? authLabel(a.p) : (caps || 'Connected account')}}</template>
@@ -54,6 +55,14 @@ export default {
       <a v-if="manage" :href="'/app/marketplace/'+encodeURIComponent(a.service)" @click.prevent="openProvider(a.service)">Manage</a>
       <button class="cn-del" :class="{armed:confirmDelSecret===a.s.id}" @click="deleteSecret(a.s)">
         {{confirmDelSecret===a.s.id ? 'Click again to remove' : 'Remove'}}</button>
+    </span>
+  </div>
+
+  <!-- Paused by this deployment: the connection is kept as it is, so the only step is removing it. -->
+  <div v-else-if="a.st.key==='paused'" class="cn-acts">
+    <span class="cn-links">
+      <button class="cn-del" :class="{armed:confirmDisc===a.c.id}" @click="disconnect(a.c)">
+        {{confirmDisc===a.c.id ? 'Click again to remove' : 'Disconnect'}}</button>
     </span>
   </div>
 

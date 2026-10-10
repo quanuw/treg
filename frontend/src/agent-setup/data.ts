@@ -32,10 +32,11 @@ export const iconUrl: IconUrl = (icon, theme = 'light') =>
 export const command = (base: string) => 'set up treg \u2014 '+base.replace(/\/$/,'')+'/llms.txt'
 
 // Claude.ai adds treg as a custom connector over OAuth: no setup line, no key. This link opens
-// Claude.ai's add-connector dialog with this server's MCP URL filled in.
+// Claude.ai's add-connector dialog with this server's team MCP URL filled in: the whole surface
+// (catalog, the team's own tools, media), always mounted. /mcp/v2 is the catalog-only directory one.
 export const claudeConnectorLink = (base: string) =>
   'https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=Treg&connectorUrl='
-  + encodeURIComponent(base.replace(/\/$/,'')+'/mcp/v2')
+  + encodeURIComponent(base.replace(/\/$/,'')+'/mcp/')
 
 export function setupText(command: string, team?: string, token?: string, masked = false) {
   if(!team&&!token) return command
@@ -60,6 +61,16 @@ export const oauthGroups: OAuthGroup[] = [
   {label:'Manage ad campaigns', items:[{s:'google-ads',n:'Google Ads'},{s:'meta-ads',n:'Meta Ads'}], soon:[]},
   {label:'SEO on your own site',items:[{s:'google-analytics',n:'Google Analytics'},{s:'google-search-console',n:'Search Console'},{s:'google-business-profile',n:'Business Profile'}], soon:[]},
 ]
+
+// The chips this deployment offers: a provider left out of /oauth/providers (a paused one) loses its
+// chip, and a group left empty goes with it. Before the listing arrives every chip shows.
+export function listedOauthGroups(listing: { service: string }[] | null | undefined): OAuthGroup[] {
+  if (!listing || !listing.length) return oauthGroups
+  const offered = new Set(listing.map(p => p.service))
+  return oauthGroups
+    .map(g => ({ ...g, items: g.items.filter(p => offered.has(p.s)) }))
+    .filter(g => g.items.length)
+}
 
 // A logo that fails to load leaves its slot instead of a broken-image glyph.
 export function hideBrokenImage(event: Event) {

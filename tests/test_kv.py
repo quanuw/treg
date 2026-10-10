@@ -1,5 +1,6 @@
 """The shared key-value store: windowed counters that fail closed."""
 import os
+import asyncio
 import time
 
 import pytest
@@ -40,6 +41,9 @@ async def test_unreachable_redis_fails_closed_and_fast():
     started = time.monotonic()
     assert await store.take('k', 5, 60) is False
     assert await store.ping() is False
+    assert await store.acquire_lease('lease', 'token', 1000) == 'unavailable'
+    assert await store.renew_lease('lease', 'token', 1000) == 'unavailable'
+    assert await store.release_lease('lease', 'token') == 'unavailable'
     assert time.monotonic() - started < 2
     await store.aclose()
 
@@ -73,3 +77,48 @@ async def test_real_redis_window():
     finally:
         await store._client.delete(key)
         await store.aclose()
+
+
+async def test_local_counters_do_not_claim_distributed_lease_support():
+    store = kv.LocalStore()
+    assert await store.acquire_lease('lease', 'owner', 1000) == 'unavailable'
+    assert await store.renew_lease('lease', 'owner', 1000) == 'unavailable'
+    assert await store.release_lease('lease', 'owner') == 'unavailable'
+
+
+@pytest.mark.skipif(not os.environ.get('TREG_TEST_KV_URL'), reason='set TREG_TEST_KV_URL to a scratch Redis')
+async def test_real_redis_clients_exclude_each_other_and_only_the_owner_releases():
+    first = kv.RedisStore(os.environ['TREG_TEST_KV_URL'])
+    second = kv.RedisStore(os.environ['TREG_TEST_KV_URL'])
+    key = f'treg-test:money-lease:{time.time_ns()}'
+    try:
+        results = await asyncio.gather(first.acquire_lease(key, 'first', 3000),
+                                       second.acquire_lease(key, 'second', 3000))
+        assert sorted(results) == ['acquired', 'busy']
+        winner = 'first' if results[0] == 'acquired' else 'second'
+        loser = 'second' if winner == 'first' else 'first'
+        assert await second.release_lease(key, loser) == 'lost'
+        assert await first.renew_lease(key, winner, 5000) == 'renewed'
+        assert await first._client.pttl(key) > 3000
+        assert await second.release_lease(key, winner) == 'released'
+        assert await first._client.get(key) is None
+    finally:
+        await first._client.delete(key)
+        await asyncio.gather(first.aclose(), second.aclose())
+
+
+@pytest.mark.skipif(not os.environ.get('TREG_TEST_KV_URL'), reason='set TREG_TEST_KV_URL to a scratch Redis')
+async def test_real_redis_expired_owner_cannot_renew_or_delete_replacement():
+    first = kv.RedisStore(os.environ['TREG_TEST_KV_URL'])
+    second = kv.RedisStore(os.environ['TREG_TEST_KV_URL'])
+    key = f'treg-test:money-lease:{time.time_ns()}'
+    try:
+        assert await first.acquire_lease(key, 'old-owner', 20) == 'acquired'
+        await asyncio.sleep(0.05)
+        assert await second.acquire_lease(key, 'new-owner', 3000) == 'acquired'
+        assert await first.renew_lease(key, 'old-owner', 5000) == 'lost'
+        assert await first.release_lease(key, 'old-owner') == 'lost'
+        assert await second._client.get(key) == 'new-owner'
+    finally:
+        await first._client.delete(key)
+        await asyncio.gather(first.aclose(), second.aclose())

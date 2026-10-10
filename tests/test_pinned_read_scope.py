@@ -221,7 +221,8 @@ async def test_same_provider_idempotency_label_is_partitioned_by_pin(clients, id
     assert len(headers_seen) == 2 and headers_seen[0] != headers_seen[1]
 
 
-@pytest.mark.parametrize('path, tool', [('/mcp/', 'call'), ('/mcp/v2/', 'catalog_call_read')])
+# Team MCP only: the async reads here are generation tasks, which `/mcp/v2/` does not call at all.
+@pytest.mark.parametrize('path, tool', [('/mcp/', 'call')])
 async def test_mcp_async_reads_apply_the_same_pin_check(clients, identities, monkeypatch, replicate_platform, path, tool):
     from test_mcp_directory import paired_mcp_session, _call_tool
     org, h = identities

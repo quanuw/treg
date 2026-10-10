@@ -87,6 +87,33 @@ async def test_search1api_key_uses_free_usage_probe(clients, monkeypatch):
     assert response.status_code == 200, response.text
 
 
+async def test_parallel_key_uses_free_monitor_stats_probe(clients, monkeypatch):
+    def probe(request):
+        assert request.method == "GET"
+        assert request.url.path == "/v1/monitors/stats"
+        assert request.headers["x-api-key"] == "own-key"
+        return httpx.Response(200, json={"total": 0, "processor_counts": {}})
+
+    async with AsyncClient(transport=httpx.MockTransport(probe)) as upstream:
+        monkeypatch.setattr(app.state, "http", upstream)
+        response = await clients.post(
+            "/connections/token", json={"provider": "parallel", "token": "own-key"},
+        )
+    assert response.status_code == 200, response.text
+
+
+async def test_parallel_rejects_a_key_its_monitor_stats_refuse(clients, monkeypatch):
+    """The live answer to a bogus key, 2026-10-09."""
+    async with AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(
+            401, json={"code": 16, "message": "Invalid API key (C.1)"}))) as upstream:
+        monkeypatch.setattr(app.state, "http", upstream)
+        response = await clients.post(
+            "/connections/token", json={"provider": "parallel", "token": "bogus-key"},
+        )
+    assert response.status_code == 422, response.text
+    assert "rejected" in response.text
+
+
 async def test_enrichlayer_key_uses_free_balance_probe(clients, monkeypatch):
     def probe(request):
         assert request.method == "GET"

@@ -1,26 +1,55 @@
-"""The shared key-value store: small, expiring counters that several workers must agree on.
+"""The shared key-value store: expiring counters and optional admission leases.
 
 Render Key Value (Redis protocol) in production, an in-process dictionary when `TREG_KV_URL` is
 unset (local development, tests, self-hosters without one). The store holds nothing that must
 survive: every key expires, and every caller treats "unavailable" as a safe answer. Reads and
 writes are bounded by `_TIMEOUT_S` so a slow store can never hold a call open.
 
-The first tenant is the review-invitation budget (`application/call/invite.py`). Nothing else may
-depend on this module until it has proved itself there; the pattern for a new tenant is one more
-narrow method here, not a generic get/set surface.
+Review-invitation budgets fail closed; money admission leases report unavailability explicitly
+so the caller can retain PostgreSQL's original correctness path. New tenants add narrow methods,
+not a generic get/set surface. Local counters do not pretend to provide distributed leases.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
-from typing import Protocol
+from datetime import datetime, timezone
+from typing import Literal, Protocol
 
 from ..config import get_settings
 
 _TIMEOUT_S = 0.1
 _LOCAL_MAX_KEYS = 10_000
 log = logging.getLogger("treg.kv")
+_clock = time.monotonic
+_utcnow = lambda: datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+_lease_error_lock = threading.Lock()
+_lease_errors: dict[tuple[str, str], dict] = {}
+_lease_timings: dict[tuple[str, str], dict] = {}
+_LEASE_OUTCOMES = {
+    "acquire": {"acquired", "busy", "unavailable", "cancelled"},
+    "renew": {"renewed", "lost", "unavailable", "cancelled"},
+    "release": {"released", "lost", "not_owned", "unavailable", "cancelled"},
+}
+_LEASE_BUCKETS = (10, 50, 100, 200)
+
+AcquireResult = Literal["acquired", "busy", "unavailable"]
+RenewResult = Literal["renewed", "lost", "unavailable"]
+ReleaseResult = Literal["released", "lost", "not_owned", "unavailable"]
+_RENEW_LEASE = """
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('pexpire', KEYS[1], ARGV[2])
+end
+return 0
+"""
+_RELEASE_LEASE = """
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('del', KEYS[1])
+end
+return 0
+"""
 
 
 class Store(Protocol):
@@ -30,6 +59,12 @@ class Store(Protocol):
         answer: a budget that cannot be checked is spent, never free."""
 
     async def ping(self) -> bool: ...
+
+    async def acquire_lease(self, key: str, token: str, ttl_ms: int) -> AcquireResult: ...
+
+    async def renew_lease(self, key: str, token: str, ttl_ms: int) -> RenewResult: ...
+
+    async def release_lease(self, key: str, token: str) -> ReleaseResult: ...
 
     async def aclose(self) -> None: ...
 
@@ -59,6 +94,15 @@ class LocalStore:
 
     async def ping(self) -> bool:
         return True
+
+    async def acquire_lease(self, key: str, token: str, ttl_ms: int) -> AcquireResult:
+        return "unavailable"  # Local counters cannot promise cross-process exclusion.
+
+    async def renew_lease(self, key: str, token: str, ttl_ms: int) -> RenewResult:
+        return "unavailable"
+
+    async def release_lease(self, key: str, token: str) -> ReleaseResult:
+        return "unavailable"
 
     async def aclose(self) -> None:
         self._windows.clear()
@@ -93,11 +137,160 @@ class RedisStore:
             _note_fault(exc)
             return False
 
+    async def acquire_lease(self, key: str, token: str, ttl_ms: int) -> AcquireResult:
+        """A short-lived admission lease, never the authority for a money write.
+
+        Unavailable is deliberately distinct from contention. Lease callers aggregate faults;
+        unlike optional invitation budgets, an outage must not discard a pending settlement.
+        """
+        started = _clock()
+        outcome = "cancelled"
+        try:
+            async with asyncio.timeout(_TIMEOUT_S * 2):
+                acquired = await self._client.set(key, token, nx=True, px=ttl_ms)
+            outcome = "acquired" if acquired else "busy"
+            return outcome
+        except Exception as exc:  # noqa: BLE001 - cancellation still propagates to the owning scope
+            outcome = "unavailable"
+            _record_lease_error("acquire", exc, started)
+            return "unavailable"
+        finally:
+            _record_lease_timing("acquire", outcome, started)
+
+    async def renew_lease(self, key: str, token: str, ttl_ms: int) -> RenewResult:
+        started = _clock()
+        outcome = "cancelled"
+        try:
+            async with asyncio.timeout(_TIMEOUT_S * 2):
+                renewed = await self._client.eval(_RENEW_LEASE, 1, key, token, ttl_ms)
+            outcome = "renewed" if renewed else "lost"
+            return outcome
+        except Exception as exc:  # noqa: BLE001
+            outcome = "unavailable"
+            _record_lease_error("renew", exc, started)
+            return "unavailable"
+        finally:
+            _record_lease_timing("renew", outcome, started)
+
+    async def release_lease(self, key: str, token: str) -> ReleaseResult:
+        """Retry one ambiguous transient failure with the same owner-checked delete.
+
+        A retry that finds no matching owner cannot distinguish a lost reply after DEL from an
+        expired/replaced lease. It is safe cleanup, but not evidence that this owner lost its
+        lease while working. No retry may delete a later owner's token.
+        """
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + _TIMEOUT_S * 4
+        for attempt in range(2):
+            if loop.time() >= deadline:
+                break
+            started = _clock()
+            outcome = "cancelled"
+            try:
+                async with asyncio.timeout_at(min(deadline, loop.time() + _TIMEOUT_S * 2)):
+                    released = await self._client.eval(_RELEASE_LEASE, 1, key, token)
+                outcome = "released" if released else ("not_owned" if attempt else "lost")
+                return outcome
+            except Exception as exc:  # noqa: BLE001 - cancellation never retries
+                outcome = "unavailable"
+                _record_lease_error("release", exc, started)
+                if attempt or not _transient_lease_error(exc):
+                    return "unavailable"
+            finally:
+                _record_lease_timing("release", outcome, started, retry=bool(attempt))
+        return "unavailable"
+
     async def aclose(self) -> None:
         try:
             await self._client.aclose()
         except Exception:  # noqa: BLE001
             pass
+
+
+def _transient_lease_error(exc: Exception) -> bool:
+    from redis import exceptions as errors
+
+    # Authentication errors inherit ConnectionError, but retrying them cannot recover a lease.
+    if isinstance(exc, (errors.AuthenticationError, errors.AuthorizationError, errors.NoPermissionError)):
+        return False
+    return isinstance(exc, (TimeoutError, errors.TimeoutError, errors.ConnectionError))
+
+
+def _record_lease_timing(phase: str, outcome: str, started: float, *, retry: bool = False) -> None:
+    """Fixed-cardinality command-attempt summaries; no IDs, I/O or per-command events."""
+    try:
+        if outcome not in _LEASE_OUTCOMES.get(phase, ()):
+            return
+        elapsed_ms = max(0.0, _clock() - started) * 1000
+        bucket = next((f"bucket_le_{limit}_ms" for limit in _LEASE_BUCKETS if elapsed_ms <= limit),
+                      "bucket_gt_200_ms")
+        with _lease_error_lock:
+            row = _lease_timings.setdefault((phase, outcome), {
+                "event": "kv_lease_gauge", "phase": phase, "outcome": outcome,
+                "count": 0, "retry_count": 0, "elapsed_total_ms": 0.0, "elapsed_max_ms": 0.0,
+                **{f"bucket_le_{limit}_ms": 0 for limit in _LEASE_BUCKETS}, "bucket_gt_200_ms": 0,
+            })
+            row["count"] += 1
+            row["retry_count"] += int(retry)
+            row["elapsed_total_ms"] += elapsed_ms
+            row["elapsed_max_ms"] = max(row["elapsed_max_ms"], elapsed_ms)
+            row[bucket] += 1
+    except Exception:  # noqa: BLE001 - observation must not change money admission behavior
+        pass
+
+
+def drain_lease_timings() -> list[dict]:
+    """Disjoint duration buckets per attempt; only the existing background runner drains them."""
+    with _lease_error_lock:
+        rows = list(_lease_timings.values())
+        _lease_timings.clear()
+    return rows
+
+
+def _record_lease_error(phase: str, exc: Exception, started: float) -> None:
+    """Only bounded memory work on the caller; never retain an exception or its message."""
+    try:
+        from redis import exceptions as errors
+
+        if phase not in {"acquire", "renew", "release"}:
+            return
+        if isinstance(exc, TimeoutError):
+            error_type = "deadline_exceeded"
+        elif isinstance(exc, errors.TimeoutError):
+            error_type = "redis_timeout"
+        elif isinstance(exc, errors.AuthenticationError):
+            error_type = "authentication"
+        elif isinstance(exc, (errors.NoPermissionError, errors.AuthorizationError)):
+            error_type = "permission"
+        elif isinstance(exc, errors.ConnectionError):
+            error_type = "connection"
+        elif isinstance(exc, errors.ResponseError):
+            error_type = "response"
+        else:
+            error_type = "other"
+        elapsed_ms = round(max(0.0, _clock() - started) * 1000, 3)
+        failed_at = _utcnow()
+        with _lease_error_lock:
+            # Three phases times seven fixed types; unknown exception classes share "other".
+            row = _lease_errors.setdefault((phase, error_type), {
+                "event": "kv_lease_error", "phase": phase, "error_type": error_type,
+                "count": 0, "first_failed_at": failed_at, "last_failed_at": failed_at,
+                "elapsed_max_ms": 0.0, "socket_timeout_ms": _TIMEOUT_S * 1000,
+                "operation_deadline_ms": _TIMEOUT_S * 2000,
+            })
+            row["count"] += 1
+            row["last_failed_at"] = failed_at
+            row["elapsed_max_ms"] = max(row["elapsed_max_ms"], elapsed_ms)
+    except Exception:  # noqa: BLE001 - diagnostics cannot alter lease/fallback behavior
+        pass
+
+
+def drain_lease_errors() -> list[dict]:
+    """Minute/worker-exit summaries for the existing background diagnostic log sink."""
+    with _lease_error_lock:
+        rows = list(_lease_errors.values())
+        _lease_errors.clear()
+    return rows
 
 
 def _note_fault(exc: BaseException) -> None:

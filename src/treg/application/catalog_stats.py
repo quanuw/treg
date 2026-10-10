@@ -33,6 +33,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..domain.catalog import stats
+from ..domain.catalog import store as catalog_store
 from ..infra.db import session_maker
 from ..models import CallRecord, EndpointDayStat, EndpointStatCursor
 from ..timeutil import utcnow_naive
@@ -147,7 +148,7 @@ async def refresh(session_factory=session_maker, *, max_rows: int = 500_000,
                     touched[key] = tally
                 if tally.fold(status_code=status_code, created_at=created_at, duration_ms=duration_ms,
                               hit=hit, cost_observed_micro=cost, refused_by=refused_by,
-                              verdict=verdict):
+                              verdict=verdict, empty_fails=catalog_store.empty_is_failure(endpoint_id)):
                     batch_touched.add(key)
             buckets_touched |= batch_touched
             for endpoint_id, day in sorted(batch_touched):

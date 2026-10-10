@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlmodel import SQLModel
 
 from ..config import get_settings
+from . import money_trace
 
 # `expire_on_commit=False` so objects stay usable after commit without a reload round-trip.
 # On a real (non-SQLite) DB, add production pool hygiene: pre-ping to drop dead connections
@@ -156,6 +157,7 @@ def _new_engine(name: str, url: str | None = None):
         # Use a replica/read-only database role as the access boundary, not this session default.
         kwargs["connect_args"] = {"server_settings": {"default_transaction_read_only": "on"}}
     engine = create_async_engine(db_url, **kwargs)
+    money_trace.install_engine(engine.sync_engine, pool_name=name)
     if name == "read" and is_sqlite:
         # Keep this on the dedicated reader even when both URLs name the same SQLite file.
         # Applying it to the shared primary engine would also disable application writes.
@@ -378,7 +380,18 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 async def get_admin_session() -> AsyncIterator[AsyncSession]:
     """The `/admin/*` dependency. A separate callable, not a flag, because FastAPI caches a
-    dependency per request by identity: the admin gate and the handler it guards must name the SAME
-    one, or one admin request checks out a connection from each of two pools."""
+    dependency per request by identity. Primary handlers share it with the admin gate; opted-in
+    reports use `get_admin_read_session` after the gate releases its primary transaction."""
     async with admin_session_maker() as session:
+        yield session
+
+
+async def get_admin_read_session() -> AsyncIterator[AsyncSession]:
+    """Opt-in admin reports: configured reader, otherwise the original admin primary pool.
+
+    Never use the general reader's unconfigured API-pool fallback, or retry a failed replica on
+    the primary. Authorization must finish on `get_admin_session` before this dependency runs.
+    """
+    maker = read_session_maker if _read_db_url else admin_session_maker
+    async with maker() as session:
         yield session

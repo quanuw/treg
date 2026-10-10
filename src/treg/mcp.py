@@ -41,7 +41,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Annotated, Any, TypedDict
 from urllib.parse import parse_qsl, urlsplit
 
@@ -53,7 +53,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.exceptions import MCPError
 from mcp.types import AudioContent, CallToolResult, METHOD_NOT_FOUND, TextContent, ToolAnnotations
 
-from . import analytics, audit, hints
+from . import analytics, audit, hints, oauth_providers
 from .application import catalog_find as find_app
 from .application import catalog_search as search_app
 from .application import search_experiment
@@ -104,6 +104,14 @@ class _SurfacePolicy:
     client_name: str
     event_source: str
     next_call: str
+    # Renders the review or feedback invitation `/call/` decided on. Without the tools to answer
+    # it, a surface must not ask: `/call/` still decides and records, this surface does not show it.
+    invites: bool = True
+    # Catalog platforms this surface neither lists, describes nor calls.
+    hidden_platforms: frozenset[str] = frozenset()
+
+    def hides(self, ep: dict | None) -> bool:
+        return bool(ep) and ep.get("platform") in self.hidden_platforms
 
 
 _TEAM_SURFACE = _SurfacePolicy(
@@ -111,10 +119,17 @@ _TEAM_SURFACE = _SurfacePolicy(
     event_source="mcp",
     next_call="call(...)"
 )
+# The Claude directory listing was submitted as a server that does not use AI models to generate
+# images, video or audio; these platforms are exactly those models. AI judgment (labels and scores
+# over supplied evidence) generates none of them and stays. The team `/mcp/` keeps every platform.
+_DIRECTORY_HIDDEN_PLATFORMS = frozenset({"image-gen", "video-gen", "voice-gen", "music-gen"})
+_DIRECTORY_HIDDEN_NOTE = "this connector does not offer image, video, voice or music generation"
 _DIRECTORY_SURFACE = _SurfacePolicy(
     client_name="claude-connector",
     event_source="claude-connector",
     next_call="catalog_call_read(...) or catalog_call_write(...), based on the documented method",
+    invites=False,
+    hidden_platforms=_DIRECTORY_HIDDEN_PLATFORMS,
 )
 
 
@@ -806,6 +821,12 @@ async def _catalog_search_impl(
             query, limit, cat=cat, source=surface.event_source,
             caller=search_app.Caller(hub_slug=hub_slug, hub_email=hub_email),
             observed=_observed_stats, identify=lambda: _search_identity(ctx), provider_display=_provider_display)
+    withheld = 0
+    if surface.hidden_platforms:
+        rows = [(ep, score) for ep, score in page.rows if not surface.hides(ep)]
+        withheld = len(page.rows) - len(rows)
+        page = replace(page, rows=rows, total=max(len(rows), page.total - withheld), jobs=[
+            j for j in page.jobs if j.capability.split(".", 1)[0] not in surface.hidden_platforms])
     ranked, stats, hidden, total, _steering = page.rows, page.stats, page.hidden, page.total, page.steering
     if page.arm is not None:
         analytics.capture(page.caller_key or "anonymous", "catalog_search_judged", {
@@ -879,6 +900,13 @@ async def _catalog_search_impl(
         out["ranking_note"] = (f"{query!r} matches too broadly to rank on measured reliability past "
                                f"the first {catalog_store.RERANK_BAND} equally-scoring rows — "
                                f"add a word to narrow it")
+    if withheld and not results:
+        # Every match was a generation tool this surface hides: say so, not "nothing matches" or
+        # "file a request", either of which sends the agent looking for what is withheld on purpose.
+        for key in ("verdict", "reason", "jobs", "ranking_note"):
+            out.pop(key, None)
+        out["hint"] = _DIRECTORY_HIDDEN_NOTE
+        return out
     if page.verdict == find_app.NONE:
         # a catalog gap, read by the judge: the answer that stops an agent re-querying is to say
         # so and name the way to file it - no near misses, whose advice is the opposite. Where the
@@ -891,7 +919,8 @@ async def _catalog_search_impl(
     elif not results:
         # the zero-result answer carries the rows that JUST missed the gate and which words they
         # missed — the caller is an LLM, and told exactly what to drop it re-queries correctly
-        near = catalog_store.near_misses(query, cat)
+        near = [n for n in catalog_store.near_misses(query, cat)
+                if not surface.hides(cat.by_id.get(n["endpoint_id"]))]
         if near:
             out["near"] = near
             first = near[0]
@@ -1131,6 +1160,12 @@ async def _catalog_get_impl(
 ) -> CatalogGetOut:
     """Goes through the HTTP route rather than the store: that route attaches the observed
     reliability figures and the capability siblings, and those come from the database."""
+    ep = catalog_store.load().by_id.get(endpoint_id)
+    if surface.hides(ep):
+        return {"error": f"{endpoint_id} is not available here: {_DIRECTORY_HIDDEN_NOTE}"}
+    if ep is not None and catalog_store.paused(ep):
+        # `provider` is a dict in this schema, so the typed code rides in `error`, the words in `detail`.
+        return {"error": "provider_paused", "detail": oauth_providers.paused_message(ep["provider"])}
     token = _bearer(ctx)
     api_context = (_api(token) if surface is _TEAM_SURFACE
                    else _api(token, client_name=surface.client_name))
@@ -1236,6 +1271,9 @@ async def _call_impl(endpoint_id: str, params: dict | list | None = None,
     # could see and never call — which is how this gap was found.
     cat = catalog_store.load()
     ep = cat.by_id.get(endpoint_id)
+    if surface.hides(ep):
+        return {"error": f"{endpoint_id} is not available here: {_DIRECTORY_HIDDEN_NOTE}",
+                "endpoint_id": endpoint_id}
     # A hub tool (a maker's tool made of tools, `<team-slug>.<name>[@N]`) is neither a catalog id
     # nor `<tool>/<path>`; the server resolves it last on /call/. Let it through as a POST with
     # the inputs as the JSON body - the agent walk of the case study found this verb refusing a
@@ -1436,7 +1474,7 @@ async def _call_impl(endpoint_id: str, params: dict | list | None = None,
                            f"at its real price because treg's {provider} account is out; cost_usd is "
                            f"what the relay billed, not the catalog's direct price")
     if (200 <= r.status_code < 300 and not out.get("hint") and not out.get("replayed")
-            and not _is_openai_client(ctx.headers if ctx else None)):
+            and surface.invites and not _is_openai_client(ctx.headers if ctx else None)):
         # /call/ decides whether to invite (application/call/invite.py) and records that it did;
         # this surface only renders the header into the single hint slot.
         kind = r.headers.get("X-Treg-Hint")
@@ -1675,14 +1713,6 @@ _DIRECTORY_WRITE = ToolAnnotations(
     title="Call a Write Endpoint",
     read_only_hint=False, destructive_hint=True, open_world_hint=True, idempotent_hint=False,
 )
-_DIRECTORY_MEDIA = ToolAnnotations(
-    title="Call an Audio Endpoint",
-    read_only_hint=False, destructive_hint=True, open_world_hint=True, idempotent_hint=False,
-)
-_DIRECTORY_RESOURCES = ToolAnnotations(
-    title="List Team Resources",
-    read_only_hint=True, destructive_hint=False, open_world_hint=False, idempotent_hint=True,
-)
 _DIRECTORY_BALANCE = ToolAnnotations(
     title="Check Treg Balance",
     read_only_hint=True, destructive_hint=False, open_world_hint=False, idempotent_hint=True,
@@ -1704,9 +1734,7 @@ directory_mcp = MCPServer(
         "want to do; catalog_get returns parameters, provider documentation, price and measured "
         "reliability; catalog_call_read and catalog_call_write execute the selected endpoint. When "
         "several providers cover one job, catalog_get ranks them by measured success, speed and "
-        "price; you pick. "
-        "If a call result invites a review, rate that one call with review(call_id, usefulness, "
-        "reason?) after using it, then continue."
+        "price; you pick."
     ),
     middleware=[_StaticSurfaceCapabilities()],
 )
@@ -1818,36 +1846,6 @@ async def directory_catalog_call_write(
 
 
 @directory_mcp.tool(
-    name="catalog_call_media",
-    title="Call an Audio Endpoint",
-    description=("Calls a catalog audio endpoint and returns a successful binary response as "
-                 "native MCP AudioContent, with call and cost metadata."),
-    annotations=_DIRECTORY_MEDIA,
-)
-async def directory_catalog_call_media(
-    endpoint_id: str, body: dict | list | str, ctx: Context,
-    headers: dict | None = None, idempotency_key: str | None = None,
-) -> Annotated[CallToolResult, MediaOut]:
-    return await _call_media_impl(
-        endpoint_id, body=body, headers=headers, idempotency_key=idempotency_key,
-        ctx=ctx, catalog_only=True, surface=_DIRECTORY_SURFACE,
-    )
-
-
-@directory_mcp.tool(
-    name="resources_list",
-    title="List Team Resources",
-    description="Lists durable provider resources owned by the connected team.",
-    annotations=_DIRECTORY_RESOURCES,
-    structured_output=True,
-)
-async def directory_resources_list(
-    ctx: Context, provider: str = "", kind: str = "",
-) -> ResourcesOut:
-    return await _resources_list_impl(provider, kind, ctx, surface=_DIRECTORY_SURFACE)
-
-
-@directory_mcp.tool(
     name="balance",
     title="Check Treg Balance",
     description="Returns the connected team's Treg balance, in-flight holds, team and identity.",
@@ -1872,33 +1870,6 @@ async def directory_catalog_request(capability: str, ctx: Context, note: str = "
     return await _catalog_request_impl(
         capability, ctx, note, surface=_DIRECTORY_SURFACE,
     )
-
-
-@directory_mcp.tool(
-    name="feedback",
-    title="Submit Feedback",
-    description=FEEDBACK_DESCRIPTION,
-    annotations=_DIRECTORY_ADDITIVE.model_copy(update={"title": "Submit Feedback"}),
-    structured_output=True,
-)
-async def directory_feedback(
-    category: FeedbackCategory, message: str, ctx: Context,
-    call_ids: list[str] | None = None, endpoint_id: str | None = None,
-) -> FeedbackOut:
-    return await _feedback_impl(
-        category, message, ctx, call_ids, endpoint_id, surface=_DIRECTORY_SURFACE,
-    )
-
-
-@directory_mcp.tool(
-    name="review", title="Review a Catalog Call", description=REVIEW_DESCRIPTION,
-    annotations=_DIRECTORY_ADDITIVE.model_copy(update={"title": "Review a Catalog Call"}),
-    structured_output=True,
-)
-async def directory_review(
-    call_id: str, usefulness: ReviewUsefulness, ctx: Context, reason: str | None = None,
-) -> ReviewOut:
-    return await _review_impl(call_id, usefulness, ctx, reason, surface=_DIRECTORY_SURFACE)
 
 
 # --------------------------------------------------------------------------------------------

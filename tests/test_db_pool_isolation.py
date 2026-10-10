@@ -77,6 +77,9 @@ EXPECTED_MAKERS: dict[str, set[str]] = {
     "application/evidence_retention.py": {API},
     # Off-request writers.
     "audit.py": {BACKGROUND},
+    # Request-shaped: the owner delete route and `treg-worker admin erase-archive`, in short
+    # transactions with the connection released around object I/O (archive.md, "Opting out").
+    "application/archive_erasure.py": {API},
     "bootstrap.py": {BACKGROUND},
     # `lookup` is on the API pool inside a caller's /call/; every write here is background.
     "archive.py": {API, BACKGROUND},

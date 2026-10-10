@@ -584,6 +584,23 @@ async def test_pruner_strips_both_db_bytes_but_preserves_r2(clients, r2, monkeyp
         assert await r2.get(row.content_hash) is not None
 
 
+async def test_erasure_holds_no_connection_across_object_deletes(clients, r2, monkeypatch):
+    """Team deletion erases the team's own-key bodies from R2 (archive.md, "Opting out"); the
+    fixture's `check_io` asserts no DB connection is checked out by the deleting task while the
+    store is being asked to delete, the same invariant the uploads are held to."""
+    from tests.test_archive import OWN, _own_key, _vendor_says
+    _vendor_says(monkeypatch, OWN)
+    monkeypatch.delitem(__import__('treg.domain.catalog.store', fromlist=['load']).load().by_id[EP], 'cache')
+    await _own_key(clients)
+    await clients.get(URL)
+    await archive.drain()
+    assert hashlib.sha256(OWN).hexdigest() in r2.objects
+    org = (await clients.get('/orgs')).json()[0]
+    r = await clients.delete(f"/orgs/{org['org_id']}", params={'confirm': org['slug']})
+    assert r.status_code == 200, r.text
+    assert r2.delete_calls == 1 and hashlib.sha256(OWN).hexdigest() not in r2.objects
+
+
 @pytest.mark.parametrize('setting', ['archive_body_write', 'archive_body_read_lookup',
                                     'archive_body_read_result', 'archive_body_read_terminal'])
 async def test_startup_fails_before_db_when_r2_configuration_missing(monkeypatch, setting):

@@ -1,7 +1,7 @@
 // Connections: every account and key the team holds, and every provider one can be added for.
 const byName = new Intl.Collator()
 // Accounts that need a person come first, in the order a person should deal with them.
-const RANK = {reconnect:0, second:1, failing:2, setup:3, choose:4, ok:5}
+const RANK = {reconnect:0, second:1, failing:2, setup:3, choose:4, ok:5, paused:6}
 
 export default {
 providerIndex(){ return new Map(this.providers.map(p=>[p.service,p])); },
@@ -26,7 +26,11 @@ providerIndex(){ return new Map(this.providers.map(p=>[p.service,p])); },
     connAccounts(){
       // A grant with no catalog provider (an own-app OAuth connect) has no provider page to manage it
       // from: it stays among the team's own secrets.
-      const conns=this.connections.flatMap(c=>{ const p=this.providerIndex.get(c.provider);
+      // A paused provider is out of the listing, but its connections are kept: they show paused.
+      const conns=this.connections.flatMap(c=>{
+        if(c.paused) return [{id:'c'+c.id, service:c.provider, c, p:null, pasted:false,
+                              name:c.provider_display_name||c.provider, st:this.connState(c)}];
+        const p=this.providerIndex.get(c.provider);
         return p ? [{id:'c'+c.id, service:c.provider, c, p, pasted:this.pastedCredential(p),
                      name:p.display_name, st:this.connState(c)}] : []; });
       const named=this.namedKeys.map(({s, p, shadowed})=>({id:'s'+s.id, service:p.service, s, p, pasted:true,

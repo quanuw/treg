@@ -82,7 +82,7 @@ def fetch_text(output: dict) -> str:
         if isinstance(page, str) and page.strip():
             return page[:100_000]
         if isinstance(page, dict):
-            for key in ("markdown", "markdown_content", "text", "raw_content", "content"):
+            for key in ("markdown", "markdown_content", "text", "raw_content", "content", "full_content"):
                 value = page.get(key)
                 if isinstance(value, str) and value.strip():
                     return value[:100_000]

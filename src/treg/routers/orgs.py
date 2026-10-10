@@ -15,6 +15,7 @@ from sqlmodel import select
 from .. import analytics, crypto, email as email_sender, health, localrun
 from .. import providers as _providers
 from ..application.onboard import demo as demo_seed
+from ..application import archive_erasure
 from ..application import signup as signup_use_cases
 from ..caller_metadata import TAG_DEFAULT, _MAX_BUDGET_DIMS, _META_KEY_RE, _client_of, _norm_client
 from ..config import get_settings
@@ -47,6 +48,7 @@ from ..domain.identity import session as identity_session
 from ..infra.db import get_session
 from ..models import (
     ROLE_RANK,
+    ApiKey,
     Bundle,
     CallRecord,
     DenyRule,
@@ -284,6 +286,7 @@ class OrgPatchIn(BaseModel):
 class OrgSettingsIn(BaseModel):
     daily_cap_micro: int | None = None
     platform_overflow: bool | None = None  # False = opt out of the overflow relay (ops/capacity.md)
+    archive: bool | None = None  # False = opt out of the archive (archive.md, "Opting out")
     budget_dims: list[str] | None = None
     primary_dim: str | None = None
 
@@ -892,6 +895,14 @@ async def delete_org(
     if confirm != org.slug:
         raise HTTPException(status_code=422, detail=(
             f"to delete this team, confirm with its slug: ?confirm={org.slug}"))
+    # The team's archived answers go with it (archive.md, "Opting out"). The opt-out is set and
+    # committed first, so nothing new of the team's is recorded from here on; the object phase
+    # then runs on its own short sessions after this one has let go of its connection, and a
+    # failure there keeps the team (opted out), so the owner simply tries again.
+    if org.archive_opt_out_at is None:
+        org.archive_opt_out_at = _utcnow_naive()
+    await db.commit()
+    await archive_erasure.erase_org(org_id)
     await teams.cascade_delete_org(org, db)
     await db.commit()
     return {"deleted_org": org_id}
@@ -1084,7 +1095,7 @@ async def create_agent(
         pins = dict(_validate_tag_pair(k, v) for k, v in pins.items())
     membership.pinned_tags = pins or None
     try:
-        token, _ = await managed_keys.rotate_agent_key(
+        token, key = await managed_keys.rotate_agent_key(
             db, membership, user, actor_email=caller.email,
         )
         await db.commit()
@@ -1093,6 +1104,7 @@ async def create_agent(
         raise HTTPException(status_code=409, detail="another rotation already replaced this agent key")
     response.headers["Cache-Control"] = "no-store"
     return {"token": token, "name": name, "email": email, "org": caller.org.slug, "user_id": user.id,
+            "api_key_id": key.id,
             "role": membership.role, "daily_call_cap": membership.daily_call_cap,
             "tool_access": membership.tool_access, "project_access": membership.project_access,
             "local_run_enabled": membership.local_run_enabled,
@@ -1112,8 +1124,8 @@ async def list_agents(
     )).scalars().all()}
     used = await _used_today_by_user(db, org_id)
     agent_emails = [u.email for u in users.values() if _is_agent_email(u.email)]
-    # "connected" = the agent has EVER called in as itself (checkin or any real call) — what the
-    # token card polls to flip to ✓ the moment the setup instruction's final step runs.
+    # The roster shows lifetime identity history. The setup card polls the separate connection
+    # endpoint for its newly issued key, so a rotation cannot inherit an old key's check-in.
     seen = set((await db.execute(
         select(CallRecord.user_email).where(
             CallRecord.org_id == org_id, CallRecord.user_email.in_(agent_emails)).distinct()
@@ -1132,6 +1144,32 @@ async def list_agents(
                     "created_by": m.created_by, "promoted_from": m.promoted_from,
                     "connected": user.email in seen})
     return out
+
+
+@app.get("/orgs/{org_id}/agents/{user_id}/connection")
+async def agent_connection(
+    org_id: int, user_id: int, response: Response, api_key_id: int = Query(gt=0),
+    caller: Caller = Depends(require_member), db: AsyncSession = Depends(get_session),
+) -> dict:
+    """Whether this agent's issued key has checked in or made a call. No roster or usage scan."""
+    _require_admin_of(org_id, caller)
+    email = (await db.execute(
+        select(User.email).join(Membership, Membership.user_id == User.id)
+        .join(ApiKey, ApiKey.membership_id == Membership.id)
+        .where(Membership.org_id == org_id, User.id == user_id,
+               ApiKey.id == api_key_id, ApiKey.org_id == org_id,
+               ApiKey.kind == managed_keys.AGENT_KIND, ApiKey.state == managed_keys.ACTIVE)
+    )).scalar_one_or_none()
+    if email is None or not _is_agent_email(email):
+        raise HTTPException(status_code=404, detail="unknown active agent key")
+    # (org_id, api_key_id, id) already has an index. EXISTS stops at the first matching row and
+    # never loads evidence bodies, counts usage, or groups the observed-agent history.
+    connected = (await db.execute(select(select(CallRecord.id).where(
+        CallRecord.org_id == org_id, CallRecord.api_key_id == api_key_id,
+        CallRecord.user_email == email,
+    ).exists()))).scalar_one()
+    response.headers["Cache-Control"] = "no-store"
+    return {"connected": connected}
 
 
 @app.post("/agents/checkin")
@@ -1351,6 +1389,9 @@ async def get_org_settings(
             "daily_cap_set_by_team": int(org.daily_cap_micro or 0) or None,
             "platform_default_micro": get_settings().platform_daily_cap_micro,  # 0 = none
             "platform_overflow": not org.platform_overflow_disabled,
+            # The archive opt-out (archive.md, "Opting out"): the moment the team objected, or None.
+            "archive": org.archive_opt_out_at is None,
+            "archive_opt_out_at": org.archive_opt_out_at.isoformat() if org.archive_opt_out_at else None,
             "budget_dims": _budget_dims_of(org), "primary_dim": _primary_dim_of(caller)}
 
 
@@ -1374,6 +1415,11 @@ async def set_org_settings(
         org.daily_cap_micro = body.daily_cap_micro
     if "platform_overflow" in sent and body.platform_overflow is not None:
         org.platform_overflow_disabled = not body.platform_overflow
+    if "archive" in sent and body.archive is not None:
+        if not body.archive and org.archive_opt_out_at is None:
+            org.archive_opt_out_at = _utcnow_naive()   # the moment of objection is the record
+        elif body.archive:
+            org.archive_opt_out_at = None
     if "budget_dims" in sent and body.budget_dims is not None:
         dims = [d.strip().lower() for d in body.budget_dims if d and d.strip()]
         if len(dims) > _MAX_BUDGET_DIMS:

@@ -17,6 +17,8 @@ sources:
   - src/treg/web/selfhost.sh
   - src/treg/config.py
   - src/treg/infra/db.py
+  - src/treg/infra/money_admission.py
+  - scripts/bench_money_admission.py
   - src/treg/email.py
   - src/treg/audit.py
   - scripts/dev-local.sh
@@ -135,6 +137,14 @@ through. Live values and production sizing belong in the private operator runboo
 headroom. Resize from measurements, one pool at a time. A larger pool does not repair a slow scan,
 lock queue, disk-bound database or missing index.
 
+Web roles and worker commands also run local money-transaction diagnostics independently of the
+PostHog key. Verify fresh `money_trace_gauge` records for each deployed build and process, including
+tracking counts, sample age and drop counters. `money_txn_slow` and `money_txn_end` correlate backend
+PIDs with application transaction IDs and stages; join within their timestamp intervals because
+connections are reused. Read the coverage and loss limitations in
+[data-model](../architecture/data-model.md#product-analytics-writer-analyticspy) before interpreting
+missing records. Deployment requires no schema migration or new database privileges.
+
 All pools use `pool_pre_ping=True`, `pool_recycle=300` and `pool_timeout=5`. A request that gets no
 slot in time receives `503 {"treg_saturated": true}` with `Retry-After: 2` through
 `bootstrap_handlers._pool_saturated`. A `/call/` holds no connection during the upstream round trip.
@@ -168,6 +178,14 @@ These connection settings guard accidental writes; they are not an authorization
 be disabled by deliberate SQL. Use a physical replica/read-only database role or filesystem access
 controls as appropriate. Connection/query failures propagate without primary fallback.
 
+`/admin/errors` uses this datasource for evidence and org names. Authorization stays on the admin
+primary pool and releases its connection before the report begins. With no read URL configured,
+`get_admin_read_session` preserves the original admin pool rather than using the general reader's
+API-pool fallback. Configured reader failures never retry on the primary.
+Before enabling a hosted cutover, verify the running process has the intended read URL, the target
+is a readable replica with the required table grants, and replication lag is acceptable. Configuring
+a URL does not migrate any other report. Removing it returns this report to the admin primary pool.
+
 `pool_snapshot()` includes a separate `read` entry for a configured PostgreSQL datasource; SQLite
 engines are omitted as for the primary. `connection_budget()` describes only the primary pools;
 budget the read pool against its target database, including process count and deployment overlap.
@@ -175,8 +193,8 @@ If both URLs target the same server, add both budgets against that server's limi
 `dispose_engine()` also disposes the read engine. Schema upgrades, startup verification and test
 schema resets continue to target the primary.
 
-This datasource is opt-in infrastructure: no application query or worker currently uses it.
-Adopting callers must tolerate replica lag and keep writes, cursor advancement and concurrency
+This datasource is opt-in infrastructure; `/admin/errors` is its first report consumer.
+Further callers must tolerate replica lag and keep writes, cursor advancement and concurrency
 control on the primary. Operators must provision and synchronize a compatible schema and data;
 setting a URL does not establish replication, translate dialect-specific queries, or migrate any
 Cron job's workload. Configure it in a private local `.env` or the hosting service's environment;
@@ -198,6 +216,11 @@ Cron job's workload. Configure it in a private local `.env` or the hosting servi
   credentials make that provider unconfigured instead of failing halfway through consent.
 - `oauth_review_pending` is a comma-separated set of provider-registry review keys. Its hosted value
   is operational state and is maintained privately.
+- `paused_providers` is a comma-separated set of provider service ids this deployment cannot serve
+  right now, for example because its own app lost upstream access. Empty (the default) pauses
+  nothing. `paused_provider_messages` is an optional JSON object `{service: message}`; malformed
+  JSON fails at boot. Removing an id restores the provider with no reconnect. Its hosted value is
+  operational state and is maintained privately. See `interface/api.md` § `503 provider_paused`.
 - `promo_grant_micro` controls the once-per-verified-user signup grant. Zero pauses new automatic
   grants without changing existing balances.
 - `blocked_email_domains` is the complete comma-separated blocklist. Empty blocks no domains. It is
@@ -220,6 +243,44 @@ subsystems. Credentials must stay in the deployment secret store. `TREG_PLATFORM
 shared-serving allow-list. Most providers also require a configured platform key. A live-verified
 free endpoint declared `platform_auth: anonymous` needs only the allow-list because treg injects no
 provider credential.
+
+## Optional money admission
+
+`TREG_MONEY_ADMISSION_ENABLED` defaults to `false`. Enabling it requires a shared Redis-compatible
+store at `TREG_KV_URL`; all participating web and money-worker processes must use the same store
+and rollout settings. No database migration or additional database privileges are required.
+
+- `TREG_MONEY_ADMISSION_ORG_IDS` is a JSON array of positive Org IDs. A non-empty array enables
+  admission only for those orgs; `[]` covers all orgs when the feature is enabled.
+- `TREG_MONEY_ADMISSION_WAIT_S` defaults to 5 seconds and bounds the complete local/Redis
+  acquisition attempt. Cleanup is separately bounded by the KV operations. Exhausting this
+  budget falls back to the existing database path; it does not reject or discard settlement.
+- `TREG_MONEY_ADMISSION_LEASE_S` defaults to 15 seconds. The owner renews while acquiring or using
+  its leases and deletes only leases with its token. Expiry, lost renewal or a Redis outage can
+  admit overlapping database transactions, so existing database locks remain authoritative.
+
+Deploy compatible code first with admission disabled to collect the same eligible-operation
+baseline, then opt in a small Org set. Compare `money_admission_gauge` wait and end-to-end durations,
+fallback/lease-loss counters, and the existing pool, money-operation and database-failure signals
+under comparable load before expanding. Whole-session serialization can reduce hot-org throughput
+even when it improves connection occupancy, so reduced lock-wait time alone is not rollout
+acceptance. Defaults are acquisition bounds, not workload sizing recommendations. Disable the
+feature to restore the original database admission path; mixed
+settings or old writers weaken isolation but do not remove accounting's database protection.
+There is no global money concurrency cap, and unrelated orgs can still collectively fill a pool.
+See [money](../architecture/money.md#optional-admission-before-the-settlement-session) for exact
+operation coverage and [data-model](../architecture/data-model.md#product-analytics-writer-analyticspy)
+for aggregate boundaries and interpretation.
+
+`tests/test_money_admission_postgres.py` uses real disposable loopback PostgreSQL and Redis via
+`TREG_TEST_DB_URL` and `TREG_TEST_KV_URL`; without these it skips instead of contacting a service.
+The PostgreSQL CI job supplies both services. `scripts/bench_money_admission.py` compares disabled
+and enabled synthetic settlement workloads using the same variables, with database names required
+to start with `treg_admission_test`. It resets that disposable schema. Its timings are local
+synthetic evidence, not a production replay or a guarantee of deployed throughput. Benchmark
+clients use separate Redis connections and local mutex maps within one event loop; this exercises
+Redis contention without a shared local mutex hiding it, but is not an operating-system
+multi-process load or failure test.
 
 ## Safe local mode
 

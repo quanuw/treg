@@ -400,7 +400,9 @@ Money notes for agents:
   `X-Treg-Cache: hit` with `X-Treg-Fetched-At` and `X-Treg-Age`. Your team's first call on a
   question costs full price either way; from your second call on, a hit costs 10% - and a hit on
   your own key is free. Send `Cache-Control: no-cache` to force a live call, or `X-Treg-Max-Age:
-  <seconds>` to accept only a younger answer. An idempotency replay is different
+  <seconds>` to accept only a younger answer. A team admin can opt the whole team out of the
+  archive (`treg org archive off`): new calls are then neither answered from nor stored in it,
+  so metered calls lose the repeat price. An idempotency replay is different
   (`X-Treg-Idempotent-Replay: true`). Empty results are the provider's own semantics — treg does
   not normalise "no data" vs "no coverage" vs "unsupported target".
 - Out of balance → HTTP **402** with a machine-actionable body: `balance_micro`,
@@ -412,6 +414,9 @@ Money notes for agents:
   when known and `alternatives` — other providers for the same capability; pick one, or use
   your own key for the provider (never affected). treg does not switch providers for you.
   treg re-checks the provider about once a minute, so a retry after a minute can succeed.
+- HTTP **503** with `error: provider_paused` → this treg deployment has paused that provider
+  (nothing charged, nothing sent to it). The `message` says why. Its endpoints are out of search
+  and the team's existing connection is kept; do not reconnect, it works again when resumed.
 - `treg balance` shows the prepaid balance and recent charges; the dashboard Activity page
   shows the exact settled cost of every call.
 

@@ -59,6 +59,12 @@ cash. The shared-key rate policy spaces calls at five per second, below the Base
 bypass shared-key capacity policy. The funded account was not exhausted to capture an empty-wallet
 signature, and no overflow route is claimed.
 
+Parallel publishes `GET /account/service/v1/balance`, but it accepts only an Account API OAuth access
+token, never the API key treg holds, so `NO_BALANCE_API` reports the account as Platform-only and
+`_KNOWN` classifies it as manually funded cash. The shared key is paced at the documented 600
+requests a minute that Search, Extract and Entity Search each allow. HTTP 402 insufficient credit
+was not forced, and no overflow route is claimed.
+
 Litescrape's internal collector reads the free `GET /api/keys/status` route with the platform
 Bearer key. It accepts a nonnegative integer `remaining_calls` as the prepaid call balance and
 records the key's reported concurrency limit as an informational note. The policy is

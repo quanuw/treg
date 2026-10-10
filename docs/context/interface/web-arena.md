@@ -186,8 +186,8 @@ window over dated links when the query needs recent information; missing dates r
 Fetch counts words and symbols with the fixed `word-or-symbol-v1` tokenizer. For at least two
 provider texts, a bounded LLM request lists up to 12 facts from their union. Jev tests retention
 of each fact in each text. This is relative coverage and cannot detect facts every provider
-missed. Web Arena reads plain page text, Olostep's `markdown_content`, and Brand.dev's nested
-`markdown.data` before deciding whether a Fetch returned usable text. Fetch cards show text count,
+missed. Web Arena reads plain page text, Olostep's `markdown_content`, Parallel's `full_content`,
+and Brand.dev's nested `markdown.data` before deciding whether a Fetch returned usable text. Fetch cards show text count,
 Fact coverage, and token efficiency as compact metrics with explanations. The text count is a
 word-and-symbol count, not a model token count. Cards omit the underlying tokens-per-fact ratio
 and the shared fact-list generation time. Card and table views both call the fetch metric Fact

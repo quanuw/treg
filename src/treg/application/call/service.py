@@ -58,6 +58,7 @@ from .resolve import (
     _oauth_billed_provider,
     _request_body_document,
     _resolve_call,
+    provider_paused,
     resolve_call_target,
     resolve_marketplace_target,
 )
@@ -820,6 +821,7 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
             # still leave a trace — it's exactly the row the caller will come asking about.
             request.state.call_audited = True
             refused = ("capacity" if mkexc.kind == "provider_capacity"
+                       else "paused" if mkexc.kind == "provider_paused"
                        else _refusal_kind(mkexc.status_code))
             audit.record_call(
                 org_id=caller.org_id, user_email=caller.email, tool_name=ep["id"],
@@ -1038,6 +1040,13 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
     except CallFailure as exc:
         _audit(exc.status_code, refused_by=_refusal_kind(exc.status_code))  # the attempt is a record too
         raise
+    # A connection of a paused provider (TREG_PAUSED_PROVIDERS) is kept but not used: its own tool
+    # and a URL passthrough to its hosts resolve to the tool bound to it. Refused here, before the
+    # money gate and before a token refresh or the relay could reach the provider.
+    paused = next((s.provider for s in secrets.values() if oauth_providers.is_paused(s.provider)), None)
+    if paused is not None:
+        _audit(503, refused_by="paused", answered=False)
+        raise provider_paused(paused)
     billed_provider = _oauth_billed_provider(secrets)
     if billed_provider is not None:
         # The sandbox never reaches here (it returned above); the public demo could, and one shared
@@ -1217,12 +1226,20 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
             # run below unchanged — a cached hit is billed exactly like the live call it stands in
             # for, tagged `cached`; the founder's deferred pricing decision attaches to that tag.
             served = None
+            # A team that opted out of the archive (archive.md, "Opting out") is never answered
+            # from it and never recorded into it, on any tier: no lookup, no record, and so no
+            # key hash reaches the settle to mark the team against the question. Read off the
+            # org row the caller already carries - no query on the call path.
+            archive_opted_out = caller.org.archive_opt_out_at is not None
+            if archive_opted_out:
+                cache_diagnostics["cache_outcome"] = "org_opt_out"
             # An own-key catalog call (tier 1/2, never metered) takes part in the archive too:
             # it may be answered from a stored answer (free — the team's key is never billed)
             # and its own answer is recorded for the team, provided the question is fully
             # known (a streamed caller body was never read and cannot key).
             own_key_cacheable = (
-                mk is not None and not mk.metered and mk.tier in ("tool", "credential")
+                mk is not None and not archive_opted_out
+                and not mk.metered and mk.tier in ("tool", "credential")
                 and not mk.free_owned_poll and (caller_body_read or not request.has_body))
             own_key_archivable = (
                 own_key_cacheable and archive.recording()
@@ -1241,6 +1258,7 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                     catalog_store.load().by_id.get(mk.endpoint_id), own_credential=own_credential)
             # A probe must reach the vendor: an archived answer proves nothing about capacity.
             if (mk is not None and mk.probe_lock_id is None and archive.serving()
+                    and not archive_opted_out
                     and ((mk.metered and not mk.streamable_free_result) or own_key_cacheable)):
                 lookup_started = time.monotonic()
                 try:
@@ -1334,7 +1352,8 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                 # 2xx only — gate 3 of eligibility is exactly 'this fact, at this line'. Off unless
                 # TREG_ARCHIVE_MODE says otherwise; record() is fire-and-forget and never raises.
                 # `own_credential` here means billed OAuth: the org's token, treg's bill.
-                if (mk.metered and archive.recording() and 200 <= response.status < 300
+                if (mk.metered and archive.recording() and not archive_opted_out
+                        and 200 <= response.status < 300
                         and spooled_bytes is None and not _unfinished_submission(mk, body)
                         and not (own_credential and _echoes_own_credential(tool, secrets, body))
                         and not _account_out_2xx(mk, response, body)):

@@ -8,6 +8,7 @@
     treg-worker catalog stats [--max-rows 500000]    # fold new audit rows into per-day endpoint stats
     treg-worker jev xboost [--posts 60] [--min-likes 150]   # the /jev launch-radar demo: X posts <24h -> jev
     treg-worker admin purge-evidence [--batch-size 5000]  # blank expired error evidence past 14-day retention
+    treg-worker admin erase-archive --org <id>             # erase what an opted-out team stored in the archive
 
 Not the light `treg` CLI: these need the server extra (DB, platform keys in the env) and make
 outbound calls to third parties, so they run as Render cron jobs with the server's env — never as
@@ -366,11 +367,57 @@ async def _admin_purge_evidence(args) -> int:
     return 1 if result.get("error") else 0
 
 
+async def _admin_erase_archive(args) -> int:
+    """Erase what one opted-out team stored in the archive (application/archive_erasure): the
+    answer to an erasure request. Refuses a team still in the archive; opt it out first."""
+    from . import bootstrap
+    from .application import archive_erasure
+    from .infra.db import verify_db
+
+    await verify_db()
+    try:
+        async with bootstrap.archive_object_store():
+            result = await archive_erasure.erase_org(args.org)
+    except archive_erasure.NotOptedOut as exc:
+        print(json.dumps({"error": str(exc)}, sort_keys=True))
+        return 1
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
 def _positive_int(value: str) -> int:
     n = int(value)
     if n < 1:
         raise argparse.ArgumentTypeError("must be >= 1")
     return n
+
+
+async def _run_command(args) -> int:
+    from . import analytics
+    from .infra import kv
+    from .infra.money_admission_reporting import emit_snapshot
+    from .infra.money_trace_runner import money_trace_lifespan
+
+    # In particular, async hold settlement runs here without any web application's lifespan.
+    try:
+        async with money_trace_lifespan(role="worker"):
+            try:
+                return await args.fn(args)
+            finally:
+                try:
+                    emit_snapshot(role="worker", shutdown=True)
+                except Exception:  # noqa: BLE001 - preserve the command's result/failure
+                    pass
+                finally:
+                    await kv.close()
+    finally:
+        try:
+            # The trace lifespan also queues lease/trace exit summaries. Drain once after all
+            # producers stop; a short worker must not queue its tail after its final send.
+            async with asyncio.timeout(1):
+                await analytics.drain()
+        except Exception:  # noqa: BLE001 - local exit summaries remain the fallback evidence
+            pass
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -439,9 +486,12 @@ def main(argv: list[str] | None = None) -> int:
     purge.add_argument("--batch-size", type=_positive_int, default=5000,
                        help="rows to update per transaction (default 5000)")
     purge.set_defaults(fn=_admin_purge_evidence)
+    erase = adminsub.add_parser("erase-archive", help="erase what an opted-out team stored in the archive")
+    erase.add_argument("--org", type=_positive_int, required=True, help="the team's org id")
+    erase.set_defaults(fn=_admin_erase_archive)
     args = ap.parse_args(argv)
     _need_server()
-    return asyncio.run(args.fn(args))
+    return asyncio.run(_run_command(args))
 
 
 if __name__ == "__main__":

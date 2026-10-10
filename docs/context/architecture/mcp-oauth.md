@@ -32,12 +32,14 @@ team, and a token accepted only on the table routes. See [table](table.md).
 
 ## Feedback
 
-Both transports expose `feedback(category, message, call_ids?, endpoint_id?)`, using a four-value
-category enum and the shared HTTP intake. This is an additive, non-destructive write on treg,
-not an upstream call. It requires the existing transport identity and spends no balance.
-Both also expose `review(call_id, usefulness, reason?)` as a non-destructive, non-idempotent local
+The team `/mcp/` exposes `feedback(category, message, call_ids?, endpoint_id?)`, using a
+four-value category enum and the shared HTTP intake. This is an additive, non-destructive write on
+treg, not an upstream call. It requires the existing transport identity and spends no balance.
+It also exposes `review(call_id, usefulness, reason?)` as a non-destructive, non-idempotent local
 write relayed to `/reviews`, using the shared usefulness enum and description.
-See [feedback](feedback.md) for invitation sampling and hint priority. V2 retains its catalog-only calling boundary.
+See [feedback](feedback.md) for invitation sampling and hint priority. `/mcp/v2/` registers neither
+tool, so it never renders the review or feedback invitation `/call/` decided on
+(`_SurfacePolicy.invites`); `/call/` still decides and records it, as for OpenAI's clients.
 
 ## Managed bearer keys
 
@@ -100,11 +102,10 @@ of shared behavior.
 
 | Area | Must stay shared | Intentional difference |
 |---|---|---|
-| catalog search | loading, ranking, price view, near misses, and the same process observation cache and refresh Task used by HTTP | next-call guidance and event source |
-| endpoint details | the `/catalog/endpoints/{id}` route and error shape | client attribution |
-| calls | request assembly, credentials, policy, limits, idempotency, relay, errors, metering, audit | team MCP accepts team tools; V2 accepts catalog ids only and splits read/write methods |
+| catalog search | loading, ranking, price view, near misses, and the same process observation cache and refresh Task used by HTTP | next-call guidance and event source; V2 drops rows on its hidden platforms |
+| endpoint details | the `/catalog/endpoints/{id}` route and error shape | client attribution; V2 refuses an endpoint on its hidden platforms |
+| calls | request assembly, credentials, policy, limits, idempotency, relay, errors, metering, audit | team MCP accepts team tools; V2 accepts catalog ids only, splits read/write methods, refuses its hidden platforms and shows no invitation |
 | balance | team selection, grant labels, balance route, error shape | client attribution |
-| feedback | `/feedback`, categories, privacy guidance, team scope and limits | client attribution |
 | catalog requests | `/tool-requests`, rate limit, field limits, caller IP | event source and client attribution |
 | transport | host checks, compression, cache headers, eager auth, static capabilities | V2 has a separate audience, metadata path, scope marker, and Claude browser origin |
 | lifecycle | the transport factory and `mcp_lifespan` | V2 mount and lifespan depend on its feature flag |
@@ -119,7 +120,12 @@ shared behavior and must also prove the listed differences. Keep these V2 proper
 new directory review approves a contract change:
 
 - `/mcp/v2/` is the stable URL, and `/mcp/v2` resolves to the same resource.
-- The tool list has ten tools, including `feedback` and `review`; directory submissions must reflect this schema.
+- The tool list has the six tools the directory listing was submitted with: `catalog_search`,
+  `catalog_get`, `catalog_call_read`, `catalog_call_write`, `balance`, `catalog_request`. Adding a
+  tool changes the listing; do it with a resubmission, not in passing.
+- V2 does not list, describe or call image, video, voice or music generation
+  (`_DIRECTORY_HIDDEN_PLATFORMS`): the listing states the server does not use AI models to generate
+  images, video or audio. The team `/mcp/` keeps them.
 - V2 accepts catalog ids only. It does not list or call arbitrary team tools or passthrough paths.
 - Read and write calls stay separate, and their annotations match their method classes.
 - V1 and V2 OAuth audiences do not cross.
@@ -596,8 +602,8 @@ override it, and the header is not relayed to the provider.
 
 The generic `call` surfaces accept optional `form` scalar fields and base64 `uploads`, capped at 30
 MiB before the internal request, so multipart voice creation does not change the existing JSON call
-contract. `/mcp/v2/` names the audio tool `catalog_call_media`; both surfaces independently register
-and test `resources_list`. Native audio never passes through JSON/text decoding.
+contract. Only the team `/mcp/` registers `call_media` and `resources_list`; `/mcp/v2/` has neither.
+Native audio never passes through JSON/text decoding.
 
 `X-Treg-Meta` (see [money](money.md)) is read off the MCP **transport** in `mcp.call()` and forwarded
 on the internal request, the same way `catalog_request` forwards `X-Forwarded-For`. It is deliberately

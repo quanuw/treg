@@ -5,6 +5,7 @@ import pytest
 import sqlalchemy as sa
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from treg.infra import db
 from tests.test_alembic_baseline import _drop_everything
@@ -73,9 +74,49 @@ async def _apply(direction, statements=None):
 
 async def _index_names():
     async with db._engine.connect() as connection:
-        return await connection.run_sync(lambda conn: {
-            index["name"] for table, _, _ in CASES for index in sa.inspect(conn).get_indexes(table)
-        })
+        return await connection.run_sync(_index_names_on)
+
+
+def _index_names_on(connection):
+    if connection.dialect.name == "sqlite":
+        # PRAGMA index_list can see an older schema on a pooled connection after another one
+        # performed DDL. Read the catalog itself; this also keeps expression indexes in the
+        # before/after assertion instead of letting reflection silently omit them.
+        query = sa.text("""
+            SELECT name FROM sqlite_master
+            WHERE type = 'index' AND tbl_name IN :tables
+              AND name NOT GLOB 'sqlite_autoindex_*'
+        """).bindparams(sa.bindparam("tables", expanding=True))
+        return set(connection.execute(query, {"tables": [table for table, _, _ in CASES]}).scalars())
+    return {
+        index["name"] for table, _, _ in CASES for index in sa.inspect(connection).get_indexes(table)
+    }
+
+
+async def test_sqlite_index_snapshot_sees_ddl_from_another_connection(tmp_path):
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'indexes.db'}")
+    try:
+        async with engine.connect() as reader:
+            # Warm this connection's schema before a different connection performs the DDL.
+            assert await reader.run_sync(lambda conn: sa.inspect(conn).get_table_names()) == []
+            await reader.commit()
+            async with engine.begin() as writer:
+                for table, column, constraint in CASES:
+                    await writer.execute(sa.text(
+                        f'CREATE TABLE "{table}" (id INTEGER PRIMARY KEY, "{column}" TEXT, '
+                        f'other TEXT, CONSTRAINT "{constraint}" UNIQUE ("{column}"))'))
+                    await writer.execute(sa.text(
+                        f'CREATE INDEX "ix_{table}_{column}" ON "{table}" ("{column}")'))
+                    await writer.execute(sa.text(
+                        f'CREATE INDEX "ix_{table}_other" ON "{table}" (other)'))
+                await writer.execute(sa.text(
+                    'CREATE INDEX ix_archivekey_expression ON archivekey (lower(key_hash))'))
+            expected = {f"ix_{table}_{suffix}" for table, column, _ in CASES
+                        for suffix in (column, "other")} | {"ix_archivekey_expression"}
+            assert await reader.run_sync(_index_names_on) == expected
+            assert await reader.run_sync(_index_names_on) == expected
+    finally:
+        await engine.dispose()
 
 
 async def _assert_data_and_uniqueness(metadata):

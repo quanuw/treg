@@ -288,6 +288,8 @@ contracts:
       count: {type: int}
     miss: "results == []"
     idempotent: true
+    empty_is_failure: true   # an empty answer is the provider failing the job
+    prefer: [crawl4ai]
 
   people.search:
     summary: "Find people by a free-text description, or by company domain / title / country — provider-native rows in `people`"
@@ -1194,6 +1196,7 @@ contracts:
       count: {type: int}
     miss: "results == []"
     idempotent: true
+    empty_is_failure: true   # an empty answer is the provider failing the job
     prefer: [crawl4ai]
 
   web.search.news:
@@ -1218,6 +1221,7 @@ contracts:
       count: {type: int}
     miss: "pages == []"
     idempotent: true
+    empty_is_failure: true   # an empty answer is the provider failing the job
     prefer: [crawl4ai]
 
   web.extract.structured:

@@ -142,6 +142,11 @@ class Org(SQLModel, table=True):
     # column default is the plain `false` in Python — and LAST in the class, because alembic's
     # add_column appends, keeping create_all test schemas aligned with the migrated shape.
     platform_overflow_disabled: bool = Field(default=False)
+    # The team has opted out of the archive (docs/context/architecture/archive.md, "Opting out"):
+    # none of its calls is answered from or recorded into the archive. A timestamp rather than a
+    # flag because the moment the team objected is the processing record. Appended last, like the
+    # column above, so create_all schemas match the migrated shape.
+    archive_opt_out_at: NaiveUTC | None = Field(default=None)
 
 
 class User(SQLModel, table=True):
@@ -1782,6 +1787,11 @@ class ArchiveSnapshot(SQLModel, table=True):
         # Partial index for the report's "refreshes today" count — only refresh-origin rows.
         Index("ix_archivesnapshot_refresh_fetched", "fetched_at",
               postgresql_where=text("origin = 'refresh'"), sqlite_where=text("origin = 'refresh'")),
+        # Partial index for "the keys this team fetched on its own credential" (archive erasure,
+        # run by every team deletion) — NULL on every platform-key snapshot, most of the table.
+        Index("ix_archivesnapshot_origin_org", "origin_org_id",
+              postgresql_where=text("origin_org_id IS NOT NULL"),
+              sqlite_where=text("origin_org_id IS NOT NULL")),
     )
 
     id: int | None = Field(default=None, primary_key=True)

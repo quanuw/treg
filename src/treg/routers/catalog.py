@@ -506,6 +506,10 @@ async def catalog_endpoint(
             "error": f"unknown endpoint {endpoint_id!r}",
             "hint": catalog_store.unknown_id_hint(endpoint_id, cat),
             "did_you_mean": catalog_store.near_ids(endpoint_id, cat)})
+    if catalog_store.paused(ep):
+        # Out of search while paused, but a held id is told why instead of "unknown endpoint".
+        raise HTTPException(status_code=503, detail=oauth_providers.paused_detail(
+            ep["provider"], endpoint_id))
     view = (catalog_store.endpoint_view(ep, _provider_display(ep["provider"]), cat)
             | catalog_store.endpoint_context(ep, cat))
     siblings = [
