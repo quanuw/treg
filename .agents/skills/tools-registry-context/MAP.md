@@ -27,6 +27,7 @@ Regenerate via `scripts/build-map.py`.
 | `examples/claude-code-mods/jev-memory/hooks/jev-memory.mjs` | interface/skill.md |
 | `examples/proxy-demo/server.js` | architecture/local-proxy.md |
 | `external:meetings/2026-06-30-jason-tools-registry.md` | foundation/charter.md, reference/glossary.md |
+| `frontend/e2e/agents.spec.ts` | interface/dashboard.md |
 | `frontend/e2e/catalog-find.spec.ts` | architecture/find.md |
 | `frontend/e2e/landing.spec.ts` | interface/seo.md |
 | `frontend/e2e/layout.spec.ts` | interface/dashboard.md |
@@ -46,7 +47,9 @@ Regenerate via `scripts/build-map.py`.
 | `frontend/src/pages/HubRunPage.vue` | architecture/hub.md |
 | `frontend/src/pages/ProviderPage.vue` | architecture/instagram-oauth.md |
 | `frontend/src/pages/SearchPage.vue` | architecture/find.md |
-| `frontend/src/pages/TeamPage.vue` | architecture/auth-secrets.md |
+| `frontend/src/pages/TeamPage.vue` | architecture/auth-secrets.md, interface/dashboard.md |
+| `frontend/src/state/agents.js` | interface/dashboard.md |
+| `frontend/src/state/agentsComputed.js` | interface/dashboard.md |
 | `frontend/src/state/boot.js` | interface/landing-sandbox.md, interface/seo.md |
 | `frontend/src/state/catalog.js` | interface/dashboard.md |
 | `frontend/src/state/connections.js` | architecture/instagram-oauth.md |
@@ -56,8 +59,10 @@ Regenerate via `scripts/build-map.py`.
 | `frontend/src/state/keys.js` | architecture/auth-secrets.md |
 | `frontend/src/state/onboarding.js` | interface/onboarding.md |
 | `frontend/src/state/session.js` | architecture/auth-secrets.md |
+| `frontend/src/state/team.js` | interface/dashboard.md |
 | `frontend/src/styles/base.css` | interface/dashboard.md |
 | `frontend/src/views.ts` | interface/dashboard.md |
+| `frontend/tests/agents.test.ts` | interface/dashboard.md |
 | `hatch_build.py` | ops/deploy.md |
 | `package.json` | interface/skill.md |
 | `plugin/.codex-plugin/plugin.json` | interface/skill.md |
@@ -692,7 +697,7 @@ Regenerate via `scripts/build-map.py`.
 | `interface/api.md` | `media.py`, `sitetrack.js`, `api.py`, `bootstrap_handlers.py`, `bootstrap_http.py`, `call_surface.py`, `caller_metadata.py`, `client_identity.py`, `auth.py`, `provider_resources.py`, `access.py`, `authorize.py`, `idempotency.py`, `intake.py`, `resolve.py`, `reserve.py`, `settle.py`, `evidence.py`, `service.py`, `types.py`, `relay.py`, `connect.py`, `__init__.py`, `referrals.py`, `signup.py`, `__init__.py`, `activity.py`, `admin.py`, `auth.py`, `auth_helpers.py`, `billing.py`, `call.py`, `catalog.py`, `connections.py`, `onboard.py`, `orgs.py`, `provider_resources.py`, `api_keys.py`, `resources.py`, `referrals.py`, `signup_cookies.py`, `web.py`, `access.py`, `api_keys.py`, `teams.py`, `access.py`, `budgets.py`, `publicdemo.py`, `usage.py`, `mcp_oauth.py`, `session.py`, `timeutil.py`, `store.py`, `email.py`, `runner.py`, `ratestore.py` |
 | `interface/catalog-review-proposal.md` | _(no source files — narrative/reference)_ |
 | `interface/cli.md` | `cli.py`, `test_released_cli_compat.py`, `test_cli_key_compatibility.py`, `auth_helpers.py`, `cli_analytics.py`, `convert.py`, `agents.py`, `api_keys.py`, `test_api_keys.py` |
-| `interface/dashboard.md` | `App.vue`, `views.ts`, `controller.js`, `catalog.js`, `base.css`, `layout.spec.ts`, `dashboard.css`, `web.py`, `tutorial.js`, `tour.js` |
+| `interface/dashboard.md` | `App.vue`, `views.ts`, `controller.js`, `agents.js`, `agentsComputed.js`, `team.js`, `TeamPage.vue`, `agents.test.ts`, `agents.spec.ts`, `catalog.js`, `base.css`, `layout.spec.ts`, `dashboard.css`, `web.py`, `tutorial.js`, `tour.js` |
 | `interface/enrich-arena.md` | `arena.py`, `arena.py`, `arena.py`, `models.py`, `0027_enrich_arena.py`, `teams.py`, `auth.py`, `bootstrap.py`, `enrich-arena.html`, `arena.js`, `bench.js`, `arena.css`, `index.ts`, `arena_verification_insights.py`, `0029_arena_verification_snapshot.py`, `import_arena_verification.py`, `test_arena_verification_insights.py`, `arena_insights.py`, `arena_insights.py`, `0028_arena_insights.py`, `test_arena_insights.py`, `apollo.svg`, `branddev.svg`, `companyenrich.svg`, `findymail.svg`, `hunter.svg`, `icypeas.svg`, `leadmagic.svg`, `leadsforge.svg`, `lusha.svg`, `pdl.svg`, `predictleads.svg`, `thecompaniesapi.svg`, `tomba.svg`, `sitetrack.js`, `test_enrich_arena.py` |
 | `interface/env-import.md` | `providers.py`, `skills.py` |
 | `interface/landing-sandbox.md` | `sandbox.py`, `sandbox_identity.py`, `pubfeed.py`, `sandbox.py`, `__init__.py`, `sandbox.py`, `api.py`, `onboard.py`, `web.py`, `boot.js`, `SignedOutPage.vue`, `install.sh` |

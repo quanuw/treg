@@ -44,7 +44,9 @@ async addToken(tok, isAdd){ tok=(tok||'').trim(); if(!tok) return; this.busy=tru
         this.cfg.active=active.slug; this.save(); this.tokenInput=''; this.addOrg=false; await this.loadAll();
       }catch(e){ this.loginErr = e.status===401?'Invalid token.':('Error: '+(e.detail||e.status)); }
       finally{ this.busy=false; } },
-switchOrg(o){ this.orgMenu=false; this.newAgent=null; this.snipAgent=null; this.newApiKey=null; this.keyMsg=null;
+switchOrg(o){ this.stopAgentPoll(); this.ticket('agentIssue'); this.ticket('keyAction');
+      this.agentBusy=false; this.keyBusy=false;
+      this.orgMenu=false; this.newAgent=null; this.snipAgent=null; this.newApiKey=null; this.keyMsg=null;
       if(!this.connected(o.slug)){ this.addOrg=true; return; }
       // The previous team's balance and auto top-up settings must not be shown, or paid against,
       // while the new team's load: they arrive with loadBilling.

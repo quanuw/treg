@@ -321,7 +321,12 @@ validated before resolving the shared HTTP client. `/auth/logout` remains an HTT
   `require_identity` and can never be an owner. **Re-POSTing the same name ROTATES, and a field the
   caller omits is left as it is** - a rotate changes the token, never the limits. `AgentIn` also takes
   `project_access` (slugs or ids), so an agent can be project-scoped at mint time; `created_by` stamps
-  the minting admin. `GET /orgs/{id}/agents/observed` (admin+) lists the agents **detected in member
+  the minting admin. Creation and rotation return `api_key_id` alongside the one-time token.
+  `GET /orgs/{id}/agents/{user_id}/connection?api_key_id=...` (admin+) returns only `connected`
+  with `Cache-Control: no-store`: an indexed existence check for this active key's check-in or
+  call, scoped to its live agent membership and org. An old key's history cannot confirm a new
+  key after rotation; unknown, foreign, disabled, revoked, or removed agent keys return 404.
+  `GET /orgs/{id}/agents/observed` (admin+) lists the agents **detected in member
   traffic** - one row per (member, runtime) from `CallRecord.client`/`RunRecord.client` over 30 days,
   excluding plain-terminal (`''`/`cli`) and machine-identity traffic; attribution, never a gate. See
   [multi-tenancy](../architecture/multi-tenancy.md).

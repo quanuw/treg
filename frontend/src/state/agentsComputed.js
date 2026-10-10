@@ -89,7 +89,7 @@ rosterMembers(){  // one roster: each person, then the agents they minted, then 
         obs.filter(o=>o.member===h.email).forEach(o=>out.push({...o, is_observed:true, key:'o'+o.member+'/'+o.client})); });
       agents.filter(a=>!humans.some(h=>h.email===a.created_by)).forEach(a=>out.push({...a, key:'u'+a.user_id}));
       return out; },
-agentConnected(){ const n=this.newAgent; if(!n) return false;
-      const row=(this.agents||[]).find(a=>a.user_id===n.user_id); return !!(row&&row.connected); },
+agentConnectionTarget(){ return this.newAgent || (this.newApiKey?.assigned_type==='agent' ? this.newApiKey : null); },
+agentConnected(){ return !!this.agentConnectionTarget?.connected; },
 isOwner(){ return this.activeRole==='owner'; }
 }

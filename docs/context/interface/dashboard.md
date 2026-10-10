@@ -5,6 +5,12 @@ sources:
   - frontend/src/App.vue
   - frontend/src/views.ts
   - frontend/src/state/controller.js
+  - frontend/src/state/agents.js
+  - frontend/src/state/agentsComputed.js
+  - frontend/src/state/team.js
+  - frontend/src/pages/TeamPage.vue
+  - frontend/tests/agents.test.ts
+  - frontend/e2e/agents.spec.ts
   - frontend/src/state/catalog.js
   - frontend/src/styles/base.css
   - frontend/e2e/layout.spec.ts
@@ -66,6 +72,24 @@ this page keeps what no single file shows. The look follows the root `design.md`
 - **New tables use `components/ui/table`**; the sheet's old table rules are `:where()`-scoped.
 - **`e2e/layout.spec.ts`** fails on text painted over text or past its row, a page scrolling
   sideways, or overlapping top-bar items, at desktop and phone width.
+
+## Agent setup status
+
+`loadOrgAdmin` loads the full Team roster on entry and after management actions. Setup cards use
+`pollAgentConnected` instead: one `GET /orgs/{org_id}/agents/{user_id}/connection?api_key_id=...`
+after each three-second pause, at most forty attempts per visit. The next pause starts only after
+the previous request settles; polling never reloads the roster, usage, or observed-agent aggregates.
+
+Both the Members card and the API Keys rotation card track the newly issued key. A previous key's
+check-in does not satisfy a replacement's setup. The status endpoint requires an admin in the
+selected org, validates the active key's agent membership, and uses an indexed `EXISTS` against
+`CallRecord` for that org and key. The full agent roster keeps its lifetime identity history.
+
+`TeamPage` resumes unfinished detection on mount and aborts it on unmount. Closing or replacing a
+card, switching teams, and unmounting the controller also cancel it. A request captures its card,
+team, and polling session; a late response cannot mark a replacement card connected or restart a
+cancelled loop. Pending create/rotate responses are discarded after a team switch. Authentication
+or missing-key errors stop detection; transient failures retry within the same attempt limit.
 
 ## Catalog, Connections, a provider
 

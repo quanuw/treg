@@ -1828,6 +1828,15 @@
   {
     "kind": "APIRoute",
     "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "agent_connection",
+    "path": "/orgs/{org_id}/agents/{user_id}/connection"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
       "POST"
     ],
     "name": "agent_checkin",

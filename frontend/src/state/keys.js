@@ -26,13 +26,16 @@ keyHasMore(k){ return k.can_rename||k.can_disable||k.can_enable||k.can_revoke||(
 toggleKeyMenu(k,e){ if(this.keyMenu&&this.keyMenu.key.id===k.id){ this.keyMenu=null; return; } const r=e.currentTarget.getBoundingClientRect(); this.keyMenu={key:k,top:r.bottom+6,right:Math.max(12,innerWidth-r.right)}; },
 requestKeyAction(k,action){ this.keyMenu=null; if(['rotate','disable','revoke','hide'].includes(action)){ this.keyConfirm={key:k,action}; return; } this.keyAction(k,action); },
 confirmKeyAction(){ if(!this.keyConfirm)return; const c=this.keyConfirm; this.keyConfirm=null; this.keyAction(c.key,c.action); },
-async keyAction(k,action){ this.keyBusy=true; this.keyErr=''; this.keyMsg=null;
-      try{ const r=await this.api('/orgs/'+this.activeOrgId+'/api-keys/'+k.id+'/'+action,{method:'POST'});
+async keyAction(k,action){ const orgId=this.activeOrgId, live=this.ticket('keyAction');
+      this.keyBusy=true; this.keyErr=''; this.keyMsg=null;
+      try{ const r=await this.api('/orgs/'+orgId+'/api-keys/'+k.id+'/'+action,{method:'POST'});
+        if(!live()) return;
         if(r.secret && k.kind==='default_human'){ this.myToken=r.secret; this.defaultKeyId=k.id; this.defaultKeyState='active'; this._myTokenOrg=this.activeSlugNow; this.startTokenShow=false; this.newApiKey={...r,rotated:true}; }
-        else if(r.secret){ this.newAgent=null; this.snipAgent=null; this.agentSnip='prompt'; this.newApiKey={...r, assigned_name:k.assigned_name, assigned_type:k.assigned_type, user_id:k.user_id, org:this.activeSlugNow, rotated:true}; }
+        else if(r.secret){ this.newAgent=null; this.snipAgent=null; this.agentSnip='prompt'; this.newApiKey={...r, api_key_id:r.id, org_id:orgId, connected:false, assigned_name:k.assigned_name, assigned_type:k.assigned_type, user_id:k.user_id, org:this.activeSlugNow, rotated:true}; }
         if(r.agent_revoked) this.keyMsg={agent:true,text:k.assigned_name+' was removed from this team, and all its keys were revoked. Historical Activity remains available.'};
         if(k.kind==='default_human' && action!=='rotate') await this.loadDefaultToken();
+        if(!live()) return;
         if(r.agent_revoked) await this.loadOrgAdmin(); else await this.loadApiKeys(); }
-      catch(e){ this.keyErr='Key action failed: '+(e.detail||e.status); } finally{ this.keyBusy=false; } },
+      catch(e){ if(live()) this.keyErr='Key action failed: '+(e.detail||e.status); } finally{ if(live()) this.keyBusy=false; } },
 showKeyActivity(k){ this.activityKey=String(k.id); this.go('activity'); }
 }

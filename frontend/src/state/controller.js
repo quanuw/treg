@@ -48,7 +48,10 @@ export default {
  watch:{
     // Dialog focus (in on open, trapped, back to the trigger on close) and Escape: v-dialog (dialogs/dialog.ts)
     'welcome.agent'(v){ storageSet('treg-agent', v); },  // see _restoreAgent
-    activeOrgId(){ this.resetRenameForm(); },  // team switch or first load: prefill the rename form
+    activeOrgId(){ this.stopAgentPoll(); this.ticket('agentIssue'); this.ticket('keyAction');
+      this.newAgent=null; this.newApiKey=null; this.snipAgent=null;
+      this.agentBusy=false; this.keyBusy=false; this.resetRenameForm(); },
+    agentConnectionTarget(){ this.stopAgentPoll(); this.resumeAgentPoll(); },
     // Editing the box after a find starts a new question: the answer to the old one goes away
     // and the shelves go back to filtering by name.
     q(v){ if(this.findActive && this.view==='catalog' && v.trim()!==this.find.q) this.findExit(); },

@@ -15,13 +15,14 @@ from types import SimpleNamespace
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 from sqlmodel import select
 
 from conftest import make_upstream
 
 from treg import audit, crypto
 from treg.api import app
-from treg.infra.db import reset_db, session_maker
+from treg.infra.db import _engine as engine, reset_db, session_maker
 from treg.models import CallRecord, Membership, Org, User
 
 
@@ -245,3 +246,119 @@ async def test_members_roster_carries_agent_name_and_owner(env):
     assert agent["created_by"] == "owner@x.dev"
     human = next(m for m in members if not m["is_agent"])
     assert human["name"] is None and "created_by" in human
+
+
+def _connection_path(env, agent, key_id=None):
+    key_id = agent["api_key_id"] if key_id is None else key_id
+    return f"/orgs/{env.org_id}/agents/{agent['user_id']}/connection?api_key_id={key_id}"
+
+
+async def _agent(env, name="connection-bot"):
+    response = await env.c.post(f"/orgs/{env.org_id}/agents", headers=_h(env.owner), json={"name": name})
+    assert response.status_code == 200
+    return response.json()
+
+
+@pytest.mark.parametrize("action", ["checkin", "call"])
+@pytest.mark.parametrize("archive_enabled", [True, False])
+async def test_connection_checks_only_the_issued_key(env, action, archive_enabled):
+    settings = f"/orgs/{env.org_id}/settings"
+    changed = await env.c.patch(settings, headers=_h(env.owner), json={"archive": archive_enabled})
+    assert changed.status_code == 200 and changed.json()["archive"] is archive_enabled
+    agent = await _agent(env)
+    path = _connection_path(env, agent)
+    first = await env.c.get(path, headers=_h(env.owner))
+    assert first.status_code == 200 and first.json() == {"connected": False}
+    assert first.headers["cache-control"] == "no-store"
+    if action == "checkin":
+        assert (await env.c.post("/agents/checkin", headers=_h(agent["token"]))).status_code == 200
+    else:
+        assert (await env.c.get("/call/alpha/ok", headers=_h(agent["token"]))).status_code == 200
+        await audit.drain()
+    assert (await env.c.get(path, headers=_h(env.owner))).json() == {"connected": True}
+    assert (await env.c.get(settings, headers=_h(env.owner))).json()["archive"] is archive_enabled
+
+
+@pytest.mark.parametrize("route", ["agents", "api-keys"])
+@pytest.mark.parametrize("archive_enabled", [True, False])
+async def test_rotation_requires_a_new_key_checkin(env, route, archive_enabled):
+    settings = f"/orgs/{env.org_id}/settings"
+    assert (await env.c.patch(settings, headers=_h(env.owner), json={"archive": archive_enabled})).status_code == 200
+    old = await _agent(env)
+    await env.c.post("/agents/checkin", headers=_h(old["token"]))
+    if route == "agents":
+        new = await _agent(env)
+    else:
+        rotated = await env.c.post(f"/orgs/{env.org_id}/api-keys/{old['api_key_id']}/rotate",
+                                   headers=_h(env.owner))
+        assert rotated.status_code == 200
+        data = rotated.json()
+        new = {**old, "api_key_id": data["id"], "token": data["secret"]}
+    assert new["api_key_id"] != old["api_key_id"]
+    assert (await env.c.get(_connection_path(env, old), headers=_h(env.owner))).status_code == 404
+    assert (await env.c.get(_connection_path(env, new), headers=_h(env.owner))).json() == {"connected": False}
+    assert (await env.c.post("/agents/checkin", headers=_h(old["token"]))).status_code == 401
+    assert (await env.c.post("/agents/checkin", headers=_h(new["token"]))).status_code == 200
+    assert (await env.c.get(_connection_path(env, new), headers=_h(env.owner))).json() == {"connected": True}
+    assert (await env.c.get(settings, headers=_h(env.owner))).json()["archive"] is archive_enabled
+
+
+async def test_connection_requires_admin_in_the_selected_org(env):
+    agent = await _agent(env)
+    path = _connection_path(env, agent)
+    assert (await env.c.get(path)).status_code == 401
+    assert (await env.c.get(path, headers=_h(env.member))).status_code == 403
+    viewer, _ = await _mint("viewer@x.dev", env.org_id, "viewer")
+    assert (await env.c.get(path, headers=_h(viewer))).status_code == 403
+    admin, _ = await _mint("admin@x.dev", env.org_id, "admin")
+    assert (await env.c.get(path, headers=_h(admin))).status_code == 200
+    async with session_maker() as db:
+        other = Org(name="Other", slug="other")
+        db.add(other)
+        await db.commit()
+        other_id = other.id
+    other_owner, _ = await _mint("other@x.dev", other_id, "owner")
+    assert (await env.c.get(path, headers=_h(other_owner))).status_code == 403
+    foreign_path = path.replace(f"/orgs/{env.org_id}/", f"/orgs/{other_id}/")
+    assert (await env.c.get(foreign_path, headers=_h(env.owner))).status_code == 403
+    assert (await env.c.get(foreign_path, headers=_h(other_owner))).status_code == 404
+
+
+async def test_connection_binds_the_key_to_an_active_agent_membership(env):
+    agent, other = await _agent(env), await _agent(env, "other-bot")
+    assert (await env.c.get(_connection_path(env, agent, other["api_key_id"]), headers=_h(env.owner))).status_code == 404
+    human_path = _connection_path(env, {**agent, "user_id": env.member_uid})
+    assert (await env.c.get(human_path, headers=_h(env.owner))).status_code == 404
+    assert (await env.c.get(_connection_path(env, agent, 999999), headers=_h(env.owner))).status_code == 404
+    path = _connection_path(env, agent)
+    await env.c.post(f"/orgs/{env.org_id}/api-keys/{agent['api_key_id']}/disable", headers=_h(env.owner))
+    assert (await env.c.get(path, headers=_h(env.owner))).status_code == 404
+    await env.c.post(f"/orgs/{env.org_id}/api-keys/{agent['api_key_id']}/enable", headers=_h(env.owner))
+    assert (await env.c.get(path, headers=_h(env.owner))).status_code == 200
+    await env.c.delete(f"/orgs/{env.org_id}/agents/{agent['user_id']}", headers=_h(env.owner))
+    assert (await env.c.get(path, headers=_h(env.owner))).status_code == 404
+
+
+async def test_connection_uses_one_indexed_exists_and_no_history_aggregation(env):
+    agent = await _agent(env)
+    statements = []
+
+    def record_sql(conn, cursor, statement, parameters, context, executemany):
+        if "callrecord" in statement.lower():
+            statements.append((statement, parameters))
+
+    event.listen(engine.sync_engine, "before_cursor_execute", record_sql)
+    try:
+        result = await env.c.get(_connection_path(env, agent), headers=_h(env.owner))
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", record_sql)
+    assert result.json() == {"connected": False}
+    assert len(statements) == 1
+    sql, parameters = statements[0]
+    assert "exists" in sql.lower()
+    for heavy in ("group by", "distinct", "count(", "sum(", "response_body", "request_body"):
+        assert heavy not in sql.lower()
+    if engine.dialect.name == "sqlite":
+        async with engine.connect() as conn:
+            plan = (await conn.exec_driver_sql("EXPLAIN QUERY PLAN " + sql, parameters)).all()
+        assert "ix_callrecord_org_key_id" in str(plan)

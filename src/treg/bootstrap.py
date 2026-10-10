@@ -279,6 +279,7 @@ _CONTROL_ROUTE_KEYS: frozenset[RouteKey] = frozenset({
     ('/orgs/{org_id}/public-token', ('DELETE',), 'delete_public_token'),
     ('/orgs/{org_id}/agents', ('POST',), 'create_agent'),
     ('/orgs/{org_id}/agents', ('GET',), 'list_agents'),
+    ('/orgs/{org_id}/agents/{user_id}/connection', ('GET',), 'agent_connection'),
     ('/agents/checkin', ('POST',), 'agent_checkin'),
     ('/orgs/{org_id}/agents/observed', ('GET',), 'list_observed_agents'),
     ('/orgs/{org_id}/agents/{user_id}', ('DELETE',), 'revoke_agent'),
