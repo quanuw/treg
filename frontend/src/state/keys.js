@@ -28,10 +28,16 @@ async renameApiKey(k){ const name=(this.editKeyName||'').trim(); if(!name){ this
       try{ await this.api('/orgs/'+this.activeOrgId+'/api-keys/'+k.id,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({name})}); this.editKey=null; await this.loadApiKeys(); }
       catch(e){ this.keyErr='Could not rename key: '+(e.detail||e.status); } finally{ this.keyBusy=false; } },
 keyHasMore(k){ return k.can_rename||k.can_disable||k.can_enable||k.can_revoke||(k.can_hide&&k.state==='revoked'); },
+keyActionBlockReason(){ return this.credentialIssue
+      ? "Handle this team's retained key result first: save and close its card, or follow its status notice." : ''; },
+blockKeyAction(){ const reason=this.keyActionBlockReason(); if(!reason) return false;
+      this.keyErr=reason; return true; },
 toggleKeyMenu(k,e){ if(this.keyMenu&&this.keyMenu.key.id===k.id){ this.keyMenu=null; return; } const r=e.currentTarget.getBoundingClientRect(); this.keyMenu={key:k,top:r.bottom+6,right:Math.max(12,innerWidth-r.right)}; },
-requestKeyAction(k,action){ this.keyMenu=null; if(['rotate','disable','revoke','hide'].includes(action)){ this.keyConfirm={key:k,action}; return; } this.keyAction(k,action); },
-confirmKeyAction(){ if(!this.keyConfirm)return; const c=this.keyConfirm; this.keyConfirm=null; this.keyAction(c.key,c.action); },
-async keyAction(k,action){ if(this.credentialIssue) return;
+requestKeyAction(k,action){ if(this.blockKeyAction()) return;
+      this.keyMenu=null; if(['rotate','disable','revoke','hide'].includes(action)){ this.keyConfirm={key:k,action}; return; } return this.keyAction(k,action); },
+confirmKeyAction(){ if(!this.keyConfirm || this.blockKeyAction()) return;
+      const c=this.keyConfirm; this.keyConfirm=null; return this.keyAction(c.key,c.action); },
+async keyAction(k,action){ if(this.blockKeyAction()) return;
       const issue=action==='rotate'?this.beginCredentialIssue('key'):null;
       if(action==='rotate' && !issue) return;
       const orgId=this.activeOrgId, live=this.ticket('keyAction');

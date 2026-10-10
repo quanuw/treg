@@ -67,6 +67,19 @@ async function switchTeam(page: Page, name: string) {
   await expect(page.getByRole('button', { name: 'Teams' })).toContainText(name)
 }
 
+async function waitForConsumedCredential(page: Page, orgId: number, keyId: number) {
+  // waitForResponse only observes the network. Inspect the mounted Vue instance (no production
+  // test hook) to require application consumption, then drain its pending render before asserting.
+  await expect.poll(() => page.evaluate(async ({ orgId, keyId }) => {
+    const vm = (document.querySelector('#app') as any)?._vnode?.component?.proxy
+    if (!vm) throw new Error('The dashboard Vue instance is not mounted')
+    const issue = vm.credentialIssues[orgId]
+    if (issue?.status !== 'held' || (issue.result?.api_key_id ?? issue.result?.id) !== keyId) return false
+    await vm.$nextTick() // after consumption, so its queued render is included in this barrier
+    return vm.credentialIssues[orgId] === issue && issue.status === 'held' && vm.activeOrgId !== orgId
+  }, { orgId, keyId }), { message: 'the issuing org has consumed the delayed result while another org is active' }).toBe(true)
+}
+
 for (const action of ['create', 'rotate', 'keyAction'] as const) {
   test(`${action}: a committed response arriving in another team remains recoverable`, async ({ page }) => {
     await signIn(page, `issued-${action}`, 'Issuing team')
@@ -112,9 +125,15 @@ for (const action of ['create', 'rotate', 'keyAction'] as const) {
     if (old) expect((await page.request.post('/agents/checkin', { headers: { 'X-Treg-Token': old.token } })).status()).toBe(401)
     await switchTeam(page, 'Other team')
     release(); await received
+    await waitForConsumedCredential(page, first.org_id, result.api_key_id ?? result.id)
     const secret = result.token || result.secret
     await expect(page.locator('body')).not.toContainText(secret)
     expect(await page.locator('input').evaluateAll((inputs, value) => inputs.some(input => input.value === value), secret)).toBe(false)
+    expect(await page.locator('pre, code').evaluateAll((snippets, value) => snippets.some(snippet => snippet.textContent?.includes(value)), secret)).toBe(false)
+    expect(await page.evaluate(value => {
+      const vm = (document.querySelector('#app') as any)._vnode.component.proxy
+      return vm.agentSnippet.includes(value) || vm.newAgent?.token === value || vm.newApiKey?.secret === value
+    }, secret)).toBe(false) // also cover the values wired to the copy buttons
 
     await switchTeam(page, 'Issuing team')
     const card = page.locator('.card').filter({ hasText: action === 'keyAction' ? 'New key for retained-bot' : 'Token for retained-bot' })
@@ -128,3 +147,44 @@ for (const action of ['create', 'rotate', 'keyAction'] as const) {
     expect(postCount).toBe(1)
   })
 }
+
+test('key menu actions explain their retained-result guard and work after acknowledgement', async ({ page }) => {
+  await signIn(page, 'key-menu', 'Menu team')
+  const org = (await (await page.request.get('/orgs')).json()).find((org: any) => org.name === 'Menu team')
+  const headers = { 'X-Treg-Org': org.slug }
+  const path = `/orgs/${org.org_id}/api-keys`
+  const active = await (await page.request.post(path, { headers, data: { name: 'menu-active' } })).json()
+  const retired = await (await page.request.post(path, { headers, data: { name: 'menu-retired' } })).json()
+  expect((await page.request.post(`${path}/${retired.id}/revoke`, { headers })).ok()).toBe(true)
+  await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: 'Team', exact: true }).click()
+  await page.getByRole('button', { name: 'API Keys', exact: true }).click()
+  await page.getByPlaceholder('New key name').fill('retained-result')
+  await page.getByRole('button', { name: 'Create key', exact: true }).click()
+  const card = page.locator('.card').filter({ hasText: 'retained-result — copy it now' })
+  await expect(card).toBeVisible()
+
+  const mutations: string[] = []
+  page.on('request', request => {
+    if (request.method() === 'POST' && /\/api-keys\/\d+\/(disable|enable|revoke|hide)$/.test(new URL(request.url()).pathname)) mutations.push(request.url())
+  })
+  await page.getByRole('button', { name: 'More actions for menu-active', exact: true }).click()
+  const menu = page.getByRole('menu')
+  await expect(menu).toContainText("Handle this team's retained key result first")
+  await expect(menu.getByRole('menuitem', { name: 'Disable', exact: true })).toBeDisabled()
+  await expect(menu.getByRole('menuitem', { name: 'Revoke', exact: true })).toBeDisabled()
+  await expect(menu.getByRole('menuitem', { name: 'Rename', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'More actions for menu-retired', exact: true }).click()
+  await expect(menu.getByRole('menuitem', { name: 'Hide', exact: true })).toBeDisabled()
+  await expect(menu).toContainText("Handle this team's retained key result first")
+  expect(mutations).toEqual([])
+
+  await card.getByRole('button', { name: 'Done', exact: true }).click()
+  await page.getByRole('button', { name: 'More actions for menu-active', exact: true }).click()
+  await menu.getByRole('menuitem', { name: 'Disable', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Disable “menu-active”?' })
+  await expect(dialog).toBeVisible()
+  const disabled = page.waitForResponse(r => new URL(r.url()).pathname === `${path}/${active.id}/disable`)
+  await dialog.getByRole('button', { name: 'Confirm disable', exact: true }).click()
+  expect((await disabled).ok()).toBe(true)
+  expect(mutations).toHaveLength(1)
+})

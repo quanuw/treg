@@ -100,8 +100,15 @@ unacknowledged issuance per org in the dashboard instance's memory, keyed by org
 by its operation object. Creating an Agent, either rotation control, and additional-key creation
 retain successful results even after navigation. `newAgent` / `newApiKey` expose only the active
 org's result. A second issuance in the same org waits for acknowledgement, including when the
-first POST is pending across a switch; other orgs can issue independently. Writes are never
-aborted or automatically retried. An uncertain write reports that it may have completed.
+first POST is pending across a switch; other orgs can issue independently. This state machine
+does not abort writes or add automatic mutation retries. The shared `api.ts` transport still has
+its existing encoded retry for a string-body request rejected by a 403 HTML edge response; that
+behavior is unchanged. An uncertain write reports that it may have completed.
+
+While an issuance needs attention, the API Keys menu disables state-changing actions and explains
+the retained-result guard. `requestKeyAction`, `confirmKeyAction`, and `keyAction` also check it
+defensively and report the same reason. If the guard becomes active with a confirmation already
+open, the dialog stays open with its confirm button disabled; it does not imply the action ran.
 
 `resumeCredentialIssue` checks a retained key before revealing it on receipt or return: the
 lightweight connection endpoint for Agents, active key metadata for additional keys, and the

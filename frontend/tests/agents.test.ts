@@ -240,6 +240,44 @@ async function switchTeam(vm: any, slug: string) {
   vm.switchOrg({ slug }); await nextTick()
 }
 
+describe('key actions blocked by a retained issuance', () => {
+  test.each(['disable', 'enable', 'revoke', 'hide', 'rotate'])('%s reports the guard at both request and execution boundaries', async action => {
+    const vm = dashboard()
+    ready(vm)
+    vm.keyMenu = { key }
+    vm.keyConfirm = null
+    vm.requestKeyAction(key, action)
+    expect(vm.keyConfirm).toBeNull()
+    expect(vm.keyMenu).not.toBeNull()
+    expect(vm.keyErr).toBe(vm.keyActionBlockReason())
+    expect(vm.keyErr).toContain('retained key result')
+    vm.keyErr = ''
+    await vm.keyAction(key, action)
+    expect(vm.keyErr).toBe(vm.keyActionBlockReason())
+    expect(vm.api).not.toHaveBeenCalled()
+    expect(vm.loadApiKeys).not.toHaveBeenCalled()
+  })
+
+  test.each(['disable', 'revoke', 'hide'])('%s keeps an open confirmation when an issuance appears and requires a fresh confirmation', async action => {
+    const vm = dashboard()
+    vm.requestKeyAction(key, action)
+    const confirmation = vm.keyConfirm
+    ready(vm)
+    await vm.confirmKeyAction()
+    expect(vm.keyConfirm).toBe(confirmation)
+    expect(vm.keyErr).toContain('retained key result')
+    expect(vm.api).not.toHaveBeenCalled()
+    vm.dismissCredentialIssue() // the existing explicit acknowledgement, not an automatic bypass
+    await nextTick()
+    expect(vm.api).not.toHaveBeenCalled()
+    expect(vm.keyConfirm).toBe(confirmation)
+    await vm.confirmKeyAction()
+    expect(vm.keyConfirm).toBeNull()
+    expect(posts(vm)).toEqual([[`/orgs/1/api-keys/7/${action}`, { method: 'POST' }]])
+    expect(vm.keyErr).toBe('')
+  })
+})
+
 describe('credential results survive navigation without repeating the write', () => {
   test.each(actions)('%s survives switching away and back while its POST is pending', async action => {
     const vm = dashboard(), response = deferred()
