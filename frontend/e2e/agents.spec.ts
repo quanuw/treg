@@ -57,6 +57,46 @@ test('agent setup polls only connection status across return and both rotation c
   await expect(page.getByText(/connected .*poll-bot called in as itself/)).toBeVisible({ timeout: 8000 })
   await page.getByRole('button', { name: 'Team settings', exact: true }).click()
   await expect(page.getByTitle('archive off — click to opt back in', { exact: true }).getByRole('checkbox')).not.toBeChecked()
+
+  // Reuse this signed-in flow so the full suite stays within the local OTP rate window.
+  await page.getByRole('button', { name: 'API Keys', exact: true }).click()
+  await page.getByRole('button', { name: 'I’ve updated poll-bot', exact: true }).click()
+  const org = (await (await page.request.get('/orgs')).json()).find((org: any) => org.name === 'Browser test team')
+  const headers = { 'X-Treg-Org': org.slug }
+  const path = `/orgs/${org.org_id}/api-keys`
+  const active = await (await page.request.post(path, { headers, data: { name: 'menu-active' } })).json()
+  const retired = await (await page.request.post(path, { headers, data: { name: 'menu-retired' } })).json()
+  expect((await page.request.post(`${path}/${retired.id}/revoke`, { headers })).ok()).toBe(true)
+  await page.getByRole('button', { name: 'API Keys', exact: true }).click()
+  await page.getByPlaceholder('New key name').fill('retained-result')
+  await page.getByRole('button', { name: 'Create key', exact: true }).click()
+  const card = page.locator('.card').filter({ hasText: 'retained-result — copy it now' })
+  await expect(card).toBeVisible()
+
+  const mutations: string[] = []
+  page.on('request', request => {
+    if (request.method() === 'POST' && /\/api-keys\/\d+\/(disable|enable|revoke|hide)$/.test(new URL(request.url()).pathname)) mutations.push(request.url())
+  })
+  await page.getByRole('button', { name: 'More actions for menu-active', exact: true }).click()
+  const menu = page.getByRole('menu')
+  await expect(menu).toContainText("Handle this team's retained key result first")
+  await expect(menu.getByRole('menuitem', { name: 'Disable', exact: true })).toBeDisabled()
+  await expect(menu.getByRole('menuitem', { name: 'Revoke', exact: true })).toBeDisabled()
+  await expect(menu.getByRole('menuitem', { name: 'Rename', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'More actions for menu-retired', exact: true }).click()
+  await expect(menu.getByRole('menuitem', { name: 'Hide', exact: true })).toBeDisabled()
+  await expect(menu).toContainText("Handle this team's retained key result first")
+  expect(mutations).toEqual([])
+
+  await card.getByRole('button', { name: 'Done', exact: true }).click()
+  await page.getByRole('button', { name: 'More actions for menu-active', exact: true }).click()
+  await menu.getByRole('menuitem', { name: 'Disable', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Disable “menu-active”?' })
+  await expect(dialog).toBeVisible()
+  const disabled = page.waitForResponse(r => new URL(r.url()).pathname === `${path}/${active.id}/disable`)
+  await dialog.getByRole('button', { name: 'Confirm disable', exact: true }).click()
+  expect((await disabled).ok()).toBe(true)
+  expect(mutations).toHaveLength(1)
 })
 
 async function switchTeam(page: Page, name: string) {
@@ -147,44 +187,3 @@ for (const action of ['create', 'rotate', 'keyAction'] as const) {
     expect(postCount).toBe(1)
   })
 }
-
-test('key menu actions explain their retained-result guard and work after acknowledgement', async ({ page }) => {
-  await signIn(page, 'key-menu', 'Menu team')
-  const org = (await (await page.request.get('/orgs')).json()).find((org: any) => org.name === 'Menu team')
-  const headers = { 'X-Treg-Org': org.slug }
-  const path = `/orgs/${org.org_id}/api-keys`
-  const active = await (await page.request.post(path, { headers, data: { name: 'menu-active' } })).json()
-  const retired = await (await page.request.post(path, { headers, data: { name: 'menu-retired' } })).json()
-  expect((await page.request.post(`${path}/${retired.id}/revoke`, { headers })).ok()).toBe(true)
-  await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: 'Team', exact: true }).click()
-  await page.getByRole('button', { name: 'API Keys', exact: true }).click()
-  await page.getByPlaceholder('New key name').fill('retained-result')
-  await page.getByRole('button', { name: 'Create key', exact: true }).click()
-  const card = page.locator('.card').filter({ hasText: 'retained-result — copy it now' })
-  await expect(card).toBeVisible()
-
-  const mutations: string[] = []
-  page.on('request', request => {
-    if (request.method() === 'POST' && /\/api-keys\/\d+\/(disable|enable|revoke|hide)$/.test(new URL(request.url()).pathname)) mutations.push(request.url())
-  })
-  await page.getByRole('button', { name: 'More actions for menu-active', exact: true }).click()
-  const menu = page.getByRole('menu')
-  await expect(menu).toContainText("Handle this team's retained key result first")
-  await expect(menu.getByRole('menuitem', { name: 'Disable', exact: true })).toBeDisabled()
-  await expect(menu.getByRole('menuitem', { name: 'Revoke', exact: true })).toBeDisabled()
-  await expect(menu.getByRole('menuitem', { name: 'Rename', exact: true })).toBeEnabled()
-  await page.getByRole('button', { name: 'More actions for menu-retired', exact: true }).click()
-  await expect(menu.getByRole('menuitem', { name: 'Hide', exact: true })).toBeDisabled()
-  await expect(menu).toContainText("Handle this team's retained key result first")
-  expect(mutations).toEqual([])
-
-  await card.getByRole('button', { name: 'Done', exact: true }).click()
-  await page.getByRole('button', { name: 'More actions for menu-active', exact: true }).click()
-  await menu.getByRole('menuitem', { name: 'Disable', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Disable “menu-active”?' })
-  await expect(dialog).toBeVisible()
-  const disabled = page.waitForResponse(r => new URL(r.url()).pathname === `${path}/${active.id}/disable`)
-  await dialog.getByRole('button', { name: 'Confirm disable', exact: true }).click()
-  expect((await disabled).ok()).toBe(true)
-  expect(mutations).toHaveLength(1)
-})
