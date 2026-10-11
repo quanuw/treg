@@ -61,9 +61,9 @@ The rules below are the same either way. The one that matters most — **say the
 spend it** — matters more here, because `call` returns `cost_usd` and you can report what a call
 actually cost rather than estimating.
 
-A `call` on a catalog endpoint spends the team's balance. A `call` on one of the team's own tools
-spends nothing: that key belongs to them. The exception is an X connection made through treg's app,
-which is billed per call (see above).
+A `call` spends the team's balance only when treg's own key serves it, or on an X connection made
+through treg's app (see above). A `call` on the team's own key or tool spends nothing: that key
+belongs to them.
 
 ## Task — the catalog: what treg can do for you (start here)
 
