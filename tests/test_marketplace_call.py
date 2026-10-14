@@ -1170,8 +1170,12 @@ def test_apollo_settles_a_2xx_miss_at_zero():
     """Apollo answers a no-match with 2xx and charges nothing for it — `organization: null` or a
     bare `{}` on enrich (the live unmatched-domain shape), an empty `organizations` page on
     search. Status-based billing would charge the caller the full credit for a response Apollo
-    gave away; the body is what decides. A people-enrichment body carrying neither organization
-    key stays at the estimate — deriving is only safe where the rule is flat."""
+    gave away; the body is what decides. A person that came back (people enrichment's 1-9 credit
+    range) stays at the estimate — deriving is only safe where the rule is flat — but a person
+    that did not is free, on a single match (`person: null`, the adapter's miss) and on a bulk
+    match whose every `matches` entry is null. Unless a waterfall flag sent the lookup on to
+    third-party vendors, which may bill a miss, or Apollo itself reports credits consumed: then
+    the estimate stands."""
     credit = 26_000  # $0.026/credit (fx.yaml, Basic $65/mo / 2,500 credits)
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"organization": {"name": "Apple"}}') == credit
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"organization": null}') == 0, "a 2xx miss is free"
@@ -1180,6 +1184,24 @@ def test_apollo_settles_a_2xx_miss_at_zero():
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"organizations": [{"name": "Apple"}], "pagination": {}}') == credit
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"organizations": [], "pagination": {}}') == 0, "an empty page is free"
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"person": {"id": "x"}}') is None, "1-9 credit range: estimate, not a guess"
+    people = _mk("apollo", endpoint_id="apollo.people.enrich", cost_type="per_success")
+    assert call_settle._observed_cost_micro(people, b'{"person": null}') == 0, "an unmatched single reveal is free via adapter"
+    # bulk_match: the unmatched row is a null in `matches`, with Apollo's own `credits_consumed: 0`
+    miss = b'{"status": "success", "total_requested_enrichments": 1, "unique_enriched_records": 0, "matches": [null], "credits_consumed": 0}'
+    assert call_settle._observed_cost_micro(_mk("apollo"), miss) == 0, "an unmatched bulk reveal is free"
+    assert call_settle._observed_cost_micro(_mk("apollo"), b'{"matches": [null, null], "credits_consumed": 0}') == 0
+    assert call_settle._observed_cost_micro(_mk("apollo"), b'{"matches": [{"id": "x"}], "credits_consumed": 1}') is None, "a matched row stays at the estimate"
+    assert call_settle._observed_cost_micro(_mk("apollo"), b'{"matches": [null, {"id": "x"}]}') is None, "a partial batch is not free"
+    for flag in ("run_waterfall_email", "run_waterfall_phone"):
+        for value in (True, "true"):
+            waterfall = _mk("apollo", request_data={"queryParams": {flag: value}})
+            assert call_settle._observed_cost_micro(waterfall, miss) is None, f"{flag}={value!r}: vendors may bill a miss"
+            single = _mk("apollo", endpoint_id="apollo.people.enrich", cost_type="per_success",
+                         request_data={"queryParams": {flag: value}})
+            assert call_settle._observed_cost_micro(single, b'{"person": null}') is None, "the guard outranks the adapter"
+    off = _mk("apollo", request_data={"queryParams": {"run_waterfall_email": "false"}})
+    assert call_settle._observed_cost_micro(off, miss) == 0, "a flag set to false is no waterfall"
+    assert call_settle._observed_cost_micro(_mk("apollo"), b'{"matches": [null], "credits_consumed": 2}') is None, "Apollo says it charged"
     assert call_settle._observed_cost_micro(_mk("apollo"), b"not json") is None
 
 

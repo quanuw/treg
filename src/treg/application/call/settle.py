@@ -34,7 +34,7 @@ from ...models import Org
 from ...timeutil import utcnow_naive as _utcnow_naive
 from .idempotency import _release_idempotent_claim
 from . import keyslots
-from .resolve import MarketplaceCall, _openmart_credits, _usd_to_micro
+from .resolve import MarketplaceCall, _openmart_credits, _truthy, _usd_to_micro
 from .types import GatewayFailed, UpstreamResponse
 
 
@@ -453,9 +453,10 @@ def _observed_cost_micro(mk: MarketplaceCall, body: bytes, headers=None) -> int 
         including 0 on a 2xx miss (the captured people.enrich example IS one) and the 2-credit
         company enrich. Converted through the lusha rate like the others.
       - apollo: DERIVED, not reported. Apollo answers a miss with 2xx (`organization: null` or a
-        bare `{}` on enrich, an empty `organizations` page on search) and charges nothing for it, so
-        status-based billing alone would bill the caller for a response Apollo gave away. The body
-        says whether the charged thing came back; when it didn't, the call settles at 0.
+        bare `{}` on enrich, an empty `organizations` page on search, `person: null` on a single
+        people match, a `matches` list of only nulls on a bulk match) and charges nothing for it,
+        so status-based billing alone would bill the caller for a response Apollo gave away. The
+        body says whether the charged thing came back; when it didn't, the call settles at 0.
       - hunter (domain search): DERIVED too, and for the opposite reason — its price is not
         per row but one whole SEARCH credit per 10 emails returned, rounded up, with an empty
         domain free. `data.emails` is the only place that number exists.
@@ -811,12 +812,23 @@ def _observed_cost_micro(mk: MarketplaceCall, body: bytes, headers=None) -> int 
         # live companies.enrich miss is bare `{}`, and people enrichment's 1-9 credit range has
         # neither key — do not return None: fall through so the GENERIC miss / adapter rule can
         # zero a verified companies.enrich miss, while people enrichment still settles at the
-        # estimate (no organization keys, adapter miss is on `person`).
+        # estimate (no organization keys, adapter miss is on `person`). A bulk match has no
+        # adapter, so its miss is decided here: every `matches` entry null (Apollo reports
+        # `credits_consumed: 0` for it) costs nothing. Neither people miss is free when a
+        # waterfall flag was set (third-party vendors behind it may bill a miss) or Apollo reports
+        # a non-zero `credits_consumed`: those settle at the estimate, adapter or not.
         rate = catalog_store.load().credit_rates.get("apollo")
         if rate:
             for key in ("organization", "organizations"):
                 if key in doc:
                     return int(rate * 1_000_000 + 0.5) if doc[key] else 0
+            query = (mk.request_data.get("queryParams") or {}) if isinstance(mk.request_data, dict) else {}
+            if any(_truthy(query.get(flag)) for flag in ("run_waterfall_email", "run_waterfall_phone")) \
+                    or doc.get("credits_consumed", 0) != 0:
+                return None
+            matches = doc.get("matches")
+            if isinstance(matches, list) and not any(matches):
+                return 0
     # GENERIC miss rule: a `per_success` endpoint bills only when it found something, and the
     # routing adapter (catalog/adapters.yaml, fixture-verified at load) already knows what "nothing"
     # looks like in this provider's body. Before this, tomba / findymail / leadsforge misses settled
