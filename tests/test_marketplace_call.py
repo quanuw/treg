@@ -1199,8 +1199,23 @@ def test_apollo_settles_a_2xx_miss_at_zero():
             single = _mk("apollo", endpoint_id="apollo.people.enrich", cost_type="per_success",
                          request_data={"queryParams": {flag: value}})
             assert call_settle._observed_cost_micro(single, b'{"person": null}') is None, "the guard outranks the adapter"
-    off = _mk("apollo", request_data={"queryParams": {"run_waterfall_email": "false"}})
-    assert call_settle._observed_cost_micro(off, miss) == 0, "a flag set to false is no waterfall"
+    # wherever the flag rode: repeated in the query string, or in the JSON body, in any spelling
+    for sent in ({"queryParams": {"run_waterfall_email": ["true", "true"]}},
+                 {"queryParams": {"run_waterfall_phone": ["false", "true"]}},
+                 {"body": {"details": [{}], "run_waterfall_email": True}},
+                 {"body": {"run_waterfall_phone": 1}},
+                 {"queryParams": {"run_waterfall_email": "maybe"}}):
+        assert call_settle._observed_cost_micro(_mk("apollo", request_data=sent), miss) is None, sent
+    for sent in ({"queryParams": {"run_waterfall_email": "false"}},
+                 {"queryParams": {"run_waterfall_email": ["false", "0"]}},
+                 {"body": {"run_waterfall_email": False, "run_waterfall_phone": 0}},
+                 {"queryParams": {"run_waterfall_email": ""}, "body": {"details": [{}]}}):
+        assert call_settle._observed_cost_micro(_mk("apollo", request_data=sent), miss) == 0, f"{sent}: no waterfall"
+    # Apollo's documented waterfall answer: a `waterfall` object, no `credits_consumed`, and an
+    # unmatched person may be `match_confidence: none` rather than null
+    for body in (b'{"status": "success", "matches": [null], "waterfall": {"status": "accepted"}}',
+                 b'{"matches": [{"match_confidence": "none"}], "waterfall": {}}'):
+        assert call_settle._observed_cost_micro(_mk("apollo"), body) is None, "the answer shows a waterfall ran"
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"matches": [null], "credits_consumed": 2}') is None, "Apollo says it charged"
     assert call_settle._observed_cost_micro(_mk("apollo"), b"not json") is None
 

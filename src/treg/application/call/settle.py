@@ -34,7 +34,7 @@ from ...models import Org
 from ...timeutil import utcnow_naive as _utcnow_naive
 from .idempotency import _release_idempotent_claim
 from . import keyslots
-from .resolve import MarketplaceCall, _openmart_credits, _truthy, _usd_to_micro
+from .resolve import MarketplaceCall, _openmart_credits, _usd_to_micro
 from .types import GatewayFailed, UpstreamResponse
 
 
@@ -409,6 +409,31 @@ _CREDIT_HEADERS = {
     "aiark": ("x-credit", -1),
     "crawl4ai": ("x-c4-cost", 1),
 }
+
+
+_APOLLO_WATERFALL_FLAGS = ("run_waterfall_email", "run_waterfall_phone")
+_EXPLICIT_FALSE = ("", "0", "false", "no", "off")
+
+
+def _apollo_waterfall(request_data) -> bool:
+    """Whether the caller asked Apollo to fall through to its waterfall vendors, wherever the flag
+    rode: the query string (where Apollo documents it, possibly repeated) or the JSON body. Any
+    value but an explicit false counts as set: a miss wrongly kept at the estimate costs the
+    caller one credit, a waterfall miss wrongly settled at 0 costs treg whatever the vendors bill."""
+    if not isinstance(request_data, dict):
+        return False
+    for block in (request_data.get("queryParams"), request_data.get("body")):
+        if not isinstance(block, dict):
+            continue
+        for flag in _APOLLO_WATERFALL_FLAGS:
+            sent = block.get(flag)
+            for value in sent if isinstance(sent, list) else [sent]:
+                if value is None or value is False or value == 0:
+                    continue
+                if isinstance(value, str) and value.strip().lower() in _EXPLICIT_FALSE:
+                    continue
+                return True
+    return False
 
 
 def _usage_document(body: bytes):
@@ -822,8 +847,9 @@ def _observed_cost_micro(mk: MarketplaceCall, body: bytes, headers=None) -> int 
             for key in ("organization", "organizations"):
                 if key in doc:
                     return int(rate * 1_000_000 + 0.5) if doc[key] else 0
-            query = (mk.request_data.get("queryParams") or {}) if isinstance(mk.request_data, dict) else {}
-            if any(_truthy(query.get(flag)) for flag in ("run_waterfall_email", "run_waterfall_phone")) \
+            # Apollo's own answer says so too: a waterfall response carries a `waterfall` object
+            # and omits `credits_consumed`, so the request flags are not the only evidence.
+            if _apollo_waterfall(mk.request_data) or "waterfall" in doc \
                     or doc.get("credits_consumed", 0) != 0:
                 return None
             matches = doc.get("matches")
