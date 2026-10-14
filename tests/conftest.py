@@ -68,6 +68,9 @@ os.environ["TREG_READ_DATABASE_URL"] = ""
 os.environ["TREG_KV_URL"] = ""
 os.environ["TREG_MONEY_ADMISSION_ENABLED"] = "false"
 os.environ["TREG_MONEY_ADMISSION_ORG_IDS"] = "[]"
+os.environ["TREG_ORG_CONCURRENCY_ENABLED"] = "false"
+os.environ["TREG_ORG_CONCURRENCY_LIMITS"] = "{}"
+os.environ["TREG_ORG_CONCURRENCY_EXEMPT_ORG_IDS"] = "[]"
 os.environ["TREG_EMAIL_DEV_MODE"] = "true"  # tests need the returned OTP code (prod default is now False)
 os.environ["TREG_RESEND_API_KEY"] = ""  # never fire a real Resend send from the test suite (send_otp/send_invite skip when empty)
 os.environ["TREG_RUN_ALLOWED_BINS"] = "sh,echo,true,false,cat,sleep,treg-nonexistent-bin-xyz"  # allow the test CLIs for --server run tests
@@ -390,7 +393,7 @@ async def verified_identity(client, email):
         with patch.object(email_sender, "send_otp", receive):
             started = await client.post("/auth/email/start", json={"email": email})
         assert started.status_code == 200, started.text
-        code = started.json().get("dev_code") or delivered[email]
+        code = started.json().get("dev_code") or delivered[started.json()["email"]]
         proof = await client.post("/auth/email/verify", json={"email": email, "code": code})
         assert proof.status_code == 200, proof.text
         return proof.json()["token"]
@@ -511,6 +514,8 @@ def _reset_call_path_caches():
         try:
             from treg.infra.upstream.limiter import limiter
             limiter.reset()
+            from treg.application.call import keyslots
+            keyslots._rotation.clear()
         except ImportError:
             pass
         # The shared store's in-process fallback (the review-invitation budget): org ids restart

@@ -2,6 +2,7 @@
 title: The API — the only brain (FastAPI)
 status: shipped
 sources:
+  - src/treg/application/key_spend.py
   - src/treg/routers/media.py
   - src/treg/web/sitetrack.js
   - src/treg/api.py
@@ -58,6 +59,7 @@ sources:
   - src/treg/email.py
   - src/treg/runner.py
   - src/treg/ratestore.py
+  - tests/test_cli_pairing.py
 related:
   - interface/cli.md
   - architecture/proxy-model.md
@@ -82,6 +84,21 @@ and revokes all its keys; revoking a human key does not remove the human members
 
 `GET /calls` and `GET /runs` accept `api_key_id` and return the retained key id, name, and safe prefix.
 Billing, balance, and daily-cap checks still use the resolved membership.
+
+`GET /orgs/{id}/api-keys/spend` returns each key's billed spend over the last 30 UTC days
+(`spent_micro`, `charges`), read only from the daily spend rollup
+(`architecture/money.md`, "Spend per API key"). A member sees only their own keys, as on the list;
+the team's `unattributed` line (charges with no keyed audit row) is admin+ and `null` for others.
+`ready` is false, with no numbers, until the rollup has caught up once. `charges` counts settle
+entries, not calls.
+
+`GET /orgs/{id}/usage/spend` (admin+) is the Usage page's spend chart, from the same rollup only:
+`from`/`to` (UTC days, default the last 30), `group` (`day`, `week`, `month`), `stack` (`key`, or
+`tool` with a `provider`), and optional `key` and `provider` filters. The range starts no earlier
+than the rollup's `history_from`. The biggest seven series keep their own color slot and the rest
+fold into one Other, so a bucket has at most eight parts; `ranking` lists every series and
+`options` the keys and providers before any filter. Four grouped reads of the rollup, whatever the
+team's size.
 
 ## Feedback
 
@@ -214,8 +231,11 @@ deployment can relay - the price a "free" endpoint may actually bill, stated bef
 ## `X-Treg-Smoothed` - the call waited for treg's own rate limit
 
 On platform calls, including owned free polling: `wait=<ms>` when the call was spaced behind other callers on the
-same platform key, `retry=1` when a burst-429 with a short `retry-after` was re-sent once (body-less GET/HEAD only). Informational; the status and body are the provider's. See
-`architecture/proxy-model.md` § Burst smoothing.
+same platform key, `retry=1` when a burst-429 with a short `retry-after` was re-sent once (body-less GET/HEAD only),
+`share_wait=<ms>` when the provider's concurrency was fully used and the call waited in line for a place
+(`ops/capacity.md` § fair share). Informational; the status and body are the provider's. See
+`architecture/proxy-model.md` § Burst smoothing. A call that waited too long is refused instead with the
+typed `share_busy` 429 (`retry_after_s`, not charged); a routed job asks its next provider.
 
 ## `X-Treg-Error` - whose refusal is this?
 `bootstrap_handlers._mark_treg_own_errors` tags treg's **own**
@@ -273,14 +293,28 @@ consumption, user provisioning, and invite-token consumption. They return framew
 semantic errors; the HTTP boundary maps them to responses and sets browser cookies. Every identity door
 reuses the same first-proof provisioning command.
 
-The CLI pairing state machine prunes before creating a pending entry, pops a completed result exactly
-once, and preserves session lookup, attempt decrement, pending pop, and result publication order. Its
-team-selection sessions are read-only. The three short-lived dictionaries are process-local and shared
-by every pairing door.
+The CLI pairing state machine uses the existing database `Ephemeral` table across workers and Web
+instances. `start_cli_login` sweeps expired pairing/OAuth entries and stores an encrypted code with
+`CLI_APPROVE_MAX_TRIES` attempts. `approve_cli_login` resolves the session, locks the pairing row with
+a no-op update (PostgreSQL and SQLite), checks expiry/code and selected membership, then commits the
+encrypted result and any Default-key creation together. Wrong attempts commit their decrement without
+extending expiry; the final miss deletes the row. A rejected membership or cancelled transaction leaves
+the pending handshake usable. `poll_cli_login` uses `DELETE RETURNING` and returns credentials only
+after commit. Pending, completed and OAuth-return state each have `HANDSHAKE_TTL` validity; expiry is
+checked on use, including after an approval's key lookup. Team-listing sessions remain read-only.
+
+Store failures return a generic, non-cacheable 503 with no local fallback or SQL/credential logging.
+Cancellation before commit rolls back; a lost response/acknowledgement after committed consumption can
+lose delivery, so the user must start a new login. Consumption is at-most-once, not guaranteed delivery.
+All workers need the same database and configured encryption/session secrets. A rolling upgrade or
+rollback involving the old process-local implementation can interrupt in-flight pairings; retry after
+all workers run the same version. No migration or Redis configuration is required.
 
 Social login builds each authorization request, exchanges the provider code, validates the proven
-email, provisions the user, and commits before publishing a CLI result. Provider callback state is
-validated before resolving the shared HTTP client. `/auth/logout` remains an HTTP-only cookie action.
+email and provisions the user. `_remember_cli_state` and `_consume_cli_state` share the expiring,
+one-time return mapping; the callback sets a browser session and returns CLI users to the team picker,
+where the pairing code is still required. Provider callback state is validated before resolving the
+shared HTTP client. `/auth/logout` remains an HTTP-only cookie action.
 
 ## Endpoints
 
@@ -501,6 +535,10 @@ validated before resolving the shared HTTP client. `/auth/logout` remains an HTT
     in `TREG_FIXED_LOGIN_CODES` (an account with no inbox, such as a directory reviewer's demo
     account) is issued its configured code hash instead and nothing is sent; attempts, TTL and
     start limits are unchanged. Verification issues an identity token and session cookie.
+    Start accepts an optional `captcha_token` (Cloudflare Turnstile); when the deployment enables it
+    in enforce mode, a missing or invalid token is a 400 with `X-Treg-Captcha: required` and a
+    message naming the likely cause (blocked script, unticked check, or failed check) (see
+    [multi-tenancy](../architecture/multi-tenancy.md), "Bot check on email sign-in").
   - Invite sign-in: the admin-visible invite code is join-only. An independent inbox-only
     `email_token` authenticates through `/auth/invite-signin`, consumed once. Invalid/expired
     links return `/?invite_expired=1`. See [auth-secrets](../architecture/auth-secrets.md).
@@ -512,7 +550,14 @@ validated before resolving the shared HTTP client. `/auth/logout` remains an HTT
   session, same-origin CSRF check, matching code and membership in the chosen team.
   Wrong attempts are bounded. `GET /auth/cli/poll` consumes the selected membership's Default key
   and org exactly once. When no team was selected, it returns only a seven-day bootstrap credential.
-  Pairing dictionaries remain process-local.
+  Pairing state and the social-login return mapping are shared through `Ephemeral`. Poll validates
+  the same login-id shape as approve before storage access, returning the usual 200 pending response
+  immediately for a malformed id. Start and poll preserve their existing response shapes.
+  A live pending or unknown poll reads without writing or committing the pairing transaction;
+  completed results still require atomic deletion before disclosure. Storage failures roll back
+  and use a generic 503 for CLI API requests; OAuth callbacks use the existing HTML failure page.
+  Pairing does not alter email Turnstile enforcement, the CLI browser fallback, or signup eligibility.
+  In-flight logins held by old workers may need to restart once during rollout or rollback.
 
   `GET /auth/me` accepts token or session authentication and returns identity/onboarding state.
   `GET /auth/cli-token` uses `application.auth.issue_cli_token` to return a human membership's
@@ -664,7 +709,9 @@ validated before resolving the shared HTTP client. `/auth/logout` remains an HTT
   (`GET /oauth/callback`, open) exchanges the code and creates/updates the oauth secret; `oauth_status`
   polls. **Two modes** (`OAuthStartIn`): **BYO** (supply `client_id`/`client_secret`/`auth_uri`/
   `token_uri`/`scopes`) or **REGISTRY** (supply `provider` + optional `capability`) where treg fills
-  everything from **its own approved OAuth app** - the marketplace. `oauth_providers_list`
+  everything from **its own approved OAuth app** - the marketplace. REGISTRY mode refuses a
+  pasted-secret provider (422 `pasted_secret_provider`, naming `POST /connections/token`): it has
+  no consent screen and no scopes to request. `oauth_providers_list`
   (`GET /oauth/providers`) lists the providers treg holds an app for, each flagged `configured` (false
   when this deployment hasn't set that provider's client credentials) and `metered` (true when the
   provider's upstream bills treg's app per use AND this deployment charges for it - then

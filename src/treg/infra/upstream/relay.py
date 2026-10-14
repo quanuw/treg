@@ -5,8 +5,11 @@ Faithfulness contract — it alters ONLY these, everything else is relayed verba
   1. transport/hop-by-hop headers — re-derived for the new hop (forwarding stale ones corrupts
      the stream); httpx sets them correctly upstream.
   2. treg's own control/infra headers + the edge's forwarding headers (`x-treg-*`,
-     `ngrok-skip-browser-warning`, `x-forwarded-*`, `x-real-ip`, `forwarded`, `via`) — stripped so
-     they never leak upstream. treg's own cookies (`treg_session`, `treg_oauth_state`) are scrubbed
+     `ngrok-skip-browser-warning`, `x-forwarded-*`, `x-real-ip`, `forwarded`, `via`, Cloudflare's
+     `cf-connecting-ip` family and whatever `TREG_CLIENT_IP_HEADER` names) — stripped so they never
+     leak upstream. A Cloudflare-fronted provider refuses any request still carrying one with 403
+     error 1000 ("DNS points to prohibited IP"), and the MCP layer forwards the caller's address
+     to treg's own API in that header, so every MCP call to such a provider would fail. treg's own cookies (`treg_session`, `treg_oauth_state`) are scrubbed
      from the Cookie header too (the dashboard's `credentials:'include'` Try-it would otherwise leak
      our session token to the upstream); any other caller cookies are preserved.
   3. the credential(s) the tool's bindings inject — overwrite only their target header, query
@@ -38,7 +41,7 @@ from collections.abc import Awaitable, Callable
 
 import httpx
 
-from ... import crypto
+from ... import crypto, jsontext
 from ...application.call.types import GatewayFailed, UpstreamRequest, UpstreamResponse
 from ...config import TREG_USER_AGENT, get_settings
 from ...models import Secret, Tool
@@ -61,6 +64,9 @@ _CONTROL = frozenset(
         "ngrok-skip-browser-warning",
         "x-forwarded-for", "x-forwarded-proto", "x-forwarded-host", "x-forwarded-port",
         "x-real-ip", "forwarded", "via",
+        # The headers Cloudflare's edge adds on the way in (and the MCP layer re-sends in process).
+        "cf-connecting-ip", "cf-connecting-ipv6", "cf-pseudo-ipv4", "true-client-ip",
+        "cf-ipcountry", "cf-ray", "cf-visitor", "cf-worker", "cf-ew-via", "cdn-loop",
     }
 )
 _TREG_PREFIX = "x-treg-"
@@ -69,7 +75,8 @@ _DROP_REQUEST = _HOP_BY_HOP | _CONTROL
 
 def _is_dropped_request_header(name: str, extra: frozenset[str]) -> bool:
     """Whether a caller header is ours/hop-by-hop and must not reach the upstream."""
-    return name in _DROP_REQUEST or name in extra or name.startswith(_TREG_PREFIX)
+    return (name in _DROP_REQUEST or name in extra or name.startswith(_TREG_PREFIX)
+            or name == get_settings().client_ip_header.strip().lower())
 
 
 _IDEMPOTENCY_HEADER = b"idempotency-key"
@@ -198,7 +205,7 @@ async def relay(
         # extractable through a local run.
         setting = binding.get("platform_setting")
         if setting:
-            value = getattr(get_settings(), setting, "") or ""
+            value = get_settings().platform_credential(setting, binding.get("account"))
             if not value:
                 raise GatewayFailed(
                     "injection_failed", status_code=502,
@@ -222,7 +229,7 @@ async def relay(
     # Only carry a body when the caller actually sent one — otherwise passing an (unsized) stream
     # makes httpx frame the request `Transfer-Encoding: chunked`, putting a bogus body-frame on a
     # GET/HEAD/OPTIONS (which strict upstreams reject).
-    content = (json.dumps(json_body, separators=(",", ":"), ensure_ascii=False).encode()
+    content = (jsontext.dumps_bytes(json_body, separators=(",", ":"))
                if json_body is not None else request.body_stream() if request.has_body else None)
     # A streamed body with no length makes httpx frame it `Transfer-Encoding: chunked`. The bytes are
     # the caller's, unaltered, so the caller's own Content-Length is exact — carry it, and httpx

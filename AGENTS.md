@@ -38,7 +38,9 @@ Everything else in this file is guidance; these are the contract, and they win o
    every path: timeout, cancellation and exceptions included.
 3. A request holds zero database connections while upstream or object-storage I/O is in flight.
    Keep `reserve` and `settle` separate; read archive pointers, close the session, then fetch bytes.
-4. Plain `/call/` is a faithful relay: the injected credential, the transport headers listed in
+4. Plain `/call/` is a faithful relay: the injected credential (on treg's shared key, one of treg's
+   accounts for the provider, chosen per call and fixed for anything an account created), the
+   transport headers listed in
    `src/treg/infra/upstream/relay.py`, and (on treg's shared key only) the per-org and, for pinned
    agents, per-pin re-scoping of the caller's `Idempotency-Key` and treg's own `User-Agent` in place
    of the caller's are the only rewrites. A credential
@@ -142,8 +144,11 @@ agents then built against a constitution that was wrong.
   approved it stays under review for good, unlisted or not, and its share
   page shows a run log of outcomes only unless the maker turns `public_log` off
   (`docs/hub-listing-decisions.md`). See `docs/context/architecture/hub.md`.
-- **Signup credit.** Once per new verified user, enforced by a user-level atomic claim committed
-  with the grant. Team deletion never restores eligibility; legacy registration is not email proof.
+- **Signup credit.** Once per new verified user and once per inbox (Gmail dots and `+tag` aliases
+  share one), enforced by a user-level atomic claim plus a `SignupPromoClaim` row committed with
+  the grant. Team deletion never restores eligibility; legacy registration is not email proof.
+  An installed policy extension may defer it through the `signup_credit` decision point
+  (`src/treg/policy.py`, docs/context/architecture/policy-extensions.md); extensions only restrict.
 - **Money.** Everything is **integer micro-USD** - never floats, never cents. The Stripe SDK lives
   only in `infra/stripe.py`, orchestration in `application/billing.py`, and `reconcile.py` is
   read-only. See `docs/context/architecture/money.md`.

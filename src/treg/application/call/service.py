@@ -12,7 +12,7 @@ from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 
 import httpx
 
-from ... import analytics, archive, audit, oauth, oauth_providers
+from ... import analytics, archive, audit, jsontext, oauth, oauth_providers
 from ...application import hub as hub_app
 from ...application.hub import runner as hub_runner
 from ...application.hub import limits as hub_limits
@@ -21,15 +21,20 @@ from ...client_identity import _norm_client
 from ...config import get_settings
 from ...domain.catalog import store as catalog_store
 from ...domain import provider_resources
+from ...infra import money_admission
 from ...infra.db import session_maker
 from ...models import Secret
 from ...sandbox_identity import visitor_name
+from ...domain.capacity import marks as capacity_marks
 from ...domain.capacity import signatures as capacity_signatures
+from ...domain.capacity.fair_share import NO_SLOT, ShareBusy, fair_share
+from ...domain.capacity.fair_share import RETRY_AFTER_S as RETRY_AFTER_SHARE_S
 from ...domain.capacity.view import view as capacity_view
 from ...infra.upstream.limiter import limiter as provider_limiter
 from ...infra.upstream.relay import identify_as_treg, relay, scope_shared_idempotency_key
 from .. import asynctasks as async_task_app
 from ...domain import asynctasks as asynctasks_rules
+from . import keyslots
 from .authorize import authorize_call, enforce_public_demo_limit
 from .evidence import (
     _ERROR_BODY_SLICE,
@@ -175,16 +180,28 @@ def create_call_context(call_input: CallInput) -> CallContext:
     return CallContext(input=call_input, call_ref=uuid.uuid4().hex, meta=meta)
 
 
+def _required_caller_org(caller) -> int:
+    """Positive org of the authenticated caller, or refuse before a balance session.
+
+    Skip-direct never reserves a parent, so that call's `payer_org_id` stays empty.
+    Overflow cancellation has to name this caller. It must not copy the org onto the parent.
+    """
+    return money_admission.require_balance_orgs([caller.org_id])[0]
+
+
 async def _finish_cancelled_call(
     request: _ApplicationRequest,
     mk: MarketplaceCall | None,
     call_ref: str,
     response: UpstreamResponse | None = None,
+    *,
+    trusted_org_id: int | None = None,
 ) -> None:
     claim, request.state.idem_claim = request.state.idem_claim, None
     if mk is not None and mk.metered:
         request.context.finalization = FinalizationState.FINALIZING
-    await finish_cancelled_call(claim, mk, call_ref, response)
+    await finish_cancelled_call(
+        claim, mk, call_ref, response, trusted_org_id=trusted_org_id)
 
 
 async def _await_before_reserve(awaitable, request: _ApplicationRequest, call_ref: str):
@@ -488,7 +505,7 @@ async def _apply_managed_resource_result(
                     resource_db, org_id=caller.org_id, provider=mk.provider,
                     resource_kind=str(rule.get("kind") or ""), upstream_id=upstream_id,
                     display_name=display_name, created_by=caller.email,
-                    source_call_id=call_ref,
+                    source_call_id=call_ref, key_slot=mk.key_slot,
                 )
                 await resource_db.commit()
         except provider_resources.ResourceCollision as exc:
@@ -548,7 +565,7 @@ async def _apply_managed_resource_result(
 
 
 def _json_response(value) -> UpstreamResponse:
-    body = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
+    body = jsontext.dumps_bytes(value, allow_nan=False, separators=(",", ":"))
     return _bytes_response(body, media_type="application/json")
 
 
@@ -704,8 +721,8 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                        if isinstance(exc.detail, dict) else 0)
             request.state.call_cost_micro = charged
             if idem_key and charged > 0 and exc.kind == "hub_run_failed":
-                error_body = json.dumps({"detail": exc.detail}, ensure_ascii=False,
-                                        allow_nan=False, separators=(",", ":")).encode()
+                error_body = jsontext.dumps_bytes({"detail": exc.detail},
+                                                  allow_nan=False, separators=(",", ":"))
                 try:
                     await _store_idempotent(
                         idem_key, caller, status_code=exc.status_code, body=error_body,
@@ -756,10 +773,8 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
             if exc.kind in ("route_caller_fault", "route_failed"):
                 request.state.call_cost_micro = charged
             if idem_key and charged > 0 and exc.kind in ("route_caller_fault", "route_failed"):
-                error_body = json.dumps(
-                    {"detail": exc.detail}, ensure_ascii=False, allow_nan=False,
-                    separators=(",", ":"),
-                ).encode()
+                error_body = jsontext.dumps_bytes(
+                    {"detail": exc.detail}, allow_nan=False, separators=(",", ":"))
                 try:
                     await _store_idempotent(
                         idem_key, caller, status_code=exc.status_code, body=error_body,
@@ -976,7 +991,8 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
             props |= {"provider": mk.provider, "endpoint_id": mk.endpoint_id,
                       "tier": mk.tier, "metered": mk.metered, "cost_type": mk.cost_type,
                       "charged_micro": charged_micro, "observed_micro": observed_micro,
-                      "capacity_signal": capacity_signal, "probe": mk.probe_lock_id is not None}
+                      "capacity_signal": capacity_signal, "probe": mk.probe_lock_id is not None,
+                      "key_slot": mk.key_slot}
         else:
             props["provider"] = urlsplit(upstream_url).hostname or ""
         if defer_analytics:
@@ -1085,6 +1101,9 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
         # attempt, no parent hold — straight to the child cycle (plan §4 ladder, tier 4b). The DB
         # phase ends here; the child places its own hold and the aggregator answers with none open.
         await db.commit()
+        # No parent hold exists yet. Require the authenticated caller before the child
+        # reserve, and keep that org off `mk.payer_org_id` — the parent was not reserved.
+        caller_org = _required_caller_org(caller)
         pending = _audit(503, charged_micro=0, refused_by="capacity",
                          error_response="treg: own account exhausted — trying overflow",
                          defer_analytics=True)
@@ -1096,7 +1115,7 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                 client=upstream_client, audit_client=_client_name(request), force_trigger="exhausted")
         except asyncio.CancelledError:
             _capture(pending)
-            await _finish_cancelled_call(request, mk, call_ref)
+            await _finish_cancelled_call(request, mk, call_ref, trusted_org_id=caller_org)
             raise
         if outcome is None or not outcome.served or outcome.response is None:
             _capture(pending)  # a refusal after all
@@ -1105,7 +1124,8 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
             raise (outcome.failure if outcome is not None and outcome.failure is not None
                    else _provider_capacity_unavailable(
                        _catalog_endpoint_for(mk.endpoint_id) or {"id": mk.endpoint_id},
-                       mk.provider, capacity_view.exhausted_until(mk.provider, mk.endpoint_id)))
+                       mk.provider, capacity_view.exhausted_until(
+                           mk.provider, mk.endpoint_id, metered=capacity_marks.spends_balance(mk.cost_type))))
         response, body, charged = outcome.response, outcome.body, outcome.charged_micro
         _capture(_overflow_event(pending, outcome, charged))
         if idem_key:
@@ -1114,7 +1134,8 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                                         media_type=_response_header(response, "content-type"),
                                         charged_micro=charged, metered=True, call_ref=call_ref)
             except asyncio.CancelledError:
-                await _finish_cancelled_call(request, mk, call_ref, response)
+                await _finish_cancelled_call(
+                    request, mk, call_ref, response, trusted_org_id=caller_org)
                 raise
             request.state.idem_claim = None
         _set_response_header(response, "X-Treg-Cost-Micro", str(charged))
@@ -1191,6 +1212,7 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
         # (settle, first-call and the idempotent store all run on their own sessions), and the session
         # is `expire_on_commit=False`, so `tool`/`secrets`/`caller.org` stay usable without a reload.
         await db.commit()
+        share_slot = NO_SLOT
         try:
             platform_tier = mk is not None and mk.tier == "platform"
             raw_headers = tuple(request.headers.raw)
@@ -1216,9 +1238,12 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                 # would exceed the provider's published rate waits briefly (≤ 2 s, in-process, no DB —
                 # the DB phase ended above) instead of being relayed into a 429 nobody can fix. Beyond
                 # the cap it proceeds as before; nothing is ever refused here.
-                rl = capacity_view.rate_limit(mk.provider)
+                # The account, when resolution left it open, is picked here and its token taken
+                # below with no await between: a burst arriving together spreads over the accounts.
+                keyslots.assign(mk)
+                rl = keyslots.rate_bucket(mk.provider, mk.endpoint_id, mk.key_slot)
                 if rl is not None:
-                    waited = await provider_limiter.acquire(mk.provider, *rl)
+                    waited = await provider_limiter.acquire(*rl)
                     if waited:
                         smoothed.append(f"wait={waited}")
             # The archive's serve path (docs/context/architecture/archive.md): a fresh stored
@@ -1287,6 +1312,26 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                 archive_key_hash, archive_content_hash = served["key_hash"], served["content_hash"]
                 response = _served_response(served, body)
             else:
+                if platform_tier and (cap := capacity_view.concurrency(mk.provider)) \
+                        and (wait_s := get_settings().fair_share_wait_s) > 0:
+                    # Fair share (domain/capacity/fair_share.py): every team shares this account's
+                    # places; a full provider hands the next free place to the team with the fewest
+                    # calls in progress. Held until the answer is read, released on every path below.
+                    try:
+                        # Each of treg's accounts has its own places (`keyslots.capacity_key`).
+                        share_slot = await fair_share.acquire(
+                            keyslots.capacity_key(mk.provider, mk.key_slot), caller.org_id, cap,
+                            max_wait_s=wait_s)
+                    except ShareBusy as busy:
+                        raise GatewayFailed("share_busy", status_code=429, detail={
+                            "error": "share_busy", "provider": mk.provider,
+                            "endpoint_id": mk.endpoint_id, "active": busy.active,
+                            "retry_after_s": RETRY_AFTER_SHARE_S,
+                            "message": f"{mk.provider} is fully used and your team already has "
+                                       f"{busy.active} calls in progress on it; not charged, "
+                                       f"try again in {RETRY_AFTER_SHARE_S} s"}) from None
+                    if share_slot.waited_ms:
+                        smoothed.append(f"share_wait={share_slot.waited_ms}")
                 upstream_started = _now_ms()
                 response = await relay(
                     upstream_request,
@@ -1335,7 +1380,7 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                     try:
                         await async_task_app.remember_platform_resources(
                             caller.org_id, mk.provider, call_ref, mk.resource_ownership, body,
-                            tags=meta.tags)
+                            tags=meta.tags, key_slot=mk.key_slot)
                     except Exception:  # noqa: BLE001 - failure keeps later access fail-closed
                         logging.getLogger("treg.asynctasks").warning(
                             "could not persist async resource ownership for %s", call_ref,
@@ -1414,6 +1459,8 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
             raise
         except httpx.RequestError as exc:  # upstream down/timeout is a gateway fault, not treg's 500
             raise _gateway_request_failure(exc) from exc
+        finally:
+            share_slot.release()
     except asyncio.CancelledError:
         await _finish_cancelled_call(request, mk, call_ref, response)
         raise
@@ -1617,7 +1664,11 @@ async def _execute_call(request: _ApplicationRequest, upstream_client: httpx.Asy
                     client=upstream_client, audit_client=_client_name(request))
             except asyncio.CancelledError:
                 _capture(pending)
-                await _finish_cancelled_call(request, mk, call_ref, response)
+                # The child hold, if the parent one was already released, still belongs
+                # to this caller. Require that identity before the refund session.
+                await _finish_cancelled_call(
+                    request, mk, call_ref, response,
+                    trusted_org_id=_required_caller_org(caller))
                 raise
             except CallFailure as exc:  # the child's own reservation refusal
                 if exc.kind == "route_max_cost" and charged:

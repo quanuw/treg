@@ -137,68 +137,88 @@ adapters:
     miss: "data.email == null"
 
   # ---- instagram.user.profile ---------------------------------------------------------------
+  # Instagram users come in GraphQL (edge_*.count) or private API (*_count) shape; read both.
   tikhub.instagram.user.profile:
     accepts: [[username]]
     in:  {username: queryParams.username}
-    out: {username: "coalesce(data.data.user.username, params.username)", user_id: data.data.user.id,
-          full_name: data.data.user.full_name, followers: data.data.user.edge_followed_by.count,
-          following: data.data.user.edge_follow.count, posts_count: data.data.user.edge_owner_to_timeline_media.count,
+    out: {username: "coalesce(data.data.user.username, params.username)",
+          user_id: "coalesce(data.data.user.id, data.data.user.pk)", full_name: data.data.user.full_name,
+          followers: "coalesce(data.data.user.edge_followed_by.count, data.data.user.follower_count)",
+          following: "coalesce(data.data.user.edge_follow.count, data.data.user.following_count)",
+          posts_count: "coalesce(data.data.user.edge_owner_to_timeline_media.count, data.data.user.media_count)",
           is_verified: data.data.user.is_verified, is_private: data.data.user.is_private, biography: data.data.user.biography}
     miss: "data.data.user == null"
   tikhub.x.instagram-v1-fetch-user-info-by-username-v2:
     accepts: [[username]]
     in:  {username: queryParams.username}
-    out: {username: data.username, user_id: data.id, full_name: data.full_name, followers: data.edge_followed_by.count,
-          following: data.edge_follow.count, posts_count: data.edge_owner_to_timeline_media.count,
+    out: {username: data.username, user_id: "coalesce(data.id, data.pk)", full_name: data.full_name,
+          followers: "coalesce(data.edge_followed_by.count, data.follower_count)",
+          following: "coalesce(data.edge_follow.count, data.following_count)",
+          posts_count: "coalesce(data.edge_owner_to_timeline_media.count, data.media_count)",
           is_verified: data.is_verified, is_private: data.is_private, biography: data.biography}
     miss: "data.username == null"
   tikhub.x.instagram-v1-fetch-user-info-by-username-v3:
     accepts: [[username]]
     in:  {username: queryParams.username}
-    out: {username: data.username, user_id: data.id, full_name: data.full_name, followers: data.edge_followed_by.count,
-          following: data.edge_follow.count, posts_count: data.edge_owner_to_timeline_media.count,
+    out: {username: data.username, user_id: "coalesce(data.id, data.pk)", full_name: data.full_name,
+          followers: "coalesce(data.edge_followed_by.count, data.follower_count)",
+          following: "coalesce(data.edge_follow.count, data.following_count)",
+          posts_count: "coalesce(data.edge_owner_to_timeline_media.count, data.media_count)",
           is_verified: data.is_verified, is_private: data.is_private, biography: data.biography}
     miss: "data.username == null"
   tikhub.x.instagram-v1-fetch-user-info-by-id:
     accepts: [[user_id]]
     in:  {user_id: queryParams.user_id}
-    out: {username: data.username, user_id: data.id, full_name: data.full_name, followers: data.edge_followed_by.count,
-          following: data.edge_follow.count, posts_count: data.edge_owner_to_timeline_media.count,
+    out: {username: data.username, user_id: "coalesce(data.id, data.pk)", full_name: data.full_name,
+          followers: "coalesce(data.edge_followed_by.count, data.follower_count)",
+          following: "coalesce(data.edge_follow.count, data.following_count)",
+          posts_count: "coalesce(data.edge_owner_to_timeline_media.count, data.media_count)",
           is_verified: data.is_verified, is_private: data.is_private, biography: data.biography}
     miss: "data.username == null"
   tikhub.x.instagram-v1-fetch-user-info-by-id-v2:
     accepts: [[user_id]]
     in:  {user_id: queryParams.user_id}
-    out: {username: data.username, user_id: data.id, full_name: data.full_name, followers: data.edge_followed_by.count,
-          following: data.edge_follow.count, posts_count: data.edge_owner_to_timeline_media.count,
+    out: {username: data.username, user_id: "coalesce(data.id, data.pk)", full_name: data.full_name,
+          followers: "coalesce(data.edge_followed_by.count, data.follower_count)",
+          following: "coalesce(data.edge_follow.count, data.following_count)",
+          posts_count: "coalesce(data.edge_owner_to_timeline_media.count, data.media_count)",
           is_verified: data.is_verified, is_private: data.is_private, biography: data.biography}
     miss: "data.username == null"
   tikhub.x.instagram-v3-get-user-profile:
     accepts: [[username]]
     in:  {username: queryParams.username}
-    out: {username: data.username, user_id: data.id, full_name: data.full_name, followers: data.follower_count,
-          following: data.following_count, posts_count: data.media_count, is_verified: data.is_verified,
-          is_private: data.is_private, biography: data.biography}
+    out: {username: data.username, user_id: "coalesce(data.id, data.pk)", full_name: data.full_name,
+          followers: "coalesce(data.edge_followed_by.count, data.follower_count)",
+          following: "coalesce(data.edge_follow.count, data.following_count)",
+          posts_count: "coalesce(data.edge_owner_to_timeline_media.count, data.media_count)",
+          is_verified: data.is_verified, is_private: data.is_private, biography: data.biography}
     miss: "data.username == null"
   justoneapi.instagram.user.profile:
     accepts: [[username]]
     in:  {username: queryParams.username}
-    out: {username: data.username, user_id: data.id, full_name: data.full_name, followers: data.edge_followed_by.count,
-          following: data.edge_follow.count, posts_count: data.edge_owner_to_timeline_media.count,
+    out: {username: data.username, user_id: "coalesce(data.id, data.pk)", full_name: data.full_name,
+          followers: "coalesce(data.edge_followed_by.count, data.follower_count)",
+          following: "coalesce(data.edge_follow.count, data.following_count)",
+          posts_count: "coalesce(data.edge_owner_to_timeline_media.count, data.media_count)",
           is_verified: data.is_verified, is_private: data.is_private, biography: data.biography}
     miss: "data.username == null"
   scrapecreators.instagram.user.profile:
     accepts: [[username]]
     in:  {username: queryParams.handle}
-    out: {username: data.user.username, user_id: data.user.pk, full_name: data.user.full_name,
-          followers: data.user.follower_count, following: data.user.following_count, posts_count: data.user.media_count,
+    out: {username: data.user.username, user_id: "coalesce(data.user.id, data.user.pk)", full_name: data.user.full_name,
+          followers: "coalesce(data.user.edge_followed_by.count, data.user.follower_count)",
+          following: "coalesce(data.user.edge_follow.count, data.user.following_count)",
+          posts_count: "coalesce(data.user.edge_owner_to_timeline_media.count, data.user.media_count)",
           is_verified: data.user.is_verified, is_private: data.user.is_private, biography: data.user.biography}
     miss: "data.user.username == null"
   scrapecreators.x.v1-instagram-basic-profile:
     accepts: [[user_id]]
     in:  {user_id: queryParams.userId}
-    out: {username: username, user_id: pk, full_name: full_name, followers: follower_count, following: following_count,
-          posts_count: media_count, is_verified: is_verified, is_private: is_private, biography: biography}
+    out: {username: username, user_id: "coalesce(id, pk)", full_name: full_name,
+          followers: "coalesce(edge_followed_by.count, follower_count)",
+          following: "coalesce(edge_follow.count, following_count)",
+          posts_count: "coalesce(edge_owner_to_timeline_media.count, media_count)",
+          is_verified: is_verified, is_private: is_private, biography: biography}
     miss: "username == null"
   serpapi.x.instagram-profile:
     accepts: [[username]]
@@ -668,7 +688,8 @@ adapters:
   dataforseo.x.serp-google-organic-live-advanced:
     accepts: [[q]]
     in:  {q: body.keyword}
-    in_expr: {body.location_code: "dfs_location(country)", body.language_code: language, body.depth: limit}
+    in_expr: {body.location_code: "dfs_location(country)", body.language_code: language, body.depth: limit,
+              body.load_async_ai_overview: "choose(ai_overview, true, null)"}
     body_array: true
     out: {results: "tasks[0].result[0].items", count: "tasks[0].result[0].items_count"}
     miss: "tasks[0].result[0].items == []"
@@ -2752,7 +2773,8 @@ adapters:
   crawl4ai.google.serp.organic:
     accepts: [[q]]
     in: {q: queryParams.q}
-    in_expr: {queryParams.country: "lower(country)", queryParams.language: "lower(language)", queryParams.num: "at_most(ceil_to(limit, 10), 100)"}
+    in_expr: {queryParams.country: "lower(country)", queryParams.language: "lower(language)", queryParams.num: "at_most(ceil_to(limit, 10), 100)",
+              queryParams.source: "choose(ai_overview, 'google', null)"}
     out: {results: results, count: "len(results)"}
     miss: "coalesce(results, []) == []"
   anyapi.google.serp.organic:
@@ -3356,3 +3378,64 @@ adapters:
     test_identity: {url: "https://example.com"}
     out: {pages: data.results, count: "len(data.results)"}
     miss: "coalesce(data.results[0].full_content, data.results[0].highlights, '') == ''"
+
+  # ---- Crawl4AI recipes (POST /recipes/{name}: {rows: [...]}) --------------------------------
+  crawl4ai.google.serp.maps:
+    accepts: [[q]]
+    in: {q: body.query}
+    out: {places: rows, count: "len(rows)"}
+    miss: "coalesce(rows, []) == []"
+  crawl4ai.instagram.user.profile:
+    accepts: [[username]]
+    in: {username: body.username}
+    out: {username: "rows[0].username", user_id: "rows[0].user_id", full_name: "rows[0].full_name",
+          followers: "rows[0].followers", following: "rows[0].following", posts_count: "rows[0].posts",
+          is_verified: "rows[0].is_verified", is_private: "rows[0].is_private", biography: "rows[0].biography"}
+    miss: "coalesce(rows, []) == []"
+  crawl4ai.instagram.user.posts:
+    accepts: [[username]]
+    in: {username: body.username}
+    out: {posts: rows}
+    miss: "coalesce(rows, []) == []"
+  crawl4ai.instagram.user.reels:
+    accepts: [[username], [user_id]]
+    in: {username: body.username, user_id: body.user_id}
+    out: {reels: rows}
+    miss: "coalesce(rows, []) == []"
+  crawl4ai.tiktok.user.profile:
+    accepts: [[username]]
+    in: {username: body.username}
+    out: {username: "rows[0].username", user_id: "rows[0].user_id", sec_uid: "rows[0].sec_uid",
+          nickname: "rows[0].nickname", followers: "rows[0].followers", following: "rows[0].following",
+          likes: "rows[0].likes", videos_count: "rows[0].videos", is_verified: "rows[0].verified",
+          biography: "rows[0].bio"}
+    miss: "coalesce(rows, []) == []"
+  crawl4ai.tiktok.user.videos:
+    accepts: [[sec_uid]]
+    in: {sec_uid: body.account}
+    out: {videos: rows}
+    miss: "coalesce(rows, []) == []"
+  crawl4ai.x.user.profile:
+    accepts: [[username]]
+    in: {username: body.username}
+    out: {username: "rows[0].username", user_id: "rows[0].user_id", name: "rows[0].name",
+          followers: "rows[0].followers", following: "rows[0].following", posts_count: "rows[0].tweets",
+          is_verified: "rows[0].verified", description: "rows[0].bio"}
+    miss: "coalesce(rows, []) == []"
+  crawl4ai.facebook.user.posts:
+    accepts: [[url]]
+    in: {url: body.page}
+    out: {posts: rows}
+    miss: "coalesce(rows, []) == []"
+  crawl4ai.youtube.channel.profile:
+    accepts: [[channel_id]]
+    in: {channel_id: body.channel}
+    out: {name: "rows[0].title", channel_id: "rows[0].channel_id", handle: "rows[0].handle",
+          description: "rows[0].description", subscribers: "rows[0].subscribers",
+          videos_count: "rows[0].videos", country: "rows[0].country"}
+    miss: "coalesce(rows, []) == []"
+  crawl4ai.youtube.video.comments:
+    accepts: [[video_id]]
+    in: {video_id: body.video}
+    out: {comments: rows}
+    miss: "coalesce(rows, []) == []"

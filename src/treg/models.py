@@ -179,6 +179,19 @@ class User(SQLModel, table=True):
     created_at: NaiveUTC = Field(default_factory=_now)
 
 
+class SignupPromoClaim(SQLModel, table=True):
+    """The signup gift, claimed once per inbox (`promotions.promo_inbox`), not per address.
+
+    The primary key arbitrates aliases racing for one mailbox; the row is staged with the
+    user-level claim and the grant, so a failed grant leaves no row. `user_id` has no FK and
+    the row outlives the user, so deleting an account never frees its inbox for another gift.
+    """
+
+    inbox: str = Field(primary_key=True)
+    user_id: int
+    created_at: NaiveUTC = Field(default_factory=_now)
+
+
 class Membership(SQLModel, table=True):
     """Links a User to an Org with a role, and carries that pairing's token.
     The caller presents a token; we store only its SHA-256 hash. Access = "are you a member
@@ -519,12 +532,12 @@ class Bundle(SQLModel, table=True):
 
 class Ephemeral(SQLModel, table=True):
     """Short-lived server state that must survive a restart and stay correct across instances:
-    the emailed OTP code + its brute-force counter, and the auth rate-limit sliding windows. Keyed
-    by (ns, k) — a namespace ('otp' | 'otp_start' | 'sandbox_hit') plus the key within it; `v` is an
+    emailed OTPs, auth rate-limit windows, and CLI pairing handshakes. Keyed
+    by (ns, k) — a namespace plus the key within it; `v` is an
     opaque JSON payload; rows past `expires_at` are swept lazily (see treg.ratestore). This is the
     DB home for what used to be per-process dicts (backlog #3) — so counters can't be reset by a
-    restart and stay correct on more than one instance. NOT the CLI-login handshake, which is
-    deliberately still in-process (short-lived, self-heals on retry — see api._cli_pending)."""
+    restart and stay correct on more than one instance. CLI pairing uses locked updates and atomic
+    consumption in application.auth; its codes and completed credentials are encrypted."""
 
     ns: str = Field(primary_key=True)
     k: str = Field(primary_key=True)
@@ -884,6 +897,7 @@ class AsyncTaskRecord(SQLModel, table=True):
     tags: dict | None = Field(default=None, sa_column=Column("tags", JSON, nullable=True))
     # The terminal answer's verdict word, kept with `hit` for the same insert race.
     verdict: str | None = Field(default=None)
+    key_slot: str | None = Field(default=None)  # config.PlatformSlot label; NULL = primary
 
 
 class AsyncResourceRecord(SQLModel, table=True):
@@ -906,6 +920,7 @@ class AsyncResourceRecord(SQLModel, table=True):
 
     # Attribution snapshot: never infer ownership from a current membership or lossy audit.
     tags: dict | None = Field(default=None, sa_column=Column("tags", JSON, nullable=True))
+    key_slot: str | None = Field(default=None)  # config.PlatformSlot label; NULL = primary
 
 
 class ProviderResource(SQLModel, table=True):
@@ -939,6 +954,7 @@ class ProviderResource(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now, index=True)
     updated_at: datetime = Field(default_factory=_now)
     deleted_at: datetime | None = Field(default=None, index=True)
+    key_slot: str | None = Field(default=None)  # config.PlatformSlot label; NULL = primary
 
 
 class TagSpend(SQLModel, table=True):
@@ -2046,6 +2062,52 @@ class EndpointStatCursor(SQLModel, table=True):
     cursor_id: int = Field(default=0)             # last consumed CallRecord.id
     watermark: NaiveUTC | None = Field(default=None)  # created_at of the last consumed row
     caught_up_at: NaiveUTC | None = Field(default=None)
+    updated_at: NaiveUTC = Field(default_factory=_now)
+
+
+class ApiKeySpendDay(SQLModel, table=True):
+    """One team's billed spend through one API key on one tool on one UTC day: the read model behind
+    the Team page's "Spent" column and the Usage page's spend chart. Folded from the ledger's
+    `settle` entries by `application.key_spend_rollup` (the `treg-worker spend rollup` cron), which
+    is this table's only writer; team deletion clears it with the team. The pages read a few
+    hundred of these rows instead of every settle entry of the window plus its audit row.
+
+    The money is the ledger's; the audit row only names the key (`docs/context/architecture/money.md`,
+    "Spend per API key"). `api_key_id = 0` is the team's one "not attributed" line for the day:
+    a charge whose call has no keyed audit row. `charges` counts settle entries, not calls: a
+    routed call or an overflow hold settles more than once.
+    """
+
+    org_id: int = Field(foreign_key="org.id", primary_key=True)
+    day: str = Field(primary_key=True)  # YYYY-MM-DD, UTC, from LedgerEntry.created_at
+    api_key_id: int = Field(primary_key=True)  # 0 = not attributed; no foreign key, a key row may go
+    endpoint_id: str = Field(primary_key=True)  # LedgerEntry.endpoint_id; "" when the entry has none
+    spent_micro: int = Field(default=0, sa_column=Column(BigInteger, nullable=False))
+    charges: int = Field(default=0)
+    updated_at: NaiveUTC = Field(default_factory=_now)
+
+
+class ApiKeySpendCursor(SQLModel, table=True):
+    """Where `application.key_spend_rollup` has got to in the ledger. One row (`id = "ledger"`).
+
+    Ledger ids are random, so the position is the pair `(watermark_at, watermark_id)`: the last
+    folded settle entry in `(created_at, id)` order. `history_from` is the first UTC day the rollup
+    holds; nothing reads before it. `caught_up_at` is NULL until a run drains the first backfill,
+    and the pages say spend history is being prepared until then. `recounted_on` is the UTC day the daily recount
+    last finished; the `recount_*` columns are the lease and progress of the one in flight.
+    """
+
+    id: str = Field(primary_key=True)
+    watermark_at: NaiveUTC
+    watermark_id: str = Field(default="")
+    history_from: str  # YYYY-MM-DD
+    caught_up_at: NaiveUTC | None = Field(default=None)
+    recounted_on: str | None = Field(default=None)
+    # The recount in progress: its day, the last team done, and the run holding it until when.
+    recount_day: str | None = Field(default=None)
+    recount_after_org: int = Field(default=0)
+    recount_owner: str | None = Field(default=None)
+    recount_lease_until: NaiveUTC | None = Field(default=None)
     updated_at: NaiveUTC = Field(default_factory=_now)
 
 

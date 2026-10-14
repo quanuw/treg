@@ -46,11 +46,14 @@ sources:
   - src/treg/domain/provider_resources.py
   - src/treg/routers/provider_resources.py
   - src/treg/alembic/versions/0033_signup_promo_eligibility.py
+  - src/treg/alembic/versions/0071_signup_promo_claim.py
   - src/treg/alembic/versions/0041_searchlog.py
   - src/treg/alembic/versions/0055_find_v2_log.py
   - src/treg/alembic/versions/0056_searchlog_verdict.py
   - src/treg/alembic/versions/0065_call_verdict.py
   - src/treg/alembic/versions/0066_endpointdaystat_verdicts.py
+  - src/treg/alembic/versions/0070_api_key_spend_rollup.py
+  - src/treg/alembic/versions/0072_callrecord_call_ref_index.py
   - src/treg/timeutil.py
   - src/treg/infra/db.py
   - src/treg/infra/money_timing.py
@@ -107,6 +110,11 @@ for legacy async pairs whose billing does not use a deferred hold. They ship wit
 because old code ignores the additions while new code cannot safely retain an asynchronous hold or
 authorize a shared-provider result without them.
 
+Revision `0069` adds nullable `key_slot` to `AsyncTaskRecord`, `AsyncResourceRecord` and
+`ProviderResource`: the label of the treg-owned account the object lives on, so its polls, fetches
+and edits use that account ([proxy model](proxy-model.md), "Several treg-owned accounts"). NULL is
+every earlier row and means the primary account.
+
 Revision `0052` adds nullable `hit`: the terminal contact verdict for the original submission.
 The terminal finalizer commits it with settlement. The audit writer locks the task row before
 inserting a submission `CallRecord`, so a poll that finishes first still gives that row its final
@@ -146,6 +154,10 @@ with a retained database default of false for existing rows and old writers. New
 explicitly insert true. No balances or historical money entries change. Successful email proof sets
 verification; only the atomic identity claim consumes availability, committed with the signup grant.
 See [signup eligibility](money.md#signup-credit-eligibility).
+
+Revision `0071` adds `SignupPromoClaim` (`inbox` primary key, `user_id` with no FK, `created_at`):
+one row per mailbox that received the signup gift, staged with the user-level claim. It is
+backfilled from users already verified and no longer eligible.
 
 ## Registry tables
 
@@ -318,6 +330,31 @@ uses this metadata, never the encrypted token's shape.
   walked the primary key testing `org_id` and the second read the team's whole history. The
   Activity feed's calls page by time on `(org_id, created_at)`.
 
+  **Spend per API key is the ledger's, folded the same way.** Revision 0070 adds `ApiKeySpendDay`
+  (team + API key + tool + UTC day -> `spent_micro`, `charges`; primary key
+  `(org_id, day, api_key_id, endpoint_id)`, `api_key_id = 0` for the not-attributed line) and the
+  single-row `ApiKeySpendCursor` (a `(created_at, id)` watermark, `history_from`, `caught_up_at`,
+  `recounted_on`). `application/key_spend_rollup.py`, run as `treg-worker spend rollup`, is the
+  only writer of both, and the Team and Usage pages read only them; see [money](money.md) § Spend
+  per API key. Team deletion clears a team's rows.
+
+  **`ix_callrecord_call_ref`, and why a database could lack it.** The model and revision 0001
+  declare it, so every database Alembic created has it. A database that predates Alembic got
+  `call_ref` from the old `init_db` `ALTER TABLE ... ADD COLUMN`, which adds no index, and was
+  then only stamped at the baseline, so it never ran 0001's `create_index`. There every
+  `call_ref` lookup read the whole audit table: the spend rollup's key lookup
+  (`call_ref IN (...)`), `GET /calls/{call_ref}` and the async hit UPDATE in `audit.py`.
+  Revision 0072 builds it where it is missing: concurrently on Postgres, without the migration
+  statement timeout (a large table takes longer than 120 s), dropping and rebuilding an INVALID
+  index an interrupted build left behind, and leaving a valid one alone. Its downgrade is a no-op,
+  since 0001 owns the index. The general lesson: a stamped database has the baseline's tables,
+  not necessarily its indexes; check `pg_indexes` before relying on one.
+
+  The rollup's ledger walks state the watermark as an index bound, `created_at >= watermark AND
+  (created_at > watermark OR id > watermark_id)`, never as one OR: with the whole condition inside
+  the OR, Postgres bounds the `created_at` index scan only from above and walks it from its oldest
+  row on every batch.
+
   `refused_by` distinguishes a treg refusal (`auth`, `policy`, `balance`, `cap`, `resolution`,
   `request`, and other mechanism-specific values) from an upstream answer, where it is null.
   In-handler audits mark their own outcome; the shared exception handler records earlier
@@ -431,9 +468,16 @@ uses this metadata, never the encrypted token's shape.
   opaque JSON `v` and an `expires_at` (rows are swept lazily). This is the DB home for what used to be
   per-process dicts in the auth HTTP layer (backlog #3): counters can no longer be reset by a redeploy,
   and a per-IP / per-email cap can't be weakened by running more than one instance. The access helpers live in
-  `ratestore.py` (`kv_put`/`kv_get`/`kv_pop`, `rate_check` sliding-window, `sweep`). NOT the CLI-login
-  handshake - that is deliberately still in-process (`application.auth._cli_pending`, short-lived,
-  self-heals on retry).
+  `ratestore.py` (`kv_put`/`kv_get`/`kv_pop`, `rate_check` sliding-window, `sweep`). CLI pairing also uses
+  this table: `application.auth` owns `cli_login` (pending code/attempts or completed result) and
+  `cli_oauth` (social-login return mapping). Their keys hash the login ID or OAuth state; codes,
+  credentials and return login IDs are Fernet-encrypted. Approval locks the pairing row through its
+  transition and Default-key creation; result and OAuth-state consumption use `DELETE RETURNING`.
+  Pending, completed and OAuth entries each expire after `HANDSHAKE_TTL`; reads enforce expiry.
+  `_prune_handshakes` runs on CLI start in a separate transaction, deleting at most 100 expired
+  rows from `cli_login` and `cli_oauth`. PostgreSQL materializes the candidate batch and skips
+  locked rows; unrelated namespaces and live rows are untouched. Further batches run on later starts, so expiry is immediate but
+  physical removal may lag idle periods or a backlog. No schema migration is needed.
 
 - **`DenyRule`** - org policy over what may be CALLED: `org_id`, nullable `user_id` (NULL = the whole
   org, set = one member/agent), nullable `project_id` (NULL = any tool, set = only calls **through**
@@ -591,7 +635,7 @@ hygiene (`pool_pre_ping`/`pool_recycle`/sizing) for non-SQLite URLs, and `verify
 no `TREG_SECRET_KEY` on a real DB (an ephemeral key would lose every stored secret on restart).
 
 `infra.money_timing.observe_money` measures the ordinary call's `reserve`, `close` and `deferred`
-application scopes with local monotonic timers. These cover optional settlement admission,
+application scopes with local monotonic timers. These cover optional money admission,
 pool acquisition and session cleanup,
 including rollback on failure; reserve also includes its post-commit balance reload. They are not
 pure row-lock durations or a census of all money writers: Hub, billing, direct ledger callers and
@@ -613,8 +657,14 @@ call ID, batch size, outcome and phase durations; no amount, body or exception m
 These observations remain best effort through the existing bounded analytics queue.
 
 `infra.money_admission.snapshot` adds bounded `money_admission_gauge` summaries by operation
-(`close`, `deferred`, `async`, `hub`) and mode (`disabled`, `redis`, `fallback`). Eligible calls
-record the same timing boundary when admission is disabled; pure releases bypass this observation.
+(`close`, `deferred`, `async`, `hub`, `reserve`, `release`) and mode (`disabled`, `redis`,
+`fallback`). Eligible calls record the same timing boundary when admission is disabled. An empty
+org list on `close`, `deferred`, `async`, or `hub` still skips the observation. `reserve` and
+`release` with an empty or invalid org raise `AdmissionRefused` before a session and do not record
+a fallback row. `fallback_*` counts, including `fallback_wait_timeout` on `reserve` and `release`,
+are degradation: the body still ran on the database path. A redis lease is the only mode that
+keeps same-org balance sessions from stacking on the pool.
+
 `money_admission_reporting.emit_snapshot` writes one local JSON record and queues one PostHog event
 per populated operation/mode, through the existing web minute timer and final partial window.
 Workers emit their accumulated window on command exit and attempt a bounded analytics drain;
@@ -625,14 +675,23 @@ events or org/call IDs in these aggregates.
 `infra.kv` by `phase` (`acquire`, `renew`, `release`) and one of seven `error_type` values:
 `deadline_exceeded` (Python timeout), `redis_timeout`, `authentication`, `permission`, `connection`,
 `response`, or `other`. At most 21 buckets retain counts, UTC first/last failure timestamps and
-`elapsed_max_ms`, plus the configured socket timeout and outer operation deadline in milliseconds.
+`elapsed_max_ms`, plus the socket timeout default (1,000 ms) and outer command-attempt deadline
+(1,500 ms). Renewal/release attempts also share a 2,500 ms per-key budget; remaining confirmed
+lease validity can further shorten renewal. URL query overrides can change the effective driver
+socket timeout without changing these reported defaults.
 Elapsed time is client-observed, including connection setup and event-loop scheduling, not Redis
 server execution time. A type narrows the failing boundary; it does not establish a network or
 server root cause by itself. Normal contention and task cancellation are not lease errors.
-Counts describe failed command attempts, including a first release attempt that a retry recovers;
-they are not counts of failed money transactions or failed release scopes.
-Admission's release `kv_errors` increments only if cleanup ultimately returns unavailable; an
-error followed by a successful retry still appears in attempt diagnostics, but not that counter.
+Counts describe failed command attempts, including a first renewal or release attempt that a retry
+recovers; they are not counts of failed money transactions or failed lease scopes.
+Admission's renewal/release `kv_errors` increments only for terminal unavailability or an unexpected
+store exception. A recovered failed attempt still appears in diagnostics, but not that counter.
+Confirmed lease validity exhaustion is counted separately as `deadline_expired` once per admission
+scope, alongside `lease_lost`. This includes expiry noticed before renewal, a `deadline_expired`
+store result, a late renewal reply, and the gate's own validity timeout. A store-raised timeout
+before validity expires remains a KV error. Actual command failures remain in attempt diagnostics
+even when validity expires during failure cleanup. These scope counts reach the existing
+`money_admission_gauge` logs and analytics; expiry before a command sends no fictitious attempt.
 
 `MoneyTraceRunner._emit` drains these buckets on its existing minute cadence and at shutdown,
 before its local sink closes. The existing bounded background log sink adds build/process/role
@@ -642,12 +701,14 @@ the runner's existing loss/error counters; the absence of a detail log is not pr
 The existing `money_admission_gauge` KV/fallback counters remain the independent aggregate signal.
 
 `kv_lease_gauge` reuses the same minute/worker-exit runner for local logs and PostHog. Each actual
-lease command attempt increments an in-memory bucket by phase and fixed outcome; at most 13
+lease command attempt increments an in-memory bucket by phase and fixed outcome; at most 14
 buckets exist per process. Each summary holds `count`, `retry_count`, `elapsed_total_ms`,
 `elapsed_max_ms` and disjoint duration buckets (up to 10, 50, 100, 200 ms, or above 200 ms), with
-build/process/role, window duration and shutdown metadata. `retry_count` counts second release
+build/process/role, window duration and shutdown metadata. `retry_count` counts second renewal/release
 attempts, including failed or cancelled ones. `unavailable` denotes a failed attempt; the local
-`kv_lease_error` supplies its error class. `not_owned` means a release retry found no matching
+`kv_lease_error` supplies its error class. `deadline_expired` denotes a renewal attempt stopped by
+its confirmed-validity timeout, without a KV error. An outer gate timeout can instead cancel the
+command (`cancelled`), while its admission summary records `deadline_expired`. `not_owned` means a release retry found no matching
 token: the earlier delete may have succeeded without a reply, or the lease expired/changed owner.
 It is neither proof of renewed ownership nor a new `lease_lost` observation. Previously detected
 renewal loss remains recorded. Normal `busy` attempts and cancellations have distinct outcomes.

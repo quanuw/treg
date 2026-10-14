@@ -25,7 +25,7 @@ from . import adsconv, analytics, archive, audit
 from .application.call import route as routed_call
 from .application import arena, find_index
 from .application.onboard import first_run
-from . import bootstrap_handlers
+from . import bootstrap_handlers, policy
 from .bootstrap_http import (
     _BodyDecodeMiddleware,
     _DevTitleMiddleware,
@@ -33,7 +33,7 @@ from .bootstrap_http import (
     _SecurityHeadersMiddleware,
 )
 from .config import TREG_USER_AGENT, get_settings
-from .infra import kv, money_timing
+from .infra import kv, money_timing, org_traffic, turnstile
 from .infra.money_trace_runner import start_money_trace, stop_money_trace
 from .infra.db import background_session_maker, verify_db
 from .infra.catalog_observations import (
@@ -179,6 +179,7 @@ _CONTROL_ROUTE_KEYS: frozenset[RouteKey] = frozenset({
     ('/privacy', ('GET',), 'privacy_page'),
     ('/connectors/claude', ('GET',), 'claude_connector_page'),
     ('/adtrack.js', ('GET',), 'adtrack_js'),
+    ('/captcha.js', ('GET',), 'captcha_js'),
     ('/agent-setup.js', ('GET',), 'agent_setup_js'),
     ('/gtag.js', ('GET',), 'gtag_js'),
     ('/resources', ('GET',), 'resources_page'),
@@ -190,7 +191,9 @@ _CONTROL_ROUTE_KEYS: frozenset[RouteKey] = frozenset({
     ('/astra', ('GET',), 'astra_page'),
     ('/gpt6', ('GET',), 'gpt6_page'),
     ('/ugc', ('GET',), 'ugc_page'),
+    ('/showcase', ('GET',), 'showcase_page'),
     ('/people-search', ('GET',), 'people_search_page'),
+    ('/start', ('GET',), 'start_page'),
     ('/leads-signals', ('GET',), 'leads_signals_page'),
     ('/gtm-engineering', ('GET',), 'gtm_engineering_page'),
     ('/gtm-engineering.md', ('GET',), 'gtm_engineering_md'),
@@ -250,6 +253,7 @@ _CONTROL_ROUTE_KEYS: frozenset[RouteKey] = frozenset({
     ('/orgs/{org_id}/invites/{invite_id}', ('DELETE',), 'revoke_invite'),
     ('/orgs/{org_id}/members', ('GET',), 'list_members'),
     ('/orgs/{org_id}/usage', ('GET',), 'org_usage'),
+    ('/orgs/{org_id}/usage/spend', ('GET',), 'usage_spend'),
     ('/orgs/{org_id}/balance', ('GET',), 'org_balance'),
     ('/orgs/{org_id}/tag-keys', ('GET',), 'list_tag_keys'),
     ('/orgs/{org_id}/usage/by-tag', ('GET',), 'usage_by_tag'),
@@ -284,6 +288,7 @@ _CONTROL_ROUTE_KEYS: frozenset[RouteKey] = frozenset({
     ('/orgs/{org_id}/agents/observed', ('GET',), 'list_observed_agents'),
     ('/orgs/{org_id}/agents/{user_id}', ('DELETE',), 'revoke_agent'),
     ('/orgs/{org_id}/api-keys', ('GET',), 'list_api_keys'),
+    ('/orgs/{org_id}/api-keys/spend', ('GET',), 'api_key_spend'),
     ('/orgs/{org_id}/api-keys', ('POST',), 'create_api_key'),
     ('/orgs/{org_id}/api-keys/{key_id}', ('PATCH',), 'rename_api_key'),
     ('/orgs/{org_id}/api-keys/{key_id}/disable', ('POST',), 'disable_api_key'),
@@ -713,6 +718,9 @@ def _lifespan(role: AppRole):
                 _mcp.configure_endpoint_observation_reader(endpoint_observations)
             fault_handler = analytics.install_fault_handler()
             analytics.capture_service_started(role)
+            for problem in turnstile.misconfiguration():
+                logging.getLogger("treg").warning("event=turnstile_misconfigured problem=%s", problem)
+            traffic_reporting = org_traffic.start_reporting() if role != "control" else False
             try:
                 if role == "control" or _mcp is None:
                     yield
@@ -750,6 +758,8 @@ def _lifespan(role: AppRole):
                     await app.state.http.aclose()
                     await kv.close()
                 finally:
+                    if traffic_reporting:
+                        org_traffic.stop_reporting()
                     try:
                         await stop_money_trace(trace_runner)
                     finally:
@@ -765,6 +775,9 @@ def create_app(role: AppRole = "all", *, archive_object_store=None) -> FastAPI:
 
     # Deferred to avoid a cycle: api.py defines the router, then calls this factory for api:app.
     from . import api as api_module
+    from .application.call import keyslots
+
+    keyslots.check_accounts()  # an unusable TREG_PLATFORM_ACCOUNTS entry refuses to start
 
     expose_docs = role != "dataplane"
     app = FastAPI(
@@ -786,6 +799,7 @@ def create_app(role: AppRole = "all", *, archive_object_store=None) -> FastAPI:
     app.add_middleware(_LegacyHostRedirectMiddleware)
     app.add_middleware(_SecurityHeadersMiddleware)
     app.add_middleware(_BodyDecodeMiddleware)
+    app.add_middleware(org_traffic.RequestLogMiddleware)
     if get_settings().local_dev:
         app.add_middleware(_DevTitleMiddleware)
     app.add_exception_handler(OverflowError, api_module._id_out_of_range)
@@ -814,4 +828,6 @@ def create_app(role: AppRole = "all", *, archive_object_store=None) -> FastAPI:
         "startup_checks": startup_checks,
     }
     app.state.archive_object_store = archive_object_store
+    # Last, so an extension's install sees the finished app. A missing required one refuses to start.
+    app.state.extensions = policy.load_extensions(app, get_settings().required_extensions)
     return app

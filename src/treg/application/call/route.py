@@ -32,12 +32,13 @@ from urllib.parse import urlencode
 
 import httpx
 
-from ... import audit
+from ... import audit, jsontext
 from ...config import get_settings
 from ...infra.db import session_maker
 from ...domain import asynctasks as asynctasks_rules
 from ...domain.capacity.routes_view import view as overflow_routes_view
 from ...domain.capacity.view import view as capacity_view
+from ...domain.capacity.marks import spends_balance
 from ...domain.capacity.signatures import classify as classify_capacity
 from ...domain.catalog import results as catalog_results
 from ...domain.catalog import stats as endpoint_stats
@@ -48,7 +49,7 @@ from ...domain.catalog.routing.plan import (
     MAX_ERROR_FALLBACKS, Candidate, Plan, candidates_for, cost_at, ignored_filters, rank, unscoped,
 )
 from .. import asynctasks as async_task_app
-from . import async_bridge
+from . import async_bridge, keyslots
 from .intake import _tag_telemetry
 from .resolve import _anonymous_offer, _host_of, _marketplace_secret
 from .settle import close_deferred
@@ -311,7 +312,8 @@ async def build_plan(ep: dict, identity_given: dict, caller, options: RouteOptio
             "platform"
         )
         cv = cat.cost_view(e.get("cost"), e["provider"])
-        direct_exhausted = tier == "platform" and capacity_view.is_exhausted(e["provider"], e["id"])
+        direct_exhausted = tier == "platform" and keyslots.all_exhausted(
+            e["provider"], e["id"], metered=spends_balance((e.get("cost") or {}).get("type")))
         overflow_route = None
         if (direct_exhausted and get_settings().overflow_mode == "on"
                 and not getattr(caller.org, "platform_overflow_disabled", False)):
@@ -481,12 +483,15 @@ async def _run_routed(parent: CallContext, ep: dict, body_bytes: bytes, get_head
                         f"no provider for {ep['id']} can honour every filter you sent for this identity "
                         f"(X-Treg-Route-Strict-Filters): " + "; ".join(f"{d['endpoint_id']} {d['why']}" for d in strict_drop)
                         + ". Send an identity a filter-aware provider accepts, or drop the header to accept a looser answer")})
-    first = plan.candidates[0]
-    if options.max_cost_micro is not None and (first.price_micro or 0) > options.max_cost_micro:
+    # rank() puts specificity ahead of price, so candidates[0] can cost more than a later
+    # one. Refuse only when none of them fit the ceiling, and name the true minimum.
+    if options.max_cost_micro is not None and all(
+            (cand.price_micro or 0) > options.max_cost_micro for cand in plan.candidates):
+        cheapest = min(plan.candidates, key=lambda cand: cand.price_micro or 0)
         raise ResolutionFailed("route_max_cost", status_code=402, detail={
             "error": "route_max_cost", "endpoint_id": ep["id"], "max_cost_micro": options.max_cost_micro,
-            "cheapest_micro": first.price_micro, "plan": plan.view()["plan"],
-            "message": f"the cheapest candidate ({first.endpoint['id']}) costs more than {MAX_COST_HEADER}"})
+            "cheapest_micro": cheapest.price_micro, "plan": plan.view()["plan"],
+            "message": f"the cheapest candidate ({cheapest.endpoint['id']}) costs more than {MAX_COST_HEADER}"})
     tried: list[Attempt] = []
     spent = 0
     errors = 0
@@ -939,7 +944,7 @@ def _audit_parent(parent: CallContext, ep: dict, status: int, charged: int, clie
 
 
 def _json(value, status: int, headers: dict[str, str]) -> UpstreamResponse:
-    body = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()
+    body = jsontext.dumps_bytes(value, separators=(",", ":"))
 
     async def _one():
         yield body

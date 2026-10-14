@@ -54,6 +54,23 @@ line pointing to that tool; `--json` puts it in `_treg.routed_tool`, and MCP ret
 with a `suggestion` sentence beside the result, leaving the invitation `hint` slot alone. Call responses
 retain the existing `_show` formatting on stdout, including pretty-printed JSON.
 
+## Pasted-key connect
+
+`treg connections connect --provider <service>` (and the hidden `oauth connect`) first reads
+`GET /oauth/providers`. A provider whose `auth_kind` is `key` or `token` has no consent screen, so
+`_connect_pasted_key` reads the key with `getpass` at a terminal, or all of stdin with
+`--key-stdin`, which keeps it off the command line and out of shell history, and posts it to
+`POST /connections/token`; the server verifies it against the provider before storing it. A
+provider that signs with a pair (`needs_extra_credential`, e.g. Tomba's key + secret) reads both
+halves first (a second hidden prompt, or the second piped line) and then posts the other half to
+`POST /connections/{id}/extra-credential`, so a half-built connection is never the outcome. Without
+a terminal and without `--key-stdin` it exits with that instruction rather than reading stdin: an
+agent's idle pipe would otherwise hang the read, the same intent rule `upload` follows for
+credentials. A `name`, `--capability`, `--client-secret` or `--scopes` is refused locally, because a
+pasted key is one per team. An unreadable listing (an older server, an error, a proxy page) falls
+back to `POST /oauth/start`, which itself refuses a pasted-key provider and names this path; every
+other provider takes the consent flow there.
+
 ## Instagram grants
 
 `TREG_OAUTH_REVIEW_PENDING` and provider-registry metadata control the CLI's effective default and
@@ -219,8 +236,10 @@ Bare **`treg connections`** now lists (the subparser is `required=False` with a 
   code**; the poll result may carry `active_org` = the team picked in the browser, which `cmd_login` adopts
   directly, falling back to `_pick_active_org` only against an older server (where `/start` 404s → a
   locally-minted `login_id`, no code)),
-  `login --email you@x.com` (terminal-only email OTP: `POST /auth/email/start` →
-  prompts for the 6-digit code → `/auth/email/verify`, storing the identity token), or `login --token <t>`
+  `login --email you@x.com` (email OTP from the terminal: `POST /auth/email/start` →
+  prompts for the 6-digit code → `/auth/email/verify`, storing the identity token; a server that
+  requires a browser check answers 400 with `X-Treg-Captcha: required`, and the CLI says so and
+  continues with the browser handshake instead), or `login --token <t>`
   for agents/CI — which now **verifies the token via `/auth/me` before saving** (a rejected token exits
   loudly instead of the old misleading "Token saved"; a valid token whose user has no team yet prints a
   "create a team first" hint rather than a silent `Active org: None`). First login by

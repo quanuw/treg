@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import crypto
+from .. import client_ip, crypto
 from ..application import auth as auth_use_cases
 from ..application import signup
 from ..application.onboard import first_run
@@ -51,6 +51,7 @@ email_router = app
 
 class EmailStartIn(BaseModel):
     email: str
+    captcha_token: str = ""  # Turnstile widget token; only read when the deployment enables it
 
 
 class EmailVerifyIn(BaseModel):
@@ -65,14 +66,40 @@ _EMAIL_HTTP_ERRORS = {
     # what is on it.
     "blocked_domain": (403, "this address cannot be used to sign in"),
     "rate_limited": (429, "too many code requests — please wait a few minutes"),
+    "captcha_failed": (400, "We couldn't verify this browser. Refresh the page and try again, "
+                            "or continue with Google or GitHub."),
+    "captcha_blocked": (400, "Your browser blocked the security check from challenges.cloudflare.com. "
+                             "Allow it and try again, or continue with Google or GitHub."),
+    "captcha_pending": (400, "Tick the security check below the form, then send the code again."),
     "invalid_code": (401, "invalid code"),
     "suspended": (403, "account suspended"),
 }
 
 
-def _email_http_error(exc: auth_use_cases.EmailAuthError) -> HTTPException:
+# Marks a refusal for want of a browser check, so a client (the CLI's `login --email`) can react
+# to it without matching the English detail.
+CAPTCHA_HEADER = "X-Treg-Captcha"
+
+
+# A terminal cannot pass a browser check. Released CLIs print `detail` and stop, so tell them the
+# command that works; newer ones read the header and continue in the browser on their own.
+_CLI_CAPTCHA_DETAIL = ("Email codes need a browser check on this server. "
+                       "Run `treg login` without --email to sign in through the browser.")
+
+
+def _email_http_error(exc: auth_use_cases.EmailAuthError, client: str = "browser") -> HTTPException:
     status_code, detail = _EMAIL_HTTP_ERRORS[exc.kind]
-    return HTTPException(status_code=status_code, detail=detail)
+    headers = None
+    if exc.kind.startswith("captcha_"):
+        headers = {CAPTCHA_HEADER: "required"}
+        if client == "cli":
+            detail = _CLI_CAPTCHA_DETAIL
+    return HTTPException(status_code=status_code, detail=detail, headers=headers)
+
+
+def _client(request: Request) -> str:
+    """`cli` for the terminal's email door (`treg login --email`), else `browser`; for the logs."""
+    return "cli" if request.headers.get("X-Treg-Key-Protocol") == "1" else "browser"
 
 
 @app.post("/auth/email/start")
@@ -85,9 +112,10 @@ async def auth_email_start(
     brute-force counter at will. All this state is in the DB (survives restart, correct multi-instance)."""
     require_managed_cli(request)
     try:
-        return await auth_use_cases.start_email_login(body.email, _client_ip(request))
+        return await auth_use_cases.start_email_login(
+            body.email, _client_ip(request), captcha_token=body.captcha_token, client=_client(request))
     except auth_use_cases.EmailAuthError as exc:
-        raise _email_http_error(exc) from exc
+        raise _email_http_error(exc, _client(request)) from exc
 
 
 @app.post("/auth/email/verify")
@@ -100,7 +128,7 @@ async def auth_email_verify(
     require_managed_cli(request)
     try:
         verified = await auth_use_cases.verify_email_login(body.email, body.code,
-            entry_surface=request.cookies.get("treg_entry_surface", ""))
+            entry_surface=request.cookies.get("treg_entry_surface", ""), client=_client(request))
     except auth_use_cases.EmailAuthError as exc:
         raise _email_http_error(exc) from exc
     resp = JSONResponse({"token": verified.token, "email": verified.email})
@@ -124,20 +152,11 @@ async def _find_or_create_user(db: AsyncSession, email: str) -> User:
 
 
 def _client_ip(request: Request) -> str:
-    """Best-effort client IP — first hop of X-Forwarded-For behind the reverse proxy (Render), else the socket peer."""
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.client.host if request.client else "?"
+    """The client address every per-IP limiter keys on; the rules live in client_ip.py."""
+    return client_ip.of(request)
 
 
-# The pairing state machine belongs to the application use case. These aliases keep the staged
-# api.py compatibility exports and the social-login handshake on the exact same mutable objects.
-_cli_states = auth_use_cases._cli_states
-_cli_results = auth_use_cases._cli_results
-_cli_pending = auth_use_cases._cli_pending
 _PAIR_ALPHABET = auth_use_cases._PAIR_ALPHABET
-_prune_handshakes = auth_use_cases._prune_handshakes
 _norm_pair_code = auth_use_cases._norm_pair_code
 _orgs_brief = auth_use_cases._orgs_brief
 
@@ -216,7 +235,9 @@ def _social_http_error(exc: auth_use_cases.SocialLoginError) -> HTTPException:
 @app.get("/auth/github")
 async def auth_github(request: Request, cli: str = "", return_to: str = ""):
     try:
-        started = auth_use_cases.start_github_login(cli, lambda: _login_callback_base(request))
+        started = await auth_use_cases.start_github_login(cli, lambda: _login_callback_base(request))
+    except auth_use_cases.CliPairingError as exc:
+        raise _cli_http_error(exc) from exc
     except auth_use_cases.SocialLoginError as exc:
         raise _social_http_error(exc) from exc
     resp = RedirectResponse(started.url, status_code=302)
@@ -304,6 +325,8 @@ async def auth_github_callback(
             lambda: _login_callback_base(request),
             entry_surface=request.cookies.get("treg_entry_surface", ""),
         )
+    except auth_use_cases.CliPairingError:
+        return _social_login_failure(auth_use_cases.SocialLoginError("callback_failed"))
     except auth_use_cases.SocialLoginError as exc:
         return _social_login_failure(exc)
     return _finish_oauth_login(request, proof.user, proof.cli_state)
@@ -313,7 +336,9 @@ async def auth_github_callback(
 async def auth_google(request: Request, cli: str = "", return_to: str = ""):
     """Human login via Google OAuth — a parallel door to GitHub, same session/CLI-handshake plumbing."""
     try:
-        started = auth_use_cases.start_google_login(cli, lambda: _login_callback_base(request))
+        started = await auth_use_cases.start_google_login(cli, lambda: _login_callback_base(request))
+    except auth_use_cases.CliPairingError as exc:
+        raise _cli_http_error(exc) from exc
     except auth_use_cases.SocialLoginError as exc:
         raise _social_http_error(exc) from exc
     resp = RedirectResponse(started.url, status_code=302)
@@ -334,6 +359,8 @@ async def auth_google_callback(
             lambda: _login_callback_base(request),
             entry_surface=request.cookies.get("treg_entry_surface", ""),
         )
+    except auth_use_cases.CliPairingError:
+        return _social_login_failure(auth_use_cases.SocialLoginError("callback_failed"))
     except auth_use_cases.SocialLoginError as exc:
         return _social_login_failure(exc)
     return _finish_oauth_login(request, proof.user, proof.cli_state)
@@ -345,13 +372,17 @@ cli_router = app
 
 
 @app.post("/auth/cli/start")
-async def auth_cli_start() -> dict:
+async def auth_cli_start(response: Response) -> dict:
     """`treg login` calls this FIRST. The SERVER mints both the login_id and a short pairing code and
     remembers them (pending approval). The code is shown only in that terminal; the browser must echo it
     back at approve time, where it's validated server-side, before any token is issued. So a login the
     user didn't start (a phished /login?cli=<id> link) can't be completed, and the poll endpoint carries
     no code to brute-force. Unauthenticated — on its own it grants nothing."""
-    return await auth_use_cases.start_cli_login()
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return await auth_use_cases.start_cli_login()
+    except auth_use_cases.CliPairingError as exc:
+        raise _cli_http_error(exc) from exc
 
 
 @app.get("/auth/cli/poll")
@@ -359,9 +390,13 @@ async def auth_cli_poll(response: Response, login_id: str = "") -> dict:
     """The CLI polls this after opening the browser; returns the identity token once, then forgets it.
     A token only lands here after auth_cli_approve validated the terminal pairing code, so a login the
     user didn't approve never yields one — there is nothing here to brute-force (no code parameter)."""
-    result = await auth_use_cases.poll_cli_login(login_id)
     response.headers["Cache-Control"] = "no-store"
-    return result
+    if not _LOGIN_ID_RE.fullmatch(login_id):
+        return {"status": "pending"}
+    try:
+        return await auth_use_cases.poll_cli_login(login_id)
+    except auth_use_cases.CliPairingError as exc:
+        raise _cli_http_error(exc) from exc
 
 
 # `treg login` mints the login_id with token_urlsafe(18) (24 chars); anything outside this shape is
@@ -388,12 +423,13 @@ _CLI_HTTP_ERRORS = {
     "too_many_wrong_codes": (400, "too many wrong codes — run `treg login` again"),
     "wrong_code": (400, "that code doesn't match the one in your terminal"),
     "not_member": (403, "not a member of that team"),
+    "unavailable": (503, "login storage unavailable — please try again"),
 }
 
 
 def _cli_http_error(exc: auth_use_cases.CliPairingError) -> HTTPException:
     status_code, detail = _CLI_HTTP_ERRORS[exc.kind]
-    return HTTPException(status_code=status_code, detail=detail)
+    return HTTPException(status_code=status_code, detail=detail, headers={"Cache-Control": "no-store"})
 
 
 @app.post("/auth/cli/approve")
@@ -468,7 +504,7 @@ def _login_page_html(login_id: str, *, session_email: str | None, github: bool, 
         doors.append(f'<a class="btn" href="/auth/google?cli={login_id}">Sign in with Google</a>')
     doors.append(
         '<div id="email-door">'
-        '<div id="email-row"><input id="em" type="email" placeholder="you@company.com" autocomplete="email">'
+        '<div id="email-row"><input id="em" type="email" data-captcha="email_start" placeholder="you@company.com" autocomplete="email">'
         '<button class="btn" onclick="sendCode()">Email me a code</button></div>'
         '<div id="code-row" style="display:none"><input id="code" inputmode="numeric" placeholder="6-digit code">'
         '<button class="btn primary" onclick="verifyCode()">Verify</button></div>'
@@ -483,6 +519,7 @@ def _login_page_html(login_id: str, *, session_email: str | None, github: bool, 
         f'<p>to connect the <b>treg</b> CLI to your account</p>'
         f'<div class="stack">{"".join(parts)}</div><div class="err" id="err"></div>'
         f"</div></div>"
+        f'<script src="/captcha.js" defer></script>'
         f"<script>const HAS_SESSION={has_session};{_LOGIN_JS.replace('__LOGIN_ID__', login_id)}</script></body></html>"
     )
 
@@ -583,10 +620,12 @@ async function loadOrgs(){const box=document.getElementById('orgpick');if(!box)r
   box.appendChild(b)});
  if(orgs.length===1){box.firstChild.classList.add('primary')}}
 async function sendCode(){err('');const em=document.getElementById('em').value.trim();if(!em)return err('enter your email');
- try{const d=await post('/auth/email/start',{email:em});
+ const b=document.querySelector('#email-row button');if(b.disabled)return;b.disabled=true;
+ try{const t=window.tregCaptcha?await window.tregCaptcha.token('email_start'):'';  // /captcha.js
+  const d=await post('/auth/email/start',{email:em,captcha_token:t});
   document.getElementById('code-row').style.display='';
   document.getElementById('hint').textContent=d.dev_code?('dev code: '+d.dev_code):('code sent to '+d.email);
- }catch(e){err(e.message)}}
+ }catch(e){err(e.message)}finally{b.disabled=false}}
 async function verifyCode(){err('');const em=document.getElementById('em').value.trim(),co=document.getElementById('code').value.trim();
  if(!co)return err('enter the code');
  try{await post('/auth/email/verify',{email:em,code:co});

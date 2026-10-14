@@ -27,7 +27,7 @@ from urllib.parse import urlencode
 import httpx
 from sqlalchemy import select
 
-from ... import audit
+from ... import audit, jsontext
 from ...domain.catalog import store as catalog_store
 from ...domain.hub import graph as hub_graph
 from . import sandbox
@@ -408,8 +408,12 @@ async def _reserve_price(parent: CallContext, tool: HubTool, run_id: str, reserv
     from ...domain import money as ledger
     caller = parent.input.caller
     if reserve_micro <= 0 or caller.org_id == tool.org_id:
-        return 0
-    async with session_maker() as s:
+        return 0  # no session and no balance row
+    async with (
+        money_admission.admit(
+            money_admission.require_balance_orgs([caller.org_id]), operation="reserve"),
+        money_session(session_maker()) as s,
+    ):
         try:
             await ledger.reserve_in_transaction(
                 s, caller.org_id, tool.tool_id, reserve_micro, call_id=f"{run_id}:price",
@@ -433,10 +437,16 @@ async def _close_price(tool: HubTool, run_id: str, held: int, *, success: bool, 
     amount is refunded to the caller. `None` settles the full held amount (a flat price). Returns
     what the maker earned."""
     if held <= 0:
-        return 0
+        return 0  # no session and no balance row
     from ...domain import money as ledger
-    admission_orgs = [payer_org_id] if success and (actual is None or actual > 0) else []
-    async with money_admission.admit(admission_orgs, operation="hub"), money_session(session_maker()) as s:
+    # A positive seller payment keeps the hub lease (payer only). A failure or a zero actual
+    # refunds the price hold; that balance update takes the release lease. Not both.
+    operation = "hub" if success and (actual is None or actual > 0) else "release"
+    async with (
+        money_admission.admit(
+            money_admission.require_balance_orgs([payer_org_id]), operation=operation),
+        money_session(session_maker()) as s,
+    ):
         if success:
             earned = await ledger.settle_to_in_transaction(
                 s, f"{run_id}:price", tool.org_id, actual_micro=actual,
@@ -517,7 +527,7 @@ def _entry(step: _Step, outcome: str, status: int | None, ms: int, cost: int, *,
 
 
 def _short(v: Any) -> Any:
-    s = v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, default=str)
+    s = v if isinstance(v, str) else jsontext.dumps(v, default=str)
     return s[:300]
 
 
@@ -530,7 +540,7 @@ def _child_input(parent: CallContext, call: str, method: str, inp: dict[str, Any
                  extra_query: dict[str, Any] | None = None,
                  extra_headers: dict[str, str] | None = None) -> CallInput:
     has_body = method in ("POST", "PUT", "PATCH")
-    payload = json.dumps(inp, ensure_ascii=False).encode() if has_body else b""
+    payload = jsontext.dumps_bytes(inp) if has_body else b""
     drop = set(_DROP_FROM_CHILD) | {k.lower().encode("latin-1") for k in (extra_headers or {})}
     headers = [(k, v) for k, v in parent.input.raw_headers if k.lower() not in drop]
     headers += [(k.lower().encode("latin-1"), v.encode("latin-1", "replace")) for k, v in (extra_headers or {}).items()
@@ -639,7 +649,7 @@ def _audit_parent(parent: CallContext, tool: HubTool, status: int, charged: int,
 
 
 def _json(value, status: int, headers: dict[str, str]) -> UpstreamResponse:
-    body = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()
+    body = jsontext.dumps_bytes(value, separators=(",", ":"))
 
     async def _one():
         yield body

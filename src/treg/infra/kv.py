@@ -2,8 +2,8 @@
 
 Render Key Value (Redis protocol) in production, an in-process dictionary when `TREG_KV_URL` is
 unset (local development, tests, self-hosters without one). The store holds nothing that must
-survive: every key expires, and every caller treats "unavailable" as a safe answer. Reads and
-writes are bounded by `_TIMEOUT_S` so a slow store can never hold a call open.
+survive: every key expires, and every caller treats "unavailable" as a safe answer. Socket I/O
+uses `_TIMEOUT_S`; optional counters and health probes have their own shorter outer deadline.
 
 Review-invitation budgets fail closed; money admission leases report unavailability explicitly
 so the caller can retain PostgreSQL's original correctness path. New tenants add narrow methods,
@@ -20,7 +20,13 @@ from typing import Literal, Protocol
 
 from ..config import get_settings
 
-_TIMEOUT_S = 0.1
+_TIMEOUT_S = 1.0
+# Optional work must not make a response wait for money's longer socket timeout.
+_OPTIONAL_TIMEOUT_S = 0.2
+# Lease attempts outlast one socket timeout; retries share a fixed per-key budget.
+# Renewal also remains bounded by the earliest confirmed lease expiry.
+_LEASE_ATTEMPT_TIMEOUT_S = 1.5
+_LEASE_RETRY_BUDGET_S = 2.5
 _LOCAL_MAX_KEYS = 10_000
 log = logging.getLogger("treg.kv")
 _clock = time.monotonic
@@ -30,13 +36,13 @@ _lease_errors: dict[tuple[str, str], dict] = {}
 _lease_timings: dict[tuple[str, str], dict] = {}
 _LEASE_OUTCOMES = {
     "acquire": {"acquired", "busy", "unavailable", "cancelled"},
-    "renew": {"renewed", "lost", "unavailable", "cancelled"},
+    "renew": {"renewed", "lost", "unavailable", "cancelled", "deadline_expired"},
     "release": {"released", "lost", "not_owned", "unavailable", "cancelled"},
 }
 _LEASE_BUCKETS = (10, 50, 100, 200)
 
 AcquireResult = Literal["acquired", "busy", "unavailable"]
-RenewResult = Literal["renewed", "lost", "unavailable"]
+RenewResult = Literal["renewed", "lost", "unavailable", "deadline_expired"]
 ReleaseResult = Literal["released", "lost", "not_owned", "unavailable"]
 _RENEW_LEASE = """
 if redis.call('get', KEYS[1]) == ARGV[1] then
@@ -51,6 +57,27 @@ end
 return 0
 """
 
+# One sorted set per org; members are unique request owners, scores are Redis-time deadlines.
+# Expiry recovers abandoned slots, not proof that old work stopped. Never renew an expired owner.
+_SLOT_CLOCK = """
+local t = redis.call('TIME')
+local now = t[1] * 1000 + math.floor(t[2] / 1000)
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now)
+"""
+_SLOT_EXTEND = """
+redis.call('ZADD', KEYS[1], now + tonumber(ARGV[2]), ARGV[1])
+local last = redis.call('ZRANGE', KEYS[1], -1, -1, 'WITHSCORES')
+redis.call('PEXPIREAT', KEYS[1], math.ceil(tonumber(last[2])))
+return 1
+"""
+_ACQUIRE_SLOT = _SLOT_CLOCK + """
+if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[3]) then return 0 end
+""" + _SLOT_EXTEND
+_RENEW_SLOT = _SLOT_CLOCK + """
+if not redis.call('ZSCORE', KEYS[1], ARGV[1]) then return 0 end
+""" + _SLOT_EXTEND
+_RELEASE_SLOT = "return redis.call('ZREM', KEYS[1], ARGV[1])"
+
 
 class Store(Protocol):
     async def take(self, key: str, limit: int, ttl_s: int) -> bool:
@@ -62,9 +89,16 @@ class Store(Protocol):
 
     async def acquire_lease(self, key: str, token: str, ttl_ms: int) -> AcquireResult: ...
 
-    async def renew_lease(self, key: str, token: str, ttl_ms: int) -> RenewResult: ...
+    async def renew_lease(self, key: str, token: str, ttl_ms: int, *,
+                          deadline: float | None = None) -> RenewResult: ...
 
     async def release_lease(self, key: str, token: str) -> ReleaseResult: ...
+
+    async def acquire_slot(self, key: str, token: str, ttl_ms: int, limit: int) -> AcquireResult: ...
+
+    async def renew_slot(self, key: str, token: str, ttl_ms: int) -> RenewResult: ...
+
+    async def release_slot(self, key: str, token: str) -> ReleaseResult: ...
 
     async def aclose(self) -> None: ...
 
@@ -98,7 +132,8 @@ class LocalStore:
     async def acquire_lease(self, key: str, token: str, ttl_ms: int) -> AcquireResult:
         return "unavailable"  # Local counters cannot promise cross-process exclusion.
 
-    async def renew_lease(self, key: str, token: str, ttl_ms: int) -> RenewResult:
+    async def renew_lease(self, key: str, token: str, ttl_ms: int, *,
+                          deadline: float | None = None) -> RenewResult:
         return "unavailable"
 
     async def release_lease(self, key: str, token: str) -> ReleaseResult:
@@ -106,6 +141,15 @@ class LocalStore:
 
     async def aclose(self) -> None:
         self._windows.clear()
+
+    async def acquire_slot(self, key: str, token: str, ttl_ms: int, limit: int) -> AcquireResult:
+        return "unavailable"
+
+    async def renew_slot(self, key: str, token: str, ttl_ms: int) -> RenewResult:
+        return "unavailable"
+
+    async def release_slot(self, key: str, token: str) -> ReleaseResult:
+        return "unavailable"
 
 
 class RedisStore:
@@ -119,7 +163,7 @@ class RedisStore:
 
     async def take(self, key: str, limit: int, ttl_s: int) -> bool:
         try:
-            async with asyncio.timeout(_TIMEOUT_S * 2):
+            async with asyncio.timeout(_OPTIONAL_TIMEOUT_S):
                 async with self._client.pipeline(transaction=True) as pipe:
                     pipe.incr(key)
                     pipe.expire(key, ttl_s, nx=True)  # the window starts at the first use
@@ -129,9 +173,30 @@ class RedisStore:
             _note_fault(exc)
             return False
 
+    async def _slot_eval(self, script: str, key: str, *args) -> int | None:
+        try:
+            # No contention wait or retry queue. Ambiguous writes are cleaned by owner token.
+            async with asyncio.timeout(_TIMEOUT_S):
+                return int(await self._client.eval(script, 1, key, *args))
+        except Exception:
+            # No URL, token, request data or exception text in this admission signal.
+            return None
+
+    async def acquire_slot(self, key: str, token: str, ttl_ms: int, limit: int) -> AcquireResult:
+        result = await self._slot_eval(_ACQUIRE_SLOT, key, token, ttl_ms, limit)
+        return "unavailable" if result is None else "acquired" if result else "busy"
+
+    async def renew_slot(self, key: str, token: str, ttl_ms: int) -> RenewResult:
+        result = await self._slot_eval(_RENEW_SLOT, key, token, ttl_ms)
+        return "unavailable" if result is None else "renewed" if result else "lost"
+
+    async def release_slot(self, key: str, token: str) -> ReleaseResult:
+        result = await self._slot_eval(_RELEASE_SLOT, key, token)
+        return "unavailable" if result is None else "released" if result else "not_owned"
+
     async def ping(self) -> bool:
         try:
-            async with asyncio.timeout(_TIMEOUT_S * 2):
+            async with asyncio.timeout(_OPTIONAL_TIMEOUT_S):
                 return bool(await self._client.ping())
         except Exception as exc:  # noqa: BLE001
             _note_fault(exc)
@@ -146,7 +211,7 @@ class RedisStore:
         started = _clock()
         outcome = "cancelled"
         try:
-            async with asyncio.timeout(_TIMEOUT_S * 2):
+            async with asyncio.timeout(_LEASE_ATTEMPT_TIMEOUT_S):
                 acquired = await self._client.set(key, token, nx=True, px=ttl_ms)
             outcome = "acquired" if acquired else "busy"
             return outcome
@@ -157,20 +222,47 @@ class RedisStore:
         finally:
             _record_lease_timing("acquire", outcome, started)
 
-    async def renew_lease(self, key: str, token: str, ttl_ms: int) -> RenewResult:
-        started = _clock()
-        outcome = "cancelled"
-        try:
-            async with asyncio.timeout(_TIMEOUT_S * 2):
-                renewed = await self._client.eval(_RENEW_LEASE, 1, key, token, ttl_ms)
-            outcome = "renewed" if renewed else "lost"
-            return outcome
-        except Exception as exc:  # noqa: BLE001
-            outcome = "unavailable"
-            _record_lease_error("renew", exc, started)
-            return "unavailable"
-        finally:
-            _record_lease_timing("renew", outcome, started)
+    async def renew_lease(self, key: str, token: str, ttl_ms: int, *,
+                          deadline: float | None = None) -> RenewResult:
+        """Retry one transient fault with the original token; never recreate an expired lease.
+
+        The gate supplies the earliest held lease's absolute time.monotonic() deadline.
+        Check it before each EVAL: a cooperative timeout may arrive late or be translated
+        into a transient error by driver cleanup. These budgets cannot preempt a pause.
+        A lost reply may have extended the TTL, but only a confirmed renewal retains ownership.
+        """
+        stop_at = time.monotonic() + _LEASE_RETRY_BUDGET_S
+        if deadline is not None:
+            stop_at = min(stop_at, deadline)
+        for attempt in range(2):
+            now = time.monotonic()
+            if deadline is not None and now >= deadline:
+                return "deadline_expired"
+            remaining = stop_at - now
+            if remaining <= 0:
+                break
+            started = _clock()
+            outcome = "cancelled"
+            validity_limited = stop_at == deadline and remaining <= _LEASE_ATTEMPT_TIMEOUT_S
+            attempt_timeout = asyncio.timeout(min(remaining, _LEASE_ATTEMPT_TIMEOUT_S))
+            try:
+                async with attempt_timeout:
+                    renewed = await self._client.eval(_RENEW_LEASE, 1, key, token, ttl_ms)
+                outcome = "renewed" if renewed else "lost"
+                return outcome
+            except Exception as exc:  # noqa: BLE001 - cancellation and ownership loss never retry
+                if isinstance(exc, TimeoutError) and attempt_timeout.expired() and validity_limited:
+                    outcome = "deadline_expired"
+                    return "deadline_expired"
+                outcome = "unavailable"
+                _record_lease_error("renew", exc, started)
+                if deadline is not None and time.monotonic() >= deadline:
+                    return "deadline_expired"  # Retain the actual failed attempt above.
+                if attempt or not _transient_lease_error(exc):
+                    return "unavailable"
+            finally:
+                _record_lease_timing("renew", outcome, started, retry=bool(attempt))
+        return "unavailable"
 
     async def release_lease(self, key: str, token: str) -> ReleaseResult:
         """Retry one ambiguous transient failure with the same owner-checked delete.
@@ -180,14 +272,14 @@ class RedisStore:
         lease while working. No retry may delete a later owner's token.
         """
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + _TIMEOUT_S * 4
+        deadline = loop.time() + _LEASE_RETRY_BUDGET_S
         for attempt in range(2):
             if loop.time() >= deadline:
                 break
             started = _clock()
             outcome = "cancelled"
             try:
-                async with asyncio.timeout_at(min(deadline, loop.time() + _TIMEOUT_S * 2)):
+                async with asyncio.timeout_at(min(deadline, loop.time() + _LEASE_ATTEMPT_TIMEOUT_S)):
                     released = await self._client.eval(_RELEASE_LEASE, 1, key, token)
                 outcome = "released" if released else ("not_owned" if attempt else "lost")
                 return outcome
@@ -276,7 +368,7 @@ def _record_lease_error(phase: str, exc: Exception, started: float) -> None:
                 "event": "kv_lease_error", "phase": phase, "error_type": error_type,
                 "count": 0, "first_failed_at": failed_at, "last_failed_at": failed_at,
                 "elapsed_max_ms": 0.0, "socket_timeout_ms": _TIMEOUT_S * 1000,
-                "operation_deadline_ms": _TIMEOUT_S * 2000,
+                "operation_deadline_ms": _LEASE_ATTEMPT_TIMEOUT_S * 1000,
             })
             row["count"] += 1
             row["last_failed_at"] = failed_at

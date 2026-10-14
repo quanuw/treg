@@ -45,6 +45,7 @@ from ..domain.governance import publicdemo as publicdemo_policy
 from ..domain.governance import usage as usage_policy
 from ..domain.identity.access import Caller, require_member
 from ..infra.db import get_session
+from ..infra import org_concurrency, org_traffic
 from ..models import Tool
 from .auth import _client_ip
 
@@ -63,6 +64,23 @@ class _HttpRequestBody:
 
     async def read(self) -> bytes:
         return await self._request.body()
+
+
+class _LeasedStreamingResponse(StreamingResponse):
+    """Retain the root slot through send/disconnect errors as well as body iteration."""
+
+    def __init__(self, response: StreamingResponse, slot, close) -> None:
+        super().__init__(response.body_iterator, status_code=response.status_code,
+                         background=response.background)
+        self.raw_headers = response.raw_headers
+        self._slot = slot
+        self._close = close
+
+    async def __call__(self, scope, receive, send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            await self._slot.finish(self._close)
 
 
 def _http_upstream_response(upstream: UpstreamResponse) -> StreamingResponse:
@@ -334,6 +352,7 @@ async def run_call_surface(rest: str, request: Request, caller: Caller, *, prefi
     rest)` runs inside the same try, so a fault there is audited and released like any other.
     `headers`, when given, replaces the request's raw headers for the upstream call (`/table/` asks
     the provider for uncompressed bytes); `/call/` never passes it."""
+    org_traffic.identify(request.scope, caller.org_id, enter=True)
     # Identity for the refusal fallback in `_mark_treg_own_errors`: a raise anywhere below (unknown
     # tool, deny rule, daily cap) leaves this handler without an audit row, and the exception handler
     # is the one place every such refusal passes through — but it has no Caller of its own.
@@ -373,9 +392,23 @@ async def run_call_surface(rest: str, request: Request, caller: Caller, *, prefi
         raise _translate_call_failure(exc) from exc
     request.state.call_ref = context.call_ref
     request.state.call_context = context
+    slot = None
+    upstream = None
+    streaming = False
     try:
+        # Caller is trusted; every root HTTP/MCP call enters here, routing children do not.
+        slot = await org_concurrency.acquire(caller.org_id)
         upstream = await execute_call(context, request.app.state.http)
-        return await finish(request, context, upstream, rest)
+        if slot is not None:
+            upstream.close = org_concurrency.cleanup_once(upstream.close)
+        response = await finish(request, context, upstream, rest)
+        if slot is not None and isinstance(response, StreamingResponse):
+            response = _LeasedStreamingResponse(response, slot, upstream.close)
+            streaming = True  # The ASGI response now owns cleanup and slot release.
+        return response
+    except org_concurrency.AdmissionRejected as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail,
+                            headers={"Retry-After": str(exc.retry_after_s)}) from exc
     except CallFailure as exc:
         raise _translate_call_failure(exc) from exc
     except PoolTimeoutError:
@@ -396,6 +429,8 @@ async def run_call_surface(rest: str, request: Request, caller: Caller, *, prefi
         request.state.idem_claim = context.idempotency
         request.state.call_audited = context.audited
         request.state.call_cost_micro = context.cost_micro
+        if slot is not None and not streaming:
+            await slot.finish(upstream.close if upstream is not None else None)
 
 
 @app.api_route(
@@ -409,6 +444,7 @@ async def call_catalog_endpoint(
     caller: Caller = Depends(require_member),
 ):
     """Call one catalog endpoint through the same policy, billing, audit, and relay path as /call."""
+    org_traffic.identify(request.scope, caller.org_id)
     if not get_settings().claude_connector_enabled:
         raise HTTPException(status_code=404, detail="Claude catalog connector is not enabled")
     request.state.catalog_only = True

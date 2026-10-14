@@ -6,8 +6,39 @@ from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
+from treg.config import Settings
 from treg.infra import kv, money_admission as admission
+
+
+def test_admission_wait_default_and_lease_are_unchanged(monkeypatch):
+    monkeypatch.delenv("TREG_MONEY_ADMISSION_WAIT_S", raising=False)
+    monkeypatch.delenv("TREG_MONEY_ADMISSION_LEASE_S", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.money_admission_wait_s == 5.0
+    assert settings.money_admission_lease_s == 15.0
+
+
+@pytest.mark.parametrize("wait_s", [0.001, 60, 90, 120])
+def test_admission_wait_accepts_positive_values_through_120(monkeypatch, wait_s):
+    monkeypatch.setenv("TREG_MONEY_ADMISSION_WAIT_S", str(wait_s))
+    settings = Settings(_env_file=None, money_admission_lease_s=15.0)
+    assert settings.money_admission_wait_s == wait_s
+    # The lease starts on acquisition and renews; it need not exceed the queue wait.
+    assert settings.money_admission_lease_s == 15.0
+
+
+@pytest.mark.parametrize("wait_s, error_type", [
+    (-1, "greater_than"), (0, "greater_than"), (121, "less_than_equal"),
+])
+def test_admission_wait_rejects_values_outside_bounds(monkeypatch, wait_s, error_type):
+    monkeypatch.setenv("TREG_MONEY_ADMISSION_WAIT_S", str(wait_s))
+    with pytest.raises(ValidationError) as caught:
+        Settings(_env_file=None)
+    [error] = caught.value.errors(include_input=False)
+    assert error["loc"] == ("money_admission_wait_s",)
+    assert error["type"] == error_type
 
 
 class LeaseStore:
@@ -28,7 +59,7 @@ class LeaseStore:
         self.values[key] = (token, now + ttl_ms / 1000)
         return "acquired"
 
-    async def renew_lease(self, key, token, ttl_ms):
+    async def renew_lease(self, key, token, ttl_ms, *, deadline=None):
         self.renewed.set()
         if self.lose_on_renew:
             self.values[key] = ("new-owner", time.monotonic() + 10)
@@ -85,6 +116,70 @@ async def test_empty_release_is_excluded_from_baseline(gate):
     async with admission.admit([], operation="close"):
         pass
     assert admission.snapshot() == []
+
+
+@pytest.mark.parametrize("operation", ["reserve", "release"])
+@pytest.mark.parametrize("orgs", [[], [None], [0], [-3], [True], [7, None]])
+async def test_balance_ops_refuse_missing_identity_before_the_body(gate, operation, orgs):
+    entered = False
+    with pytest.raises(admission.AdmissionRefused, match="missing_identity") as caught:
+        async with admission.admit(orgs, operation=operation):
+            entered = True
+    assert not entered
+    assert not hasattr(caught.value, "status_code")
+    assert admission.snapshot() == []
+    with pytest.raises(admission.AdmissionRefused):
+        admission.require_balance_orgs(orgs)
+
+
+@pytest.mark.parametrize("operation", ["reserve", "release"])
+@pytest.mark.parametrize("reason", ["kv_not_configured", "kv_unavailable", "wait_timeout"])
+async def test_balance_ops_keep_existing_wait_and_kv_fallback(gate, monkeypatch, operation, reason):
+    settings, store = gate
+    if reason == "kv_not_configured":
+        monkeypatch.setattr(kv, "configured", lambda: False)
+    elif reason == "kv_unavailable":
+        store.unavailable = True
+    else:
+        settings.money_admission_wait_s = 0.02
+        store.values["money-admission:org:7"] = ("another-owner", time.monotonic() + 10)
+    entered = False
+    async with admission.admit([7], operation=operation):
+        entered = True
+        assert not admission._local_lock(7).locked()
+    assert entered
+    [row] = completed()
+    assert row["operation"] == operation
+    assert row["mode"] == "fallback" and row["fallback_" + reason] == 1
+    assert row["failed"] == 0
+
+
+async def test_reserve_and_release_share_one_org_lease(gate):
+    _, store = gate
+    entered, leave = asyncio.Event(), asyncio.Event()
+
+    async def holding():
+        async with admission.admit([7], operation="reserve"):
+            entered.set()
+            await leave.wait()
+
+    task = asyncio.create_task(holding())
+    await entered.wait()
+    release_entered = asyncio.Event()
+
+    async def releasing():
+        async with admission.admit([7], operation="release"):
+            release_entered.set()
+
+    waiter = asyncio.create_task(releasing())
+    await asyncio.sleep(0)
+    assert not release_entered.is_set()
+    async with admission.admit([8], operation="release"):
+        assert not release_entered.is_set()
+        assert set(store.values) == {"money-admission:org:7", "money-admission:org:8"}
+    leave.set()
+    await asyncio.gather(task, waiter)
+    assert release_entered.is_set() and not store.values
 
 
 async def test_same_org_waits_outside_scope_but_other_org_can_run(gate):
@@ -335,6 +430,216 @@ async def test_lease_renewal_preserves_ownership_while_body_runs(gate):
         assert store.values["money-admission:org:7"][1] > time.monotonic()
     [row] = completed()
     assert row["lease_lost"] == 0
+
+
+@pytest.mark.parametrize("pause_s", (6, 10, 15))
+async def test_acquire_reply_does_not_restart_the_lease_validity_clock(gate, monkeypatch, pause_s):
+    settings, store = gate
+    settings.money_admission_lease_s = 15
+    now = [100.0]
+    monkeypatch.setattr(admission, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    original = store.acquire_lease
+
+    async def delayed_reply(*args):
+        result = await original(*args)
+        now[0] += pause_s
+        return result
+
+    monkeypatch.setattr(store, "acquire_lease", delayed_reply)
+    async with admission.admit([7], operation="reserve"):
+        assert bool(store.values) == (pause_s < 15)
+    [row] = completed()
+    assert row["mode"] == ("redis" if pause_s < 15 else "fallback")
+    assert row["fallback_lease_lost"] == (pause_s >= 15)
+    assert not store.values
+
+
+async def test_multi_org_acquire_cannot_enter_after_an_earlier_lease_expired(gate, monkeypatch):
+    settings, store = gate
+    settings.money_admission_lease_s = 15
+    now = [100.0]
+    monkeypatch.setattr(admission, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    original = store.acquire_lease
+
+    async def delayed_second(key, *args):
+        if key.endswith(":9"):
+            now[0] += 16
+            store.values["money-admission:org:3"] = ("new-owner", time.monotonic() + 10)
+        return await original(key, *args)
+
+    monkeypatch.setattr(store, "acquire_lease", delayed_second)
+    async with admission.admit([3, 9], operation="deferred"):
+        assert not admission._local_lock(3).locked()
+        assert not admission._local_lock(9).locked()
+        assert list(store.values) == ["money-admission:org:3"]
+    assert store.values["money-admission:org:3"][0] == "new-owner"
+    [row] = completed()
+    assert row["mode"] == "fallback" and row["fallback_lease_lost"] == 1
+
+
+@pytest.mark.parametrize("pause_s", (6, 10))
+async def test_renewer_resuming_after_a_pause_checks_last_confirmed_deadline(gate, monkeypatch, pause_s):
+    _, store = gate
+    now = [100.0]
+    monkeypatch.setattr(admission, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    observed = admission._Observation("close")
+    owned = admission._Gate(observed, 15)
+    try:
+        assert await owned.acquire([7], 1) is None
+        owned.renewer.cancel()
+        await asyncio.gather(owned.renewer, return_exceptions=True)
+        owned.renewer = None
+        wakeups = 0
+
+        async def delayed_wakeup(interval):
+            nonlocal wakeups
+            wakeups += 1
+            if wakeups > 1:
+                raise asyncio.CancelledError
+            now[0] += interval + pause_s
+
+        # Advance the gate's clock without pausing the suite or the real asyncio scheduler.
+        with monkeypatch.context() as patch:
+            patch.setattr(admission, "asyncio", SimpleNamespace(
+                sleep=delayed_wakeup, timeout=asyncio.timeout, CancelledError=asyncio.CancelledError))
+            if pause_s < 10:
+                with pytest.raises(asyncio.CancelledError):
+                    await owned._renew()
+            else:
+                await owned._renew()
+        assert store.renewed.is_set() == (pause_s < 10)
+        assert owned.lost == (pause_s >= 10)
+        assert observed.lease_lost == (pause_s >= 10)
+        assert observed.deadline_expired == (pause_s >= 10)
+        assert observed.kv_errors == 0
+        assert admission._local_lock(7).locked()  # Loss never releases an active session's gate.
+        assert sum(phase == "acquire" for phase, _ in store.calls) == 1
+    finally:
+        await owned.release()
+
+
+async def test_renewal_reply_after_confirmed_validity_does_not_restore_ownership(gate, monkeypatch):
+    _, store = gate
+    now = [100.0]
+    monkeypatch.setattr(admission, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    original = store.renew_lease
+
+    async def late_reply(*args, **kwargs):
+        result = await original(*args, **kwargs)
+        now[0] += 10  # Simulate a reply observed after the old lease's remaining validity.
+        return result
+
+    monkeypatch.setattr(store, "renew_lease", late_reply)
+    async with admission.admit([7], operation="close"):
+        await asyncio.wait_for(store.renewed.wait(), 1)
+        await asyncio.sleep(0)
+        assert admission._local_lock(7).locked()
+    [row] = completed()
+    assert row["lease_lost"] == 1 and row["failed"] == 0
+    assert row["deadline_expired"] == 1 and row["kv_errors"] == 0
+    assert sum(phase == "acquire" for phase, _ in store.calls) == 1
+
+
+@pytest.mark.parametrize("expiry", ("result", "outer_timeout"))
+async def test_renewal_is_bounded_by_remaining_validity_before_cleanup(gate, monkeypatch, expiry):
+    _, store = gate
+    cancelled = asyncio.Event()
+
+    async def blocked_renewal(*args, **kwargs):
+        try:
+            if expiry == "result":
+                return "deadline_expired"
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    monkeypatch.setattr(store, "renew_lease", blocked_renewal)
+    async with admission.admit([7], operation="close"):
+        await asyncio.wait_for(cancelled.wait(), 1)
+        await asyncio.sleep(0)
+        assert admission._local_lock(7).locked()
+        assert store.values  # The caller must still finish its DB rollback/close.
+    [row] = completed()
+    assert row["lease_lost"] == 1 and row["kv_errors"] == 0 and row["failed"] == 0
+    assert row["deadline_expired"] == 1
+
+
+@pytest.mark.parametrize("error", (TimeoutError, RuntimeError))
+async def test_store_exception_before_validity_timeout_is_still_a_kv_error(gate, monkeypatch, error):
+    _, store = gate
+
+    async def failed_renewal(*args, **kwargs):
+        store.renewed.set()
+        raise error("store failure before the gate deadline")
+
+    monkeypatch.setattr(store, "renew_lease", failed_renewal)
+    async with admission.admit([7], operation="close"):
+        await asyncio.wait_for(store.renewed.wait(), 1)
+        assert admission._local_lock(7).locked()
+    [row] = completed()
+    assert row["lease_lost"] == 1 and row["kv_errors"] == 1
+    assert row["deadline_expired"] == 0 and row["failed"] == 0
+
+
+@pytest.mark.parametrize("failure", (
+    "late_transient_after_pause", "deadline_cancel_translated_by_cleanup", "earlier_org_expiry",
+    "gate_timeout",
+))
+async def test_gate_deadline_reaches_each_redis_renewal_attempt(monkeypatch, failure):
+    from redis.exceptions import TimeoutError as RedisTimeoutError
+
+    monkeypatch.setattr(kv, "_lease_errors", {})
+    monkeypatch.setattr(kv, "_lease_timings", {})
+    observation = admission._Observation("deferred")
+    owned = admission._Gate(observation, 3)
+    owned.leases = [("org:3", "token-a")]
+    started = time.monotonic()
+    owned.valid_until = {"org:3": started + 0.050}
+    if failure == "earlier_org_expiry":
+        owned.leases.append(("org:9", "token-b"))
+        owned.valid_until = {"org:3": started + 0.100, "org:9": started + 0.020}
+    earliest = min(owned.valid_until.values())
+    attempts = []
+
+    async def command(script, count, key, token, ttl):
+        attempts.append((key, token, time.monotonic()))
+        if len(attempts) == 1:
+            if failure == "gate_timeout":
+                await asyncio.Event().wait()
+            elif failure == "late_transient_after_pause":
+                time.sleep(0.070)  # Real short loop stall; the timeout callback cannot run.
+            elif failure == "deadline_cancel_translated_by_cleanup":
+                try:
+                    await asyncio.Event().wait()
+                except asyncio.CancelledError:
+                    await asyncio.sleep(0.030)
+            else:
+                try:
+                    await asyncio.sleep(0.030)
+                except asyncio.CancelledError:
+                    pass  # Simulate a driver translating the shorter deadline's cancellation.
+            raise RedisTimeoutError("late transient failure")
+        return 1
+
+    store = kv.RedisStore.__new__(kv.RedisStore)
+    store._client = SimpleNamespace(eval=command)
+    owned.store = store
+
+    async def wake(_):
+        return None
+
+    # Bypass only the initial cadence sleep. Both timeout layers use real asyncio and clocks.
+    monkeypatch.setattr(admission, "asyncio", SimpleNamespace(
+        sleep=wake, timeout=asyncio.timeout, CancelledError=asyncio.CancelledError))
+    await owned._renew()
+    assert len(attempts) == 1
+    assert attempts[0][:2] == ("org:3", "token-a")
+    assert attempts[0][2] < earliest <= time.monotonic()
+    assert owned.lost and observation.lease_lost == 1
+    assert observation.deadline_expired == 1 and observation.kv_errors == 0
+    errors = kv.drain_lease_errors()
+    assert [(row["error_type"], row["count"]) for row in errors] == (
+        [] if failure == "gate_timeout" else [("redis_timeout", 1)])
 
 
 async def test_redis_outage_during_renewal_does_not_interrupt_the_transaction(gate):

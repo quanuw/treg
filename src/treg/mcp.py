@@ -41,6 +41,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, replace
 from typing import Annotated, Any, TypedDict
 from urllib.parse import parse_qsl, urlsplit
@@ -53,7 +54,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.exceptions import MCPError
 from mcp.types import AudioContent, CallToolResult, METHOD_NOT_FOUND, TextContent, ToolAnnotations
 
-from . import analytics, audit, hints, oauth_providers
+from . import analytics, audit, client_ip, hints, jsontext, oauth_providers
 from .application import catalog_find as find_app
 from .application import catalog_search as search_app
 from .application import search_experiment
@@ -61,6 +62,7 @@ from .domain.catalog import store as catalog_store
 from .config import PUBLIC_HOST_ALIASES, get_settings
 from .feedback_contract import FeedbackCategory, FEEDBACK_DESCRIPTION, ReviewUsefulness, REVIEW_DESCRIPTION
 from .domain.catalog.stats import EndpointObservationReader
+from .infra import org_traffic
 
 # Every tool must declare what it can DO, and the review process checks these against real behaviour.
 # Read-only means it changes nothing anywhere; open-world means what it sends leaves the caller's own
@@ -415,6 +417,7 @@ class CatalogGetOut(TypedDict, total=False):
 class CallOut(TypedDict, total=False):
     call_id: str | None
     status: int | None              # the UPSTREAM status, relayed
+    retry_after: str | None         # HTTP Retry-After, preserved where MCP cannot send that header
     endpoint_id: str | None
     replayed: bool | None           # answered from an earlier call with the same idempotency_key
     body: Any                       # the provider's response, verbatim
@@ -472,13 +475,22 @@ class MyToolsOut(TypedDict, total=False):
     hint: str | None
 
 
+# The caller's address for the tool call running in this task, resolved from the inbound MCP
+# request by `_bearer` and forwarded by `_api` on every in-process call. Without it each internal
+# request would come from the ASGI transport's loopback peer, and every MCP caller would share one
+# per-IP bucket. Task-scoped, so concurrent tool calls never see each other's address.
+_caller_ip: ContextVar[str] = ContextVar("treg_mcp_caller_ip", default="")
+
+
 def _bearer(ctx: Context) -> str:
-    """The caller's token, straight from the request headers.
+    """The caller's token, straight from the request headers. Every tool starts here, so it also
+    records the caller's address (`_caller_ip`) for the internal calls that follow.
 
     Returns "" when absent — every authenticated tool then fails closed with an instruction rather
     than a stack trace, because a missing token is the single most likely first-run problem.
     """
     headers = ctx.headers or {}
+    _caller_ip.set(client_ip.from_headers(headers, None) if headers else "")
     raw = headers.get("authorization") or headers.get("Authorization") or ""
     return raw.removeprefix("Bearer ").removeprefix("bearer ").strip()
 
@@ -640,16 +652,21 @@ async def _api(token: str, *, client_name: str = "mcp"):
         timeout=_TIMEOUT,
         # X-Treg-Client is attribution, not auth: without it every MCP-originated call lands
         # in the audit trail as client="", indistinguishable from unreported CLI traffic.
-        headers={**await _internal_auth(token), "X-Treg-Client": client_name},
+        headers={**await _internal_auth(token), "X-Treg-Client": client_name,
+                 **client_ip.forwarding_headers(_caller_ip.get())},
     ) as client:
         yield client
 
 
 def _body(r: httpx.Response) -> Any:
     try:
-        return r.json()
+        body = r.json()
     except ValueError:
         return r.text
+    # A lone surrogate parsed out of an upstream's JSON makes the SDK's pydantic dump raise, and the
+    # agent gets "Error serializing to JSON" with no body, call_id or cost for a call it paid for.
+    # pydantic cannot write the escape, so the surrogate becomes U+FFFD (treg/jsontext.py).
+    return jsontext.scrub_surrogates(body) if jsontext.may_hold_surrogates(r.content) else body
 
 
 async def _resolve_org(client: httpx.AsyncClient) -> tuple[int | None, str | None, dict | None]:
@@ -1128,16 +1145,11 @@ async def _catalog_request_impl(
     """Relays to POST /tool-requests so the rate limiting, field caps and attribution live in one
     place; the bearer (when the session has one) turns into who-asked on the stored row."""
     token = _bearer(ctx)
-    # The in-process relay would otherwise collapse every MCP caller into one client IP ("?"),
-    # making the per-IP rate limit a single global bucket — forward the edge's X-Forwarded-For
-    # so the API's limiter sees the real caller.
-    xff = (ctx.headers or {}).get("x-forwarded-for") or (ctx.headers or {}).get("X-Forwarded-For") or ""
     api_context = (_api(token) if surface is _TEAM_SURFACE
                    else _api(token, client_name=surface.client_name))
     async with api_context as client:
         r = await client.post("/tool-requests", json={
-            "capability": capability, "note": note, "source": surface.event_source},
-            headers={"X-Forwarded-For": xff} if xff else {})
+            "capability": capability, "note": note, "source": surface.event_source})
     return _body(r)
 
 
@@ -1252,6 +1264,7 @@ async def call(endpoint_id: str, params: dict | list | None = None,
     )
 
 
+@org_traffic.mcp_adapter("call")
 async def _call_impl(endpoint_id: str, params: dict | list | None = None,
                      method: str | None = None, idempotency_key: str | None = None,
                      query: dict | None = None, body: dict | list | str | None = None,
@@ -1383,8 +1396,8 @@ async def _call_impl(endpoint_id: str, params: dict | list | None = None,
             return problem
         if slug:
             extra_headers["X-Treg-Org"] = slug
-        # Relay the caller tags off the MCP transport, the same way catalog_request forwards
-        # X-Forwarded-For. A builder proxying MCP sets this header once per session on their own HTTP
+        # Relay the caller tags off the MCP transport, the same way `_api` forwards the caller's
+        # address. A builder proxying MCP sets this header once per session on their own HTTP
         # client; the model never sees it, so it cannot be forgotten or invented.
         inbound_meta = (ctx.headers or {}).get("x-treg-meta") or (ctx.headers or {}).get("X-Treg-Meta")
         if inbound_meta:
@@ -1446,6 +1459,8 @@ async def _call_impl(endpoint_id: str, params: dict | list | None = None,
         r = await client.request(method, f"{route}/{endpoint_id}", **kw)
 
     out: dict[str, Any] = {"status": r.status_code, "endpoint_id": endpoint_id, "body": _body(r)}
+    if retry_after := r.headers.get("Retry-After"):
+        out["retry_after"] = retry_after
     if call_id := r.headers.get("X-Treg-Call-Id"):
         out["call_id"] = call_id
     if r.headers.get("X-Treg-Idempotent-Replay") == "true":
@@ -1508,6 +1523,7 @@ async def _call_impl(endpoint_id: str, params: dict | list | None = None,
     return out
 
 
+@org_traffic.mcp_adapter("call_media")
 async def _call_media_impl(
     endpoint_id: str, *, body: dict | list | str, headers: dict | None,
     idempotency_key: str | None, ctx: Context, catalog_only: bool,
@@ -1548,6 +1564,8 @@ async def _call_media_impl(
         route = "/catalog/call" if catalog_only else "/call"
         response = await client.post(f"{route}/{endpoint_id}", **kw)
     metadata: dict[str, Any] = {"status": response.status_code, "endpoint_id": endpoint_id}
+    if retry_after := response.headers.get("Retry-After"):
+        metadata["retry_after"] = retry_after
     if call_id := response.headers.get("X-Treg-Call-Id"):
         metadata["call_id"] = call_id
     if response.headers.get("X-Treg-Idempotent-Replay") == "true":

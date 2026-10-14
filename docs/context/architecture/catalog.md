@@ -126,6 +126,7 @@ sources:
   - .github/workflows/catalog-drift.yml
   - scripts/catalog_drift.py
   - scripts/catalog_ingest.py
+  - scripts/catalog_ingest_crawl4ai_recipes.py
   - scripts/catalog_validate.py
   - src/treg/catalog/aliases.yaml
   - src/treg/catalog/fx.yaml
@@ -433,6 +434,7 @@ scripts/
   catalog_verify.py           # live-tests CORE endpoints with a real credential; writes examples/
   catalog_verify_extended.py  # the same for the extended tier, in bulk, under a spend cap
   catalog_ingest.py           # bulk-generates the extended tier from provider specs
+  catalog_ingest_crawl4ai_recipes.py  # writes the marked recipes block of crawl4ai.yaml from GET /recipes
   catalog_cost_provenance.py  # backfills cost units + provenance; re-run after any re-ingest
 src/treg/routers/catalog.py    # open Catalog JSON routes, attached in legacy registration order
 ```
@@ -2133,7 +2135,11 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   `released_micro` names what the providers billed treg. A crash between the two leaves the holds
   to the reaper, which releases in the caller's favour. `X-Treg-Route-Max-Cost` (default $1)
   bounds the sum before each reserve (a candidate
-  that would breach it is `skipped`). Quota-row quotes scale with the requested row count, just
+  that would breach it is `skipped`). Before any child runs, the route returns 402
+  `route_max_cost` (`cheapest_micro`, `plan`, `charged_micro: 0`) only when no candidate's
+  `price_micro` fits the ceiling, and that detail names the minimum price rather than the
+  first-ranked candidate: `rank` puts specificity ahead of price, so a dearer provider can be
+  first while a later one still fits. Quota-row quotes scale with the requested row count, just
   like per-result quotes. Each child also receives the remaining ceiling after actual earlier
   charges; the shared reservation gate checks the resolved estimate including margin, even when
   the advisory quote was too low or the child uses overflow. A budget refusal skips that candidate

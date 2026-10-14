@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, PositiveInt, field_validator
+from pydantic import Field, PositiveInt, field_validator, model_validator
 from urllib.parse import urlsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,6 +28,57 @@ PUBLIC_HOST_ALIASES: tuple[str, ...] = ("treg.superdesign.dev", "treg.to")
 # Deliberately one-way — only ever the pre-move name, never treg.to — so a browser that cached the
 # old→new 301 can never meet a new→old redirect and loop, even while a rollback is in effect.
 LEGACY_PUBLIC_HOSTS: tuple[str, ...] = ("treg.superdesign.dev",)
+
+
+PRIMARY_SLOT = "primary"
+_SLOT_LABEL = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
+
+
+@dataclass(frozen=True)
+class PlatformSlot:
+    """One treg-owned account behind a provider. `slot` is the operator's label for it (the
+    deployment's own `platform_key_<provider>` is `primary`), never a credential: it is what durable
+    rows, buckets and telemetry name. A label survives reordering the accounts and regenerating an
+    account's key; removing one retires everything created on it."""
+
+    slot: str
+    # setting name -> value; empty for the primary, whose are the fields. Credentials: never in repr.
+    values: Mapping[str, str] = field(repr=False)
+
+    def value(self, setting: str) -> str:
+        return self.values.get(setting, "")
+
+
+@lru_cache
+def _parse_platform_pools(raw: str) -> dict[str, dict[str, dict[str, str]]]:
+    """`TREG_PLATFORM_ACCOUNTS` parsed: {provider: {label: account settings}}. Every account names
+    its provider's `platform_key_<provider>` and only non-empty `platform_*` settings."""
+    if not raw.strip():
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        raise ValueError("platform_accounts must be a JSON object") from None
+    if not isinstance(parsed, dict):
+        raise ValueError("platform_accounts must be a JSON object")
+    if len({provider.lower() for provider in parsed}) != len(parsed):
+        raise ValueError("platform_accounts names a provider twice (provider names are case-insensitive)")
+    pools: dict[str, dict[str, dict[str, str]]] = {}
+    for provider, accounts in parsed.items():
+        primary = platform_setting_name(provider)
+        if not isinstance(accounts, dict) or not all(
+                isinstance(label, str) and _SLOT_LABEL.fullmatch(label) and label != PRIMARY_SLOT
+                and isinstance(a, dict) and a.get(primary)
+                and all(isinstance(k, str) and k.startswith("platform_")
+                        and isinstance(v, str) and v.strip() for k, v in a.items())
+                for label, a in accounts.items()):
+            raise ValueError(
+                f"platform_accounts[{provider!r}] must map account labels (lowercase, not "
+                f"{PRIMARY_SLOT!r}) to objects that each name {primary} and only non-empty "
+                "platform_* settings")
+        pools[provider.lower()] = {label: {k: v.strip() for k, v in a.items()}
+                                   for label, a in accounts.items()}
+    return pools
 
 
 def platform_setting_name(provider: str) -> str:
@@ -60,7 +113,9 @@ TREG_USER_AGENT = "treg/1.0 (+https://treg.to)"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="TREG_", extra="ignore")
+    # Most of these values are credentials: a validation error names the field, never the value.
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="TREG_", extra="ignore",
+                                      hide_input_in_errors=True)
 
     review_sample_rate: float = Field(default=0, ge=0, le=1)
     feedback_hint_rate: float = Field(default=0, ge=0, le=1)
@@ -70,11 +125,59 @@ class Settings(BaseSettings):
     # The shared key-value store (Redis protocol). Empty = an in-process fallback; see infra/kv.py.
     kv_url: str = ""
 
-    # Optional database-external admission for CreditBlock consumers. Keep accounting protected
-    # by database transactions even when a lease expires or the shared store is unavailable.
+    # Root Web requests only; shared across keys/processes through Redis. Enabling requires
+    # an explicit outage policy. Unlisted and exempt orgs retain their existing behavior.
+    org_concurrency_enabled: bool = False
+    org_concurrency_limits: dict[int, int] = Field(default_factory=dict)
+    org_concurrency_exempt_org_ids: list[int] = Field(default_factory=list)
+    org_concurrency_redis_failure: Literal["fail_open", "fail_closed"] | None = None
+    org_concurrency_lease_s: float = Field(default=30, ge=3, le=300)
+    org_concurrency_retry_after_s: int = Field(default=1, ge=1, le=60)
+
+    @field_validator("org_concurrency_limits", mode="before")
+    @classmethod
+    def _org_concurrency_limits(cls, value):
+        if not isinstance(value, dict) or any(
+            not (type(org) is int and org > 0
+                 or isinstance(org, str) and re.fullmatch(r"[1-9][0-9]*", org))
+            or type(limit) is not int or limit <= 0
+            for org, limit in value.items()
+        ):
+            raise ValueError("org_concurrency_limits must map positive org IDs to positive integer limits")
+        if len({int(org) for org in value}) != len(value):
+            raise ValueError("org_concurrency_limits contains duplicate org IDs")
+        return value
+
+    @field_validator("org_concurrency_exempt_org_ids", mode="before")
+    @classmethod
+    def _org_concurrency_exemptions(cls, value):
+        if not isinstance(value, list) or any(type(org) is not int or org <= 0 for org in value):
+            raise ValueError("org_concurrency_exempt_org_ids must be a list of positive integer org IDs")
+        return value
+
+    @model_validator(mode="after")
+    def _org_concurrency_configuration(self):
+        if self.org_concurrency_enabled:
+            if self.org_concurrency_redis_failure is None:
+                raise ValueError("enabled org concurrency requires an explicit org_concurrency_redis_failure")
+            if not self.kv_url.strip():
+                raise ValueError("enabled org concurrency requires shared Redis via kv_url")
+            try:
+                url = urlsplit(self.kv_url)
+                valid = (url.scheme in {"redis", "rediss"} and bool(url.hostname)
+                         or url.scheme == "unix" and bool(url.path))
+            except ValueError:
+                valid = False
+            if not valid:
+                raise ValueError("enabled org concurrency requires a valid Redis kv_url")
+        return self
+
+    # Optional same-org admission in front of a balance session (settlement, reserve, release).
+    # A lease expiry or an unavailable store still runs the database path. A reserve or release
+    # with no positive org id refuses before checkout; that refusal is not an HTTP 429.
     money_admission_enabled: bool = False
     money_admission_org_ids: list[PositiveInt] = Field(default_factory=list)
-    money_admission_wait_s: float = Field(default=5.0, gt=0, le=60)
+    money_admission_wait_s: float = Field(default=5.0, gt=0, le=120)
     money_admission_lease_s: float = Field(default=15.0, ge=3, le=300)
 
     # SQLite locally, Postgres on Render — same code path, just swap the URL.
@@ -179,6 +282,10 @@ class Settings(BaseSettings):
     spool_max_bytes: int = Field(default=64 * 1024 * 1024, ge=1)
     spool_budget_bytes: int = Field(default=512 * 1024 * 1024, ge=1)
     spool_parse_concurrency: int = Field(default=2, ge=1, le=16)
+    # Fair share of a provider's concurrency on treg's own keys (domain/capacity/fair_share.py):
+    # how long a call waits in line for a place before a routed job moves on and a direct call is
+    # refused, not charged. 0 turns the gate off (TREG_FAIR_SHARE_WAIT_S=0).
+    fair_share_wait_s: float = Field(default=2.0, ge=0, le=30)
 
     # ---- referral program (referrals.py) --------------------------------------------------------
     # Flat bounties, not a percentage of top-ups. At 0% platform margin a percentage would be a
@@ -329,6 +436,11 @@ class Settings(BaseSettings):
     # happens to hold a key can't start spending it by accident. `TREG_PLATFORM_PROVIDERS=""` in the
     # Render dashboard turns the whole feature off without a redeploy.
     platform_providers: str = ""
+    # More treg-owned accounts behind a provider, by label (rules: `_parse_platform_pools`):
+    # {"tomba": {"b": {"platform_key_tomba": "...", "platform_key_tomba_secret": "..."}}}.
+    # `platform_key_<provider>` above stays the `primary` account and the only one every reader
+    # outside the call path uses; the call path spreads platform calls across all of them.
+    platform_accounts: str = ""
     # Whether DISCOVERY steers to routed rows: `treg.<capability>` first in search, and a routed
     # parent pulled in whenever one of its children matched. `off` leaves every routed endpoint
     # callable and priced — only the steering stops, and search looks as it did before routing
@@ -627,6 +739,28 @@ class Settings(BaseSettings):
     # signs user_hash for identity verification and must never reach the browser.
     intercom_app_id: str = ""
     intercom_secret: str = ""
+    # Where the client address comes from (client_ip.py). A header only the edge can set wins
+    # (`cf-connecting-ip` behind Cloudflare); else the entry this many hops from the RIGHT of
+    # X-Forwarded-For, the one the nearest trusted proxy appended (0 = clients connect directly,
+    # use the socket peer). The first X-Forwarded-For entry is client-written and never trusted.
+    client_ip_header: str = ""
+    trusted_proxy_hops: int = Field(default=1, ge=0, le=5)
+    # Comma-separated `treg.extensions` entry-point names that must be installed (policy.py), so a
+    # deployment that relies on a private policy extension refuses to start without it. Empty =
+    # load whatever is installed, which for a plain install is nothing.
+    required_extensions: str = ""
+    # Cloudflare Turnstile on the email sign-in form. Both keys empty = OFF, so self-hosted
+    # instances load no widget and call no Cloudflare. The site key is public (sent to the
+    # browser through /captcha.js); the secret only ever reaches siteverify. `observe` records each
+    # outcome and changes nothing; `enforce` refuses a code to a missing or invalid token and
+    # withholds signup credit from a new account when Cloudflare could not answer.
+    turnstile_site_key: str = ""
+    turnstile_secret: str = ""
+    # Comma-separated frontend hostnames a token must have been solved on. Empty = the host of
+    # public_url. List every host the dashboard is served from (aliases included), never localhost
+    # in production.
+    turnstile_hostnames: str = ""
+    turnstile_mode: Literal["observe", "enforce"] = "observe"
     # Registry OAuth apps for the non-Google providers (oauth_providers.py). Empty = that provider
     # is listed as unconfigured rather than failing part-way through a consent.
     # treg's own Google Ads developer token, from OUR approved manager account. Ads needs it on
@@ -761,6 +895,12 @@ class Settings(BaseSettings):
                 raise ValueError("paused_provider_messages must map service ids to non-empty strings")
         return v
 
+    @field_validator("platform_accounts")
+    @classmethod
+    def _platform_accounts_shape(cls, v: str) -> str:
+        _parse_platform_pools(v)  # raises ValueError on a malformed value
+        return v
+
     @property
     def fixed_login_code_hashes(self) -> dict[str, str]:
         """The normalised `TREG_FIXED_LOGIN_CODES` entries; empty = no designated accounts."""
@@ -832,6 +972,40 @@ class Settings(BaseSettings):
         provider balance is used.
         """
         return (provider or "").lower() in self.platform_provider_set
+
+    def platform_slots(self, provider: str) -> tuple[PlatformSlot, ...]:
+        """Every treg-owned account behind `provider`, the primary first; empty without a primary
+        key. Says nothing about the allow-list: `platform_key_for` stays the serving switch."""
+        setting = platform_setting_name(provider)
+        primary = getattr(self, setting, "") or ""
+        if not primary:
+            return ()
+        return (PlatformSlot(PRIMARY_SLOT, {}),
+                *self.platform_extra_accounts().get((provider or "").lower(), ()))
+
+    def platform_extra_accounts(self) -> dict[str, tuple[PlatformSlot, ...]]:
+        """`TREG_PLATFORM_ACCOUNTS` by provider, whether or not the primary key is set."""
+        return {provider: tuple(PlatformSlot(label, values) for label, values in sorted(accounts.items()))
+                for provider, accounts in _parse_platform_pools(self.platform_accounts).items()}
+
+    def platform_credential(self, setting: str, account: str | None) -> str:
+        """The value a `platform_setting` binding injects. Without an account, the deployment's
+        own field: the primary account. With one (`<provider>/<label>`), that account's value, or
+        "" when it is not configured: another account's credential would act on objects that exist
+        only on the named one."""
+        if account is None:
+            return getattr(self, setting, "") or ""
+        provider, _, label = account.partition("/")
+        values = _parse_platform_pools(self.platform_accounts).get(provider, {}).get(label, {})
+        return values.get(setting, "")
+
+    def platform_credential_values(self, setting: str) -> tuple[str, ...]:
+        """Every value `setting` holds across treg's accounts: what error-body masking hides."""
+        own = (getattr(self, setting, "") or "").strip()
+        pooled = (values.get(setting, "")
+                  for accounts in _parse_platform_pools(self.platform_accounts).values()
+                  for values in accounts.values())
+        return tuple(dict.fromkeys(v for v in (own, *pooled) if v))
 
     def platform_key_for(self, provider: str) -> str | None:
         """treg's own key for `provider`, or None if tier 4 must not serve it. BOTH conditions have to

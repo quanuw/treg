@@ -1114,9 +1114,14 @@ def test_aviato_conditional_prices_follow_live_balance_deltas():
 
 
 @pytest.mark.parametrize(("endpoint", "unit_micro", "body", "expected"), [
-    # bulk enrich settles from the rows it returned
-    ("aviato.companies.enrich.bulk", 150_000, b'{"companies": [{"id": "1"}, null]}', 150_000),
-    ("aviato.people.enrich.bulk", 70_000, b'[{"id": "1"}, null]', 70_000),
+    # bulk enrich settles from the rows whose lookup succeeded; a failed row is free
+    ("aviato.companies.enrich.bulk", 150_000,
+     b'{"companies": [{"lookupSuccessful": true, "company": {"id": "1"}},'
+     b' {"lookupSuccessful": false}, null]}', 150_000),
+    ("aviato.people.enrich.bulk", 70_000,
+     b'[{"lookupSuccessful": true, "person": {"id": "1"}}, {"lookupSuccessful": false}, null]',
+     70_000),
+    ("aviato.people.enrich.bulk", 50_000, b'[{"lookupSuccessful": false}, {"lookupSuccessful": false}]', 0),
     # simple search releases its unbilled enrich rider
     ("aviato.people.search.simple", 0,
      b'{"items": [{"id":"1"},{"id":"2"},{"id":"3"},{"id":"4"},{"id":"5"}]}', 2_500),
@@ -1127,6 +1132,31 @@ def test_aviato_conditional_prices_follow_live_balance_deltas():
 def test_aviato_settles_from_counts_and_releases_unbilled_riders(endpoint, unit_micro, body, expected):
     mk = _mk("aviato", endpoint_id=endpoint, unit_micro=unit_micro)
     assert call_settle._observed_cost_micro(mk, body) == expected
+
+
+async def test_aviato_people_bulk_enrich_of_only_failed_lookups_is_free(clients, monkeypatch):
+    monkeypatch.setenv("TREG_PLATFORM_KEY_AVIATO", "PLATFORM-AVIATO")
+    monkeypatch.setenv("TREG_PLATFORM_PROVIDERS", "aviato")
+    get_settings.cache_clear()
+    lookups = [{"email": f"person{i}@example.com"} for i in range(3)]
+    failed = json.dumps([{"lookupSuccessful": False}] * 3).encode()
+    monkeypatch.setattr(call_service, "relay", _fake_relay(200, failed))
+    try:
+        before = await _balance(clients)
+        response = await clients.post("/call/aviato.people.enrich.bulk", json={"lookups": lookups})
+        assert response.status_code == 200, response.text
+        assert response.headers["x-treg-cost-micro"] == "0"
+        assert await _balance(clients) == before
+
+        hit = json.dumps([{"lookupSuccessful": True, "person": {"id": "1"}},
+                          {"lookupSuccessful": False}, {"lookupSuccessful": False}]).encode()
+        monkeypatch.setattr(call_service, "relay", _fake_relay(200, hit))
+        response = await clients.post("/call/aviato.people.enrich.bulk", json={"lookups": lookups})
+        assert response.status_code == 200, response.text
+        assert response.headers["x-treg-cost-micro"] == "50000"
+        assert before - await _balance(clients) == 50_000
+    finally:
+        get_settings.cache_clear()
 
 
 def test_observed_cost_counts_resources_for_billed_oauth_reads():
@@ -1167,14 +1197,16 @@ def test_observed_cost_counts_resources_for_billed_oauth_reads():
 
 
 def test_apollo_settles_a_2xx_miss_at_zero():
-    """Apollo answers a no-match with 2xx and charges nothing for it — `organization: null` on
-    enrich, an empty `organizations` page on search. Status-based billing would charge the
-    caller the full credit for a response Apollo gave away; the body is what decides. A body
-    carrying neither documented shape (people enrichment's 1-9 credit range) stays at the
-    estimate — deriving is only safe where the rule is flat."""
+    """Apollo answers a no-match with 2xx and charges nothing for it — `organization: null` or a
+    bare `{}` on enrich (the live unmatched-domain shape), an empty `organizations` page on
+    search. Status-based billing would charge the caller the full credit for a response Apollo
+    gave away; the body is what decides. A people-enrichment body carrying neither organization
+    key stays at the estimate — deriving is only safe where the rule is flat."""
     credit = 26_000  # $0.026/credit (fx.yaml, Basic $65/mo / 2,500 credits)
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"organization": {"name": "Apple"}}') == credit
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"organization": null}') == 0, "a 2xx miss is free"
+    enrich = _mk("apollo", endpoint_id="apollo.companies.enrich", cost_type="per_success")
+    assert call_settle._observed_cost_micro(enrich, b'{}') == 0, "live bare {} miss is free via adapter"
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"organizations": [{"name": "Apple"}], "pagination": {}}') == credit
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"organizations": [], "pagination": {}}') == 0, "an empty page is free"
     assert call_settle._observed_cost_micro(_mk("apollo"), b'{"person": {"id": "x"}}') is None, "1-9 credit range: estimate, not a guess"

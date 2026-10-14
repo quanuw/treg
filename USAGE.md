@@ -48,7 +48,7 @@ present a per-org token directly.
 |---|---|---|
 | `treg config` | `--base-url URL` | show or set the endpoint (prints base URL, email, active org, logged-in) — use `treg org ls` for the full org list |
 | `treg login` | _(none)_ | GitHub browser sign-in (register-or-login), stores one identity token |
-| `treg login` | `--email EMAIL` | email one-time-code sign-in (register-or-login); prompts for the code |
+| `treg login` | `--email EMAIL` | email one-time-code sign-in (register-or-login); prompts for the code. A server that requires a browser check finishes the sign-in in the browser instead |
 | `treg login` | `--token TOKEN` | agents/CI: use a per-org token directly |
 | `treg logout` | — | clear your stored credentials |
 | `treg onboard` | `--mode guided\|quick` · `--name N` · `--yes` · `--reset` | colourful guided first-run — pick **guided build** (you create the team + invite a teammate, step by step) or **quick demo** (we seed a full demo team + tool + activity), ending on a no-key call. Offered `[Y/n]` after your first login; `--reset` removes demo teammates |
@@ -491,6 +491,7 @@ Idempotent — re-run any time (skips what's registered; `--replace` updates). N
 | Command | Options | What it does |
 |---|---|---|
 | `treg oauth connect NAME` | `--client-secret PATH`, `--scopes S1 S2 …` | browser consent → treg captures the first token and stores it as an oauth secret |
+| `treg connections connect --provider P` | `--key-stdin` | a key-based provider (Moz, Hunter, …): prompts for the key with input hidden, or reads it from stdin with `--key-stdin`; treg verifies it with the provider before storing it |
 | `treg health` | `--run` | show every credential's status; `--run` re-checks now (refresh oauth, probe tools, alert owners) |
 
 ```bash

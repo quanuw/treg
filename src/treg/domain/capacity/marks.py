@@ -47,8 +47,18 @@ SWEEP_PROBE = "sweep:"
 log = logging.getLogger("treg.capacity")
 
 
-def lock_key(provider: str, endpoint_id: str | None, kind: str) -> str:
-    return endpoint_id if kind == "quota" and endpoint_id else provider
+def spends_balance(cost_type: str | None) -> bool:
+    """Whether a route draws on the account's money or allowance. A free route says nothing about
+    either: Dropleads answers searches at zero credits while every paid route 402s, so a free 2xx
+    is no recovery, and a balance mark is no reason to refuse a free call."""
+    return cost_type != "free"
+
+
+def lock_key(provider: str, endpoint_id: str | None, kind: str, slot: str | None = None) -> str:
+    """Provider for a balance signature, endpoint for a quota one; a further treg-owned account
+    (`slot`) runs dry on its own, so its rows are its own (`<key>#<slot>`)."""
+    key = endpoint_id if kind == "quota" and endpoint_id else provider
+    return f"{key}#{slot}" if slot else key
 
 
 @dataclass
@@ -79,11 +89,11 @@ class Lock:
 
 async def strike(provider: str, *, endpoint_id: str | None, kind: str,
                  resets_at: datetime | None, note: str = "", immediate: bool = False,
-                 now: datetime | None = None) -> Lock | None:
+                 now: datetime | None = None, slot: str | None = None) -> Lock | None:
     """One balance/quota signature on treg's own account. Returns the row as written (active or
     pending), or None when nothing could be written. `immediate` locks on the first strike."""
     now = now or utcnow_naive()
-    key = lock_key(provider, endpoint_id, kind)
+    key = lock_key(provider, endpoint_id, kind, slot)
     try:
         async with session_maker() as db:
             raw = await ratestore.kv_get(db, LOCK_NS, key)

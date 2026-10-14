@@ -303,3 +303,53 @@ async def test_a_failed_strike_never_fails_the_call(clients: AsyncClient, platfo
     # strike itself swallows; simulate the seam above it raising to prove the guard
     r = await clients.get(f"/call/{EP}?aweme_id=7")
     assert r.status_code == 402 and r.headers["X-Treg-Cost-Micro"] == "0"
+
+
+DL_PHONE, DL_SEARCH = "dropleads.people.phone.find", "dropleads.people.search"  # per_success / free
+DL_OUT = b'{"error":"Insufficient Credits","message":"Insufficient credits. Required: 3, Available: 0"}'
+
+
+def _by_path(answers: dict[str, tuple[int, bytes]]):
+    async def relay(request, upstream_url, tool, secrets, client, drop_params=None, force_identity=False):
+        status, body = next(v for path, v in answers.items() if path in upstream_url)
+        return await _relay(status, body)(request, upstream_url, tool, secrets, client)
+    return relay
+
+
+async def _dl(clients: AsyncClient, endpoint: str):
+    body = ({"linkedin_url": "https://www.linkedin.com/in/example"} if endpoint == DL_PHONE
+            else {"filters": {"companyDomains": ["example.com"]}})
+    return await clients.post(f"/call/{endpoint}", json=body)
+
+
+async def test_a_free_route_neither_lifts_nor_is_held_by_a_balance_mark(clients: AsyncClient, monkeypatch):
+    """Dropleads answers searches (free) at zero credits while every paid route 402s. Each free 2xx
+    used to erase the paid routes' balance strikes and lift the sweep's zero reading, so treg relayed
+    every paid call into a 402, while the free route was refused whenever a mark did stand. A route
+    that spends nothing proves nothing about the balance, either way."""
+    monkeypatch.setenv("TREG_PLATFORM_KEY_DROPLEADS", "PLATFORM-DROPLEADS-KEY")
+    monkeypatch.setenv("TREG_PLATFORM_PROVIDERS", "dropleads")
+    get_settings.cache_clear()
+    monkeypatch.setattr(capacity_marks, "STRIKE_MIN_GAP", timedelta(0))
+    monkeypatch.setattr(call_service, "relay", _by_path({
+        "/mobile-finder": (402, DL_OUT), "/leads/search": (200, b'{"data":[]}')}))
+    try:
+        assert (await _dl(clients, DL_PHONE)).status_code == 402
+        assert (await _lock("dropleads")).strikes == 1
+        assert (await _dl(clients, DL_SEARCH)).status_code == 200
+        assert (await _lock("dropleads")).strikes == 1, "a free 2xx keeps the paid route's strike"
+        assert (await _dl(clients, DL_PHONE)).status_code == 402
+        assert (await _lock("dropleads")).is_active(), "the second strike locks"
+        assert (await _dl(clients, DL_PHONE)).status_code == 503
+        capacity_marks._last_probe.clear()
+        assert (await _dl(clients, DL_SEARCH)).status_code == 200, "the lock never refuses a free route"
+        assert (await _lock("dropleads")).is_active(), "and a free 2xx is no probe"
+
+        await capacity_marks.clear("dropleads", lock_id=(await _lock("dropleads")).lock_id)
+        await _publish("dropleads", exhausted=True, ago=timedelta(minutes=2))
+        assert (await _dl(clients, DL_SEARCH)).status_code == 200
+        assert (await _state("dropleads")).exhausted_until is not None, "nor lifts the sweep's zero"
+        assert (await _dl(clients, DL_PHONE)).status_code == 402, "the paid probe still relays"
+        assert (await _dl(clients, DL_PHONE)).status_code == 503
+    finally:
+        get_settings.cache_clear()

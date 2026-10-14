@@ -8,13 +8,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from .. import adsconv, analytics, health, sandbox as demo_sandbox
+from .. import adsconv, analytics, health, policy, sandbox as demo_sandbox
 from ..config import get_settings
 from ..domain import money as ledger
 from ..domain import referrals
 from ..domain.governance.teams import _make_org_membership, _slugify, reserved_reason
 from ..domain.identity.access import _email_domain, _is_blocked_email, _is_machine_email, _norm_email
-from ..domain.identity.promotions import claim_signup_promo
+from ..domain.identity.promotions import claim_signup_promo, promo_inbox, signup_promo_email
 from ..infra.db import session_maker
 from ..models import Org, User
 from ..timeutil import utcnow_naive as _utcnow_naive
@@ -64,14 +64,15 @@ def blocked_email(email: str, door: str) -> bool:
 
 async def find_or_create_user(
     db: AsyncSession, email: str, *, door: str = "login",
-    created: set[int] | None = None, verified: bool = False,
+    created: set[int] | None = None, verified: bool = False, promo_eligible: bool = True,
 ) -> User:
     """Find a user by email, else register them — the user ONLY, **no auto personal org**. The shared
     core of every identity door (GitHub / Google / email OTP). A brand-new user therefore lands with
     zero teams and is asked to NAME + CREATE their first team (the dashboard's mandatory welcome, or
     `treg org create`) — we never spawn a throwaway personal org they didn't ask for. Their identity
     token is user-scoped, so it works before they have any org (org chosen per-request via X-Treg-Org).
-    Only trusted email-proof callers pass verified=True. Caller commits."""
+    Only trusted email-proof callers pass verified=True. promo_eligible=False creates the user
+    without a signup-credit claim; it never touches an existing user. Caller commits."""
     email = _norm_email(email)
     # Machine identities (agents, the published demo token) are minted by an admin and act ONLY by
     # their token. This is the single choke point every identity door shares, so blocking here means
@@ -85,7 +86,7 @@ async def find_or_create_user(
         raise BlockedEmailError
     user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
     if user is None:
-        user = User(email=email)
+        user = User(email=email, signup_promo_available=promo_eligible)
         db.add(user)
         try:
             await db.flush()  # surfaces the unique-email violation on a concurrent first-login race
@@ -101,12 +102,16 @@ async def find_or_create_user(
     return user
 
 
-def track_signup(user: User, created: set[int], method: str, entry_surface: str) -> None:
-    """Call only after commit. Existing users (including a concurrent signup's loser) emit nothing."""
+def track_signup(
+    user: User, created: set[int], method: str, entry_surface: str, *, captcha: str = "",
+) -> None:
+    """Call only after commit. Existing users (including a concurrent signup's loser) emit nothing.
+    `captcha` is the Turnstile outcome of the code request, when the deployment checks one."""
     if user.id in created:
-        analytics.capture(user.email, "signup_completed", {
-            "signup_method": method, "entry_surface": analytics.funnel_surface(entry_surface),
-        })
+        properties = {"signup_method": method, "entry_surface": analytics.funnel_surface(entry_surface)}
+        if captcha:
+            properties["captcha"] = captcha
+        analytics.capture(user.email, "signup_completed", properties)
 
 
 async def _grant_signup_promo(db: AsyncSession, org: Org, *, user_id: int) -> None:
@@ -122,7 +127,7 @@ async def _grant_signup_promo(db: AsyncSession, org: Org, *, user_id: int) -> No
     org_id = org.id
     amount = get_settings().promo_grant_micro
     try:
-        claimed = amount > 0 and await claim_signup_promo(db, user_id)
+        claimed = amount > 0 and await _policy_grants(db, org_id, user_id) and await claim_signup_promo(db, user_id)
         try:
             await adsconv.queue(db, org, adsconv.ACTION_SIGNUP)
         except Exception as exc:  # noqa: BLE001 - marketing cannot take away the signup benefit
@@ -134,6 +139,25 @@ async def _grant_signup_promo(db: AsyncSession, org: Org, *, user_id: int) -> No
     except Exception as exc:  # noqa: BLE001 - team creation already committed
         await db.rollback()
         logging.getLogger("treg").warning("promo grant failed for org %s: %s", org_id, exc)
+
+
+async def _policy_grants(db: AsyncSession, org_id: int, user_id: int) -> bool:
+    """Ask the `signup_credit` decision point, only for a user who could claim right now.
+
+    The read's transaction ends before the decision so no connection waits on the extension. A
+    deferral writes nothing: the user keeps eligibility and is asked again on their next team.
+    """
+    email = await signup_promo_email(db, user_id)
+    await db.commit()
+    if email is None:
+        return False
+    decision = await policy.registry.signup_credit(policy.SignupCreditContext(
+        user_id=user_id, org_id=org_id, email=email, canonical_inbox=promo_inbox(email),
+    ))
+    if decision is policy.CreditDecision.DEFER:
+        logging.getLogger("treg").info("event=signup_credit_deferred org=%s user=%s", org_id, user_id)
+        return False
+    return True
 
 
 def _ad_attribution_from(raw_cookie: str) -> tuple[str, str, str]:

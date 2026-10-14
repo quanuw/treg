@@ -56,6 +56,10 @@ This keeps OAuth refresh and audience isolation unchanged.
 
 ## Provider authorization remediation
 
+Both call adapters use the shared [Org concurrency guard](org-concurrency.md). Their structured
+results preserve HTTP `Retry-After` as `retry_after`, including the team media adapter, so MCP
+clients can retry a concurrency refusal without access to the internal HTTP response headers.
+
 Provider OAuth remains a human browser action. A catalog-call preflight can return a structured
 HTTP 428 body with the missing or expired grant, capability, scopes, exact CLI command, and safe
 dashboard action. The team MCP `call` tool and directory MCP `catalog_call_read` or
@@ -195,9 +199,9 @@ for Codex, by User-Agent) are not offered `review` at all: `_OpenAIClientGate` d
 `tools/list` and the review sentence from the instructions, and call results carry no review or
 feedback invitation for them, because that review reads agent-initiated rating as analytics
 collection. Other clients keep both. `catalog_request` relays to
-`POST /tool-requests` so rate limiting and field caps live in one place, forwarding the edge's
-`X-Forwarded-For` — the in-process relay would otherwise collapse every MCP caller into one
-rate-limit bucket. `catalog_search`'s zero-result hint names it, so an agent that just searched
+`POST /tool-requests` so rate limiting and field caps live in one place. Like every in-process
+call, it carries the caller's address as `_bearer` resolved it (`client_ip.py`, never the
+client-written `X-Forwarded-For`); otherwise every MCP caller would share one rate-limit bucket. `catalog_search`'s zero-result hint names it, so an agent that just searched
 and found nothing can file the gap in the same session — and the miss itself is logged as a
 `SearchMiss` row (`audit.record_search_miss`, `source="mcp"` on the team MCP and
 `source="claude-connector"` on V2): this tool reads the catalog in-process, so the HTTP route's own
