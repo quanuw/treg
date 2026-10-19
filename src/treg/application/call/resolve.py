@@ -1130,8 +1130,7 @@ def _marketplace_no_credential(
 ) -> ResolutionFailed:
     """Tier 3: the actionable dead-end. Every line names a real command; a pasted-key provider
     gets the `secret add` route too (name it for the service so the ladder finds it)."""
-    lines = [f"no {service} credential in this org — {ep_id} is a catalog tool treg can't serve "
-             f"on its own key here"]
+    lines = [f"no {service} credential in this org — {ep_id} is a catalog tool treg can't serve on its own key here"]
     lines.append(f"  connect one:  treg connections connect --provider {service}")
     if provider.uses_pasted_secret:
         lines.append(f"  or add a key: treg secret add {service} --env-var {service.upper().replace('-', '_')}_API_KEY")
