@@ -448,11 +448,11 @@ async def test_a_json_body_to_a_form_endpoint_is_a_400_hint(clients: AsyncClient
     assert "x-www-form-urlencoded" in r.json()["detail"]
 
 
-async def test_provider_name_404_points_at_the_marketplace(clients: AsyncClient):
+async def test_provider_name_404_points_at_the_catalog(clients: AsyncClient):
     """`treg call tikhub /path` (no such tool) keeps failing, but no longer dead-ends."""
     r = await clients.get("/call/tikhub/api/v1/foo")
     assert r.status_code == 404
-    assert "marketplace provider" in r.json()["detail"]
+    assert "catalog provider" in r.json()["detail"]
 
 
 async def test_unknown_dotted_name_stays_a_plain_404(clients: AsyncClient):

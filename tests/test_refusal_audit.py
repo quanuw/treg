@@ -163,6 +163,7 @@ async def test_a_credential_dead_end_names_a_sibling_treg_can_already_serve(
     detail = response.json()["detail"]
     # The original advice survives — the caller may still want their own Meta token.
     assert "no meta-ad-library credential in this org" in detail
+    assert "is a catalog tool" in detail and "marketplace" not in detail
     assert "treg connections connect --provider meta-ad-library" in detail
     # ...and the sibling is now offered, flagged as servable, so the caller can act immediately.
     assert "another provider serves meta-ads.library.search:" in detail

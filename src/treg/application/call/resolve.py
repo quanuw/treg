@@ -197,9 +197,9 @@ async def _resolve_call(rest: str, caller: Caller, db: AsyncSession) -> Resolved
                     "did_you_mean": own_near,
                 })
         # A bare provider name (`treg call tikhub /path`) stays a miss, but points at the
-        # marketplace form instead of dead-ending — its endpoints are callable without a tool.
+        # catalog form instead of dead-ending — its endpoints are callable without a tool.
         if oauth_providers.get(name) is not None or name in cat.provider_meta:
-            detail += (f" — but {name!r} is a marketplace provider; call its endpoints directly: "
+            detail += (f" — but {name!r} is a catalog provider; call its tools directly: "
                        f"treg catalog search <what you need> → treg call <endpoint-id>")
         raise ResolutionFailed("target_not_found", status_code=404, detail=detail)
     base = tool.base_url.rstrip("/")
@@ -1130,7 +1130,7 @@ def _marketplace_no_credential(
 ) -> ResolutionFailed:
     """Tier 3: the actionable dead-end. Every line names a real command; a pasted-key provider
     gets the `secret add` route too (name it for the service so the ladder finds it)."""
-    lines = [f"no {service} credential in this org — {ep_id} is a marketplace endpoint"]
+    lines = [f"no {service} credential in this org — {ep_id} is a catalog tool treg can't serve on its own key here"]
     lines.append(f"  connect one:  treg connections connect --provider {service}")
     if provider.uses_pasted_secret:
         lines.append(f"  or add a key: treg secret add {service} --env-var {service.upper().replace('-', '_')}_API_KEY")
