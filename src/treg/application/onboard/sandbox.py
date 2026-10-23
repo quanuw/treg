@@ -11,10 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ... import crypto
 from ...domain.governance.teams import cascade_delete_org
+from ...domain.identity.access import SANDBOX_DOMAIN
 from ...models import Membership, Org, Secret, Tool, User
 from ...sandbox_identity import visitor_name
 
-SANDBOX_DOMAIN = "sandbox.treg.local"     # throwaway visitor identities live here (can never log in)
 SANDBOX_TTL_MIN = 60
 MAX_TOOLS = 3                              # a sandbox visitor may register at most this many endpoints
 MAX_SECRETS = 3
@@ -128,7 +128,6 @@ async def export_skill(db: AsyncSession, org: Org) -> dict:
     }
 
 
-# ---- hosted sample skills (the "Run in Claude Code" flow) ---------------------------------
 # Each sample matches a tool the sandbox already seeds, so the installed skill's proxied calls
 # resolve against the visitor's sandbox and return the synthetic response. A skill is just a
 # recipe (SKILL.md) + wiring (treg.json) - the credential stays in the vault; the caller sends
@@ -216,7 +215,13 @@ def install_script(name: str, base: str, token: str | None = None) -> str:
 
 async def gc(db: AsyncSession) -> int:
     """Reap sandboxes older than the TTL - the throwaway user, its org, and every org-scoped row.
-    Runs opportunistically each time a new sandbox is minted. Commits itself."""
+    Runs opportunistically each time a new sandbox is minted. Commits itself.
+
+    Only landing sandbox orgs (`is_sandbox`) are reaped. A visitor that also belongs to any other
+    org is left whole, user and every org, for a person to look at: that should not exist, and
+    deleting it would erase the only record of how it came to."""
+    from ... import sandbox as sandbox_runtime
+
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=SANDBOX_TTL_MIN)
     visitors = (await db.execute(
         select(User).where(User.email.like(f"visitor-%@{SANDBOX_DOMAIN}")))).scalars().all()
@@ -226,23 +231,24 @@ async def gc(db: AsyncSession) -> int:
         ca = ca.replace(tzinfo=None) if (ca is not None and ca.tzinfo) else ca
         if ca is not None and ca >= cutoff:
             continue
-        # One savepoint per visitor. Reaping used to be all-or-nothing: one sandbox that would not
-        # delete aborted the whole loop, and since gc runs only from mint_sandbox, nothing was ever
-        # reaped again until the row was fixed by hand. Now that sandbox is logged and skipped, and
-        # every other expired one still goes.
+        # One savepoint per visitor: a sandbox that will not delete is logged and skipped, and every
+        # other expired one still goes. gc runs only from mint_sandbox, so one bad row must not stop
+        # all reaping.
         nested = await db.begin_nested()
         try:
             mems = (await db.execute(select(Membership).where(Membership.user_id == u.id))).scalars().all()
-            for m in mems:
-                org = await db.get(Org, m.org_id)
-                if org is None:
-                    continue
-                # The shared cascade, never a private table list: the reaper's own copy is what
-                # missed `IdempotentCall` and broke every sandbox mint on 2026-09-02.
+            orgs = [org for m in mems if (org := await db.get(Org, m.org_id)) is not None]
+            if not all(sandbox_runtime.is_sandbox(org) for org in orgs):
+                await nested.rollback()
+                logging.getLogger("treg").warning(
+                    "sandbox user %s belongs to a non-sandbox org; kept for review", u.id)
+                continue
+            for org in orgs:
+                # The shared cascade, never a private table list.
                 await cascade_delete_org(org, db)
             await db.delete(u)
             await db.flush()
-        except Exception:  # noqa: BLE001 - a reaper bug is logged per sandbox, never propagated
+        except Exception:
             await nested.rollback()
             logging.getLogger("treg").exception("could not reap sandbox user %s; skipping", u.id)
             continue

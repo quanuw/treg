@@ -59,6 +59,11 @@ sources:
   - src/treg/alembic/versions/0073_org_flow_control_version.py
   - tests/test_org_flow_control_schema.py
   - src/treg/alembic/versions/0075_ad_click_stash.py
+  - src/treg/alembic/versions/0079_enterprise_sso.py
+  - src/treg/alembic/versions/0082_oauth_sso_provenance.py
+  - src/treg/alembic/versions/0083_enterprise_sso_safety.py
+  - src/treg/alembic/versions/0084_enterprise_workos_cleanup.py
+  - src/treg/alembic/versions/0085_enterprise_sso_blocks.py
   - src/treg/timeutil.py
   - src/treg/infra/db.py
   - src/treg/infra/money_timing.py
@@ -92,6 +97,24 @@ related:
 ---
 
 # Data model
+
+Revision `0077` adds the empty `TeamDatabase` and `TableDoc` control-plane tables for
+[Workbench table storage](workbench-storage.md#management-metadata). It does not provision remote
+databases or business rows. Existing tables and data are unchanged by the migration.
+
+Migration `0079` adds `EnterpriseSSO` for a team's plan, subscription state, WorkOS organization,
+connection and directory; `EnterpriseSSOIdentity` for a stable team-specific SSO profile link;
+`EnterpriseDirectoryUser` for the directory roster, including users who have never signed in;
+and `EnterpriseSSOEvent` for WorkOS webhook deduplication. Team deletion removes the team-scoped
+rows before its `Org`, and active subscriptions block team deletion until canceled.
+Migration `0083` records whether SSO created a membership, makes an IdP subject unique within
+its team, reserves one pending enterprise Checkout per team, and marks keys issued under SSO
+enforcement. Existing keys have no SSO issuance proof and cannot enter an enforced team.
+Migration `0084` records when WorkOS cleanup completes. That marker keeps cancellation retries
+idempotent and prevents a new checkout while billable WorkOS resources may remain.
+Migration `0085` backfills and stores manual removal decisions separately from identity rows in minimal
+`EnterpriseSSOBlock` rows. Those rows survive connection cleanup, but leave with the team or
+the erased user; they contain no email or WorkOS identifiers.
 
 Migration `0043` adds `ProviderResource`, the durable organization-owned counterpart to the existing
 async ownership rows. It stores provider, resource kind, upstream id, display name, creator, source
@@ -186,11 +209,6 @@ An application rollback leaves the table in place; a schema downgrade deletes it
 
 ## Registry tables
 
-- **`OnboardingProfile`** - one new user's first-run lookup: `user_id` (unique, no FK, like
-  `ArenaRun`), the team it made, `status` (pending | running | done | failed), an encrypted payload
-  (setup rows, evidence, ranked tasks, filled inputs) and what the lookup cost the house team.
-  Revision `0062`; `application.onboard.first_run` is the only writer. See
-  [onboarding](../interface/onboarding.md#the-first-run-flow-onboarding_v2).
 - **`Feedback`** - durable team-scoped problem reports and suggestions. Contains the submitted
   category/message/references, authenticated org and user attribution, and the references verified
   against that team's call records or ledger. Revision `0025`; `domain.feedback` owns inserts;
@@ -226,9 +244,6 @@ uses this metadata, never the encrypted token's shape.
   FIRST page, first touch wins, 90 days), persisted once at signup in both doors. This is the column
   set that answers "how many teams did campaign X bring" - the `ad_*` columns only know Google
   clicks. `utm_referrer` is the referring hostname, kept even when no `utm_*` tag was present.
-  The first page itself is a separate first-touch cookie, `treg_landing` (path only, set on every
-  first visit, utm or not); it is ranking evidence for the first-run onboarding and is not stored
-  on the team.
   **`first_call_at`** (same migration as `ad_*`) -
   set once by a guarded UPDATE in the `/call/` handler,
   deliberately NOT derived from `CallRecord` (which `audit.py` sheds under load, undercounting exactly
@@ -248,7 +263,7 @@ uses this metadata, never the encrypted token's shape.
   pair.** `ROLE_RANK` orders the roles.
 - **`ApiKey`** — a credential control row. It keeps `org_id`, nullable `membership_id`, the retained
   identity label, kind, name, safe prefix, optional unique SHA-256 hash, state, `default_generation`, lifecycle times,
-  creator, and replacement id. A human membership has one `default_human` row for signed identity
+  creator, replacement id, and optional SSO issuance team. A human membership has one `default_human` row for signed identity
   keys and can have many `additional_human` rows. A scoped agent has one current `agent` row.
   `legacy_human` rows keep old stored membership tokens working during the compatibility release;
   new human memberships leave the old token-hash field empty and do not create legacy rows.

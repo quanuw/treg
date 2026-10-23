@@ -16,7 +16,6 @@ from sqlmodel import select
 
 from treg.application import asynctasks as task_app
 
-_real_poll = task_app._poll
 from treg.application.call import service as call_service
 from treg.application.call.resolve import MarketplaceCall
 from treg.application.call.types import UpstreamResponse
@@ -32,6 +31,8 @@ from treg.models import (
     Tool,
 )
 from treg.timeutil import utcnow_naive
+
+_real_poll = task_app._poll
 
 
 EP = "replicate.image-gen.flux-schnell"
@@ -788,7 +789,8 @@ async def test_byok_task_status_keeps_direct_provider_object_access(
 
 @pytest.mark.parametrize(("start", "payload", "created", "owned_calls"), [
     (
-        "/call/brightdata.web.scrape.job.start?dataset_id=gd_test", [{"url": "https://example.com"}],
+        "/call/brightdata.linkedin.user.profile?dataset_id=gd_l1viktl72bvl7bjuj0",
+        {"input": [{"url": "https://www.linkedin.com/in/example"}]},
         {"snapshot_id": "snapshot-owned"},
         [
             "/call/brightdata.web.scrape.job.status?snapshot_id=snapshot-owned",
@@ -797,7 +799,7 @@ async def test_byok_task_status_keeps_direct_provider_object_access(
     ),
     (
         # an extended dataset row on the sync runner: past a minute it answers 202 + snapshot_id
-        "/call/brightdata.x.amazon-reviews?dataset_id=gd_le8e811kzy4ggddlq",
+        "/call/brightdata.x.amazon-products?dataset_id=gd_l7q7dkf244hwjntr0",
         {"input": [{"url": "https://www.amazon.com/dp/B000000000"}]},
         {"snapshot_id": "snapshot-extended"},
         ["/call/brightdata.web.scrape.job.results?snapshot_id=snapshot-extended&format=json"],
@@ -1480,7 +1482,7 @@ async def test_cancellation_at_the_pending_row_commit_boundary_leaves_a_coherent
 
     monkeypatch.setattr(task_app, "defer_submission", defer_then_cancel)
     # The request path re-raises CancelledError after compensating; the ASGI client surfaces it.
-    with pytest.raises(BaseException):
+    with pytest.raises(asyncio.CancelledError):
         await _submit(clients, monkeypatch, {
             "id": "prediction-cancel", "urls": {"get": "https://api.replicate.com/v1/predictions/c"}})
     async with session_maker() as db:

@@ -67,6 +67,9 @@ jobs:
       - name: Enforce import boundaries
         if: steps.docs.outputs.only != 'true'
         run: uv run --locked lint-imports
+      - name: Lint
+        if: steps.docs.outputs.only != 'true'
+        run: uv run --locked ruff check
       - name: Validate the catalog
         if: steps.docs.outputs.only != 'true'
         # The whole catalog, not the slices the tests exercise: a catalog data PR is gated here.
@@ -154,6 +157,7 @@ jobs:
           tests/test_asynctasks.py
           tests/test_alembic_baseline.py
           tests/test_org_flow_control_schema.py
+          tests/test_workbench_table_schema.py
           tests/test_redundant_index_migration.py
           tests/test_callrecord_call_ref_index_migration.py
           tests/test_enrich_arena.py

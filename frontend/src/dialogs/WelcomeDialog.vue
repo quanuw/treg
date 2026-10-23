@@ -6,17 +6,10 @@ export default { components: { BrandMark, TregAgentPicker, TregSetupInstructions
 </script>
 
 <template>
-<div class="scrim" role="dialog" aria-label="Set up your team" aria-modal="true" v-dialog>
-      <div class="modal" :style="{width: welcome.step===0?'min(470px,94vw)':(welcome.step===3?'min(680px,94vw)':'min(560px,94vw)')}">
+<div class="scrim" role="dialog" aria-label="Set up your team" aria-modal="true" v-dialog="welcomeFinish">
+      <div class="modal" :style="{width: welcome.step===3?'min(680px,94vw)':'min(560px,94vw)'}">
         <div style="padding:26px 26px 22px">
-          <template v-if="welcome.step===0">
-            <div class="brand" style="color:var(--accent);font-size:15px;letter-spacing:.5px;margin-bottom:12px"><BrandMark/>treg</div>
-            <h2 style="margin:0 0 8px;font-size:20px">Welcome{{me?', '+me.split('@')[0]:''}} 👋</h2>
-            <p class="sub" style="margin:0 0 18px">Create your team — it's where you keep API keys and skills so your teammates and their agents can call them <b>without holding the keys</b>. You can invite people and add secrets right after.</p>
-            <div class="field"><input v-model="welcome.name" placeholder="Team name, e.g. Superdesign" @keyup.enter="welcomeCreate"/></div>
-            <button class="btn primary" style="width:100%;margin-top:4px" @click="welcomeCreate" :disabled="welcome.busy">{{welcome.busy?'Creating…':'Create team →'}}</button>
-          </template>
-          <template v-else-if="welcome.step===1">
+          <template v-if="welcome.step===1">
             <div class="brand" style="color:var(--accent);font-size:15px;letter-spacing:.5px;margin-bottom:12px"><BrandMark/>treg</div>
             <h2 style="margin:0 0 8px;font-size:20px">Which agent are you using?</h2>
             <p class="sub" style="margin:0 0 18px">Choose your agent for the best setup instructions.</p>
@@ -40,7 +33,6 @@ export default { components: { BrandMark, TregAgentPicker, TregSetupInstructions
               <button class="btn primary" @click="track('tryit_browse_catalog',{from:'onboarding'}); welcome.on=false; go('catalog')">Browse all catalog →</button>
             </div>
           </template>
-          <div v-if="welcome.err" class="banner" style="margin-top:12px">{{welcome.err}}</div>
         </div>
       </div>
     </div>

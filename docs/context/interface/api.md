@@ -276,6 +276,23 @@ line, and `treg --json call` puts it in `_treg.upstream_failed`. A routed child 
 is a `miss` whose `detail` names the failed value. Absent on an overflow answer, an idempotent
 replay, and every unmetered call.
 
+## `X-Treg-Capacity` - treg's own account for this tool is out
+
+`exhausted` on a platform-tier answer the capacity signature table reads as a balance or quota
+signature (`ops/capacity.md`), whatever the status: a 402, Apollo's 422, an out-of-credit 2xx.
+The body is relayed untouched; the header is how a caller learns the refusal is treg's account,
+not its balance and not its key. It is absent on a team's own key, on treg's own refusals
+(`X-Treg-Error`), on an overflow answer, on an idempotent replay and on an owned free poll. It is
+set from the same signal that strikes the capacity breaker (`_note_capacity_signal`), so the
+capacity events that alert are always behind it; a free route on treg's key carries it too. The MCP `call` result omits the provider's body, sets `whose_error: treg` and
+gives one notice as `hint` (`src/treg/capacity_notice.py`): the tool is temporarily unavailable on
+treg's side, the team has been notified (the capacity events alert), the caller was not charged
+when `X-Treg-Cost-Micro` is `0`, and another tool can serve meanwhile. `treg call` prints the same
+notice on stderr and `treg --json call` sets `_treg.capacity`. Only treg's own
+`error: insufficient_balance` (with `X-Treg-Error`, not a replay) is called the team's balance, by
+MCP's hint and `treg call`'s top-up line; a provider's 402 on the team's own key is marked
+`whose_error: provider`, and `route_max_cost` is the caller's ceiling.
+
 ## `X-Treg-Smoothed` - the call waited for treg's own rate limit
 
 On platform calls, including owned free polling: `wait=<ms>` when the call was spaced behind other callers on the
@@ -334,7 +351,8 @@ Each successful identity dependency commits its read-only transaction before the
 application use case can open its own session without waiting behind the request's pool slot. The
 dependency-cached session remains usable because every session maker sets `expire_on_commit=False`.
 `require_superadmin` stays on the admin primary pool through `get_admin_session`, shared with
-primary admin handlers. `/admin/errors` uses `get_admin_read_session` for evidence and org names
+primary admin handlers. `/admin/errors` and `/admin/daily` (per-day calls and per-job answers from
+`endpointdaystat`, optionally split out for one provider) use `get_admin_read_session` for their reads
 after the gate releases its connection: a configured reader, otherwise the original admin pool.
 It accepts replication lag for the report, never for authorization, and never retries a failed
 reader on the primary (see [super-admin](../architecture/super-admin.md)).
@@ -500,26 +518,16 @@ shared HTTP client. `/auth/logout` remains an HTTP-only cookie action.
   client then scrubs the injected value from the CLI's output (see [local-run](../architecture/local-run.md)).
   `report_local_run` (`POST /tools/{name}/run-report`) takes the client's verdict enum (never raw output);
   `credential_invalid` marks the injected secret(s) invalid via the health fields, skipping `param` kind.
-- **Server runs (`treg run --server`):** `POST /run` accepts `{tool, args, timeout_s}` and
-  executes the org-scoped tool's `Tool.cli` profile through `runner.run_tool`. Secrets enter a
-  scrubbed child environment, argv is an array, and the process gets its own temporary home.
-  A profile is server-runnable without local-run opt-in, but tool/project ACL, deny rules, member
-  usage caps, global/per-user concurrency limits and the executable allowlist still apply.
-  `runner.resolve_exec_bin` is shared by validation and execution; allowed commands come from
-  the catalog or `TREG_RUN_ALLOWED_BINS`. The sandbox cannot run commands.
+- **Server runs (`treg run --server`):** `POST /run` unconditionally returns 503 with
+  `Server-side CLI execution is disabled`. The handler has no body, authentication or database
+  dependencies and cannot reach the runner. This applies to every caller, including ordinary teams
+  and sandbox visitors; CLI profiles and `TREG_RUN_ALLOWED_BINS` cannot re-enable it. `_tool_view`
+  reports `server_runnable: false` for every tool. Scrubbed environments and resource limits are not
+  a filesystem/process isolation boundary.
 
-  The response is `{stdout, stderr, exit_code, timed_out}`; a nonzero child exit is a normal 200,
-  startup/configuration errors are 4xx, and exhausted run slots return 429. `RunRecord.bundle_name`
-  stores the tool name for compatibility. `GET /runs` merges server records with local grants,
-  tagged `where=server|local` and `s|l`-prefixed ids. Run settings are managed through
-  `Tool.cli`, not bundle runtime metadata. See [local-run](../architecture/local-run.md).
-  - **Resource-limit sandbox (`runner.py`, the DoS half of the server-run sandbox):** every server-run
-    child is spawned with POSIX rlimits via a `preexec_fn` (`_spawn_preexec`/`_rlimit_preexec`) - a
-    CPU-seconds cap, a max-file-size cap, and core dumps disabled (a core would spill the injected secret
-    to disk). Env-gated (`TREG_RUN_RLIMITS` on by default; `TREG_RUN_CPU_SECONDS`, `TREG_RUN_FSIZE_MB`),
-    a no-op where `resource` is unavailable. Deliberately **no** address-space or process-count cap - a
-    virtual-memory cap crashes Go CLIs (gh/stripe/doctl) and `RLIMIT_NPROC` is per-uid, shared with the
-    server. Full **filesystem/network** isolation needs a container deploy and is a planned follow-up.
+  `GET /runs` still merges historical server records with local grants, tagged `where=server|local`
+  and `s|l`-prefixed ids. `RunRecord.bundle_name` stores the tool name for compatibility. Local grants
+  and execution retain their existing authorization. See [local-run](../architecture/local-run.md).
 - **Meta:** `meta` (`GET /meta`, open) → `{public_url, github, google, app_version, treg_version,
   posthog_key/posthog_host, intercom_app_id, hub, referral, paused_providers}` for the dashboard.
   `paused_providers` is `{service: {display_name, message}}` for `TREG_PAUSED_PROVIDERS`, empty by default. `referral` carries the
@@ -634,8 +642,7 @@ shared HTTP client. `/auth/logout` remains an HTTP-only cookie action.
   permanent keys; missing `tv` means zero. New scoped credentials do not change those compatibility
   rules. `POST /auth/revoke-tokens` bumps the version and
   returns a replacement cookie/token for the caller. `/auth/logout` is a same-origin cookie action.
-  Onboarding routes are `POST /onboard/demo|skip|reset`, and behind `onboarding_v2`
-  `POST /onboarding/start` + `GET /onboarding` + `POST /onboarding/answer`; see [onboarding](onboarding.md).
+  Onboarding routes are `POST /onboard/demo|skip|reset|team`; see [onboarding](onboarding.md).
 
   The shared dependencies resolve a membership token, a team Default key, a legacy identity bearer
   plus `X-Treg-Org`, or a session cookie plus `X-Treg-Org`. Bootstrap credentials cannot access team
@@ -656,8 +663,7 @@ shared HTTP client. `/auth/logout` remains an HTTP-only cookie action.
   `sitetrack_js` (`GET /sitetrack.js`, no-cache) serves `web/sitetrack.js` with `{POSTHOG_KEY}` /
   `{POSTHOG_HOST}` templated from settings: the always-on first-party `treg_utm` first-touch cookie
   (utm_* + referring host, read by `_utm_attribution_from` / `_stamp_utm` in BOTH signup doors, `/users`
-  and `/orgs`), the first-touch `treg_landing` path cookie (read by the first-run onboarding as
-  ranking evidence) plus the PostHog bootstrap with pageviews ON. Loaded by every public page - landing,
+  and `/orgs`) plus the PostHog bootstrap with pageviews ON. Loaded by every public page - landing,
   use-case pages, resources, tutorial, and the SPA - so analytics sees the visitor's first hop rather
   than the post-OAuth `/app` landing. Without a key the analytics half is inert (empty string).
   `adtrack_js` (`GET /adtrack.js`, no-cache) serves the first-party ad-click capture script loaded by
@@ -702,8 +708,10 @@ shared HTTP client. `/auth/logout` remains an HTTP-only cookie action.
   "List as vendor" modal hands vendors a prompt naming this URL; the repo-side counterpart is
   `docs/VENDORS.md`).
   Browser-facing auth pages (GitHub callback, OAuth-connect result) render via `_auth_page` (brand card).
-- **Landing sandbox + hosted skills:** `demo_sandbox_mint` (`POST /demo/sandbox`, open, per-IP
-  rate-limited) mints an anonymous throwaway team (its response now carries `live` = whether the seeded
+- **Landing sandbox + hosted skills:** the landing sandbox is **closed**: `POST /demo/sandbox`
+  returns 410 and authentication refuses every sandbox visitor token with 403
+  ([landing-sandbox](landing-sandbox.md)); the rest of this entry describes the unreachable code
+  awaiting removal. `demo_sandbox_mint` (`POST /demo/sandbox`, open, per-IP rate-limited) minted an anonymous throwaway team (its response now carries `live` = whether the seeded
   stripe tool is a real wire); `demo_sandbox_skill` (`GET /demo/sandbox/skill`) exports what the visitor
   built. `skill_samples` (`GET /skills/samples`, open) + `skill_install`
   (`GET /skills/{name}/install.sh?token=`) host sample skills. `call_tool` short-circuits **sandbox**
@@ -952,9 +960,9 @@ why that widening must be kept out of the schema.
 treg is an OAuth authorization server for its own MCP endpoint. Detail in
 `architecture/mcp-oauth.md`; this is the surface.
 
-    GET  /.well-known/oauth-protected-resource      what guards /mcp/ (served at BOTH v1 lookup paths)
+    GET  /.well-known/oauth-protected-resource      what guards /mcp/ (also at /mcp and /mcp/ below it)
     GET  /.well-known/oauth-protected-resource/mcp/v2
-                                                    distinct metadata for /mcp/v2/
+                                                    distinct metadata for /mcp/v2/ (also at .../v2/)
     GET  /.well-known/oauth-authorization-server    endpoints, S256, DCR + CIMD support
     POST /oauth/register                            dynamic client registration (RFC 7591)
     GET  /oauth/authorize                           the consent screen (JSON with Accept: application/json)
@@ -1026,7 +1034,7 @@ The response has no id because Starlette owns it, but treg records the row and o
 `tool_called` event before re-raising. Failures before `execute_call`, plus body-stream failures after
 the handler returns its `StreamingResponse`, are not covered by that compensation path.
 
-A direct metered `/call/` honours **`X-Treg-Route-Max-Cost: <usd>`** as a hard per-call ceiling
+A direct metered `/call/` honours **`X-Treg-Route-Max-Cost: <usd>`** as a per-call ceiling
 (`service._set_caller_max_cost` and `reserve._platform_reserve`): when the reserve with margin would exceed it the
 call is refused **402** `error: route_max_cost` (`max_cost_micro`, `estimated_cost_micro`, no charge,
 audited `refused_by=balance` like every 402) — the same header and body shape the routed path uses,
@@ -1034,7 +1042,12 @@ so one agent-side handler covers both. Unlike `/do/` there is NO default on a di
 who named the endpoint and page size is uncapped unless they send the header. A non-numeric value is
 a 400. Routed children receive the unspent part of the route ceiling, including the default ceiling;
 this same reservation check also applies to overflow at its own price. Refusing a child cannot
-undo earlier paid attempts. Asked for by a customer whose runner approved $0.23 and was billed $0.56 (2026-09-04).
+undo earlier paid attempts. Where the catalog declares `ceiling_param`, treg also forwards the
+largest provider charge that still settles within the remaining ceiling after platform margin
+(the ceiling itself when the margin is 0), and never replaces a value the caller already sent,
+so settlement on a provider that reports its own charge cannot exceed the ceiling. The
+provider's refusal is a non-2xx and is not charged. For every other provider the header remains a
+pre-reservation guard. Asked for by a customer whose runner approved $0.23 and was billed $0.56 (2026-09-04).
 
 Metered responses also carry `X-Treg-Cost-Micro`; a reserved call that fails before a provider answer
 carries an explicit `0`. That `0` is what the call ends up costing, but the **balance can lag it**:
@@ -1104,6 +1117,14 @@ make a team. A failed grant recovers by rolling the session back, which expires 
 tracks - so both doors read their response fields *before* granting, and the redemption revives an
 expired `user`/`org` with `db.refresh` before touching them. The recovery path costs the team its
 credit, never the signup response or the referral attribution.
+
+## Payment history
+
+`GET /billing/history` serves the team's unified payment history. Its `kind` filter accepts
+`all`, `manual`, `auto`, or `subscription`; `cursor` pages newest first. Top-up amounts come from
+credited ledger entries, while SSO amounts and invoice documents come from Stripe. A paid SSO
+invoice includes a receipt URL only when Stripe has a successful Charge receipt for it. Stripe
+document failures do not remove ledger-backed top-up rows.
 
 ## Optional checkout attribution
 

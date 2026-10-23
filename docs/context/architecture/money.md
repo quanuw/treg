@@ -11,6 +11,12 @@ sources:
   - src/treg/domain/asynctasks/__init__.py
   - src/treg/models.py
   - src/treg/application/billing.py
+  - src/treg/routers/billing.py
+  - frontend/src/state/billing.js
+  - frontend/src/state/data.js
+  - frontend/src/pages/TeamPage.vue
+  - src/treg/application/enterprise_billing.py
+  - src/treg/routers/enterprise_sso.py
   - src/treg/application/call/idempotency.py
   - src/treg/application/call/intake.py
   - src/treg/application/call/resolve.py
@@ -55,6 +61,7 @@ sources:
   - tests/test_archive_batch_postgres.py
   - scripts/bench_money_admission.py
   - tests/test_marketplace_call.py
+  - tests/test_anyapi_cost_ceiling.py
   - tests/test_asynctasks.py
 related:
   - architecture/catalog.md
@@ -64,6 +71,42 @@ related:
 ---
 
 # Money
+
+## Enterprise SSO subscription
+
+The team dashboard displays the amount of each active flat monthly USD Stripe Price.
+`TREG_ENTERPRISE_SSO_BUNDLE_ONLY=false` exposes both plans; the default exposes only the bundle.
+Each offered plan needs a reusable Stripe Price ID
+(`TREG_ENTERPRISE_SSO_BUNDLE_PRICE_ID`, or `TREG_ENTERPRISE_SSO_ONLY_PRICE_ID` when enabled).
+`billing.catalog` reads Prices outside a database session and hides unusable or unconfigured plans;
+the API returns integer cents and the Price ID for display. A deployment may set separate minimum
+monthly USD prices for the two plans; a cheaper Price is hidden and rejected at checkout.
+`billing.status` reads existing subscription state without Stripe I/O for entitled teams, and
+never fetches Prices for non-owner callers, so a Price API failure cannot hide setup or cancellation
+controls or delay a member's team page. `billing.start_checkout` rejects a
+stale Price ID from an older page, then retrieves the configured Price again
+outside a database session and verifies its active state, flat fee, USD currency, and monthly interval
+before sending that Price ID to Checkout. This avoids creating a new Stripe
+Product and Price for every team. A pricing change creates a new Price ID for future checkouts;
+existing subscriptions retain their original Price unless explicitly migrated.
+The existing signed billing webhook records subscription status and gates WorkOS setup/sign-in on
+`active`, `trialing`, or `past_due` while Stripe retries; a redirect from Checkout grants nothing. Subscription metadata binds the
+event to a team and plan, and the Stripe customer must match that team. Older Stripe events cannot
+restore an entitlement after a later cancellation. Owners can schedule cancellation at period end;
+Checkout uses one pending reservation per team and an idempotent Stripe session request, so
+concurrent clicks cannot create parallel subscriptions. When paid entitlement ends, enforcement
+is lifted; `past_due` retains SSO and Directory Sync while Stripe retries payment. Cancellation
+removes only SSO-created memberships and their keys. Pre-existing members
+keep their memberships. Team deletion
+waits until the subscription has ended. This subscription never credits or debits the
+prepaid tool-call balance, so the five ledger entry kinds remain unchanged.
+Payment history combines prepaid top-ups and SSO subscription invoices. A paid SSO invoice can
+also link to its Stripe receipt when its successful Charge has a receipt URL. A missing receipt
+never hides the invoice; zero-amount or non-card invoices may have no receipt.
+After the paid period ends, the enterprise cleanup worker deletes every WorkOS connection and
+directory belonging to the team's verified WorkOS organization. It retries failures and prevents
+a new checkout or team deletion until cleanup finishes, without holding a database connection
+across WorkOS I/O.
 
 TrestleIQ charges USD 0.015 for Phone Validation, USD 0.03 for Real Contact, and USD 0.01 for
 Address Validation. Every HTTP 200 response is billable, including a negative verdict; 4xx and 5xx
@@ -625,7 +668,13 @@ when a user re-enables auto-top-up and resets the local failure counter. An inco
 lookup leaves the attempt unresolved and counts toward the consecutive-failure limit without
 changing the invoice key. Each unknown outcome is logged as an error. At the limit, auto top-up is
 paused with a specific billing banner and email asking the customer to check billing history and
-contact support. A later manual top-up does not advance the invoice lookup boundary. Before any
+contact support. A confirmed automatic payment ends that pause: the synchronous credit and the
+payment webhook for an automatic invoice both re-arm a policy paused as `stripe_unconfirmed` (one
+invoice serves each refill until it is credited, so that payment is the one in doubt), and a manual
+payment does not. A Stripe refusal naming the payment method (usually a saved card removed from the
+customer) charged nothing, so it is not unconfirmed: the card is forgotten and the policy waits as
+`no_card` until a payment or setup saves a new one. A card saved while that attempt ran is kept and
+leaves the policy on; a deliberate off made meanwhile stays off. A later manual top-up does not advance the invoice lookup boundary. Before any
 credited automatic top-up, the lookup checks the full customer invoice history.
 The cooldown, cap, ledger crossing, last automatic credit, and billing email are read before the
 Stripe sequence; `attempt_auto_topup` then releases the database transaction and retains only the
@@ -701,7 +750,8 @@ SetupIntent in that flow: `_set_default_pm` - called by both `_on_checkout_compl
 the policy back on from `no_card` once a card exists, and from repeated declines
 (`max_attempts:*`) only when the card is proven: it just paid (`paid=True`, both payment webhooks)
 or it is a newly saved card. The declined card saved again is not proof. A successful manual payment
-also re-arms a policy paused for 3DS (`authentication_required`). A deliberate off (reason `None`,
+also re-arms a policy paused for 3DS (`authentication_required`); a successful automatic payment
+also re-arms one paused as `stripe_unconfirmed`. A deliberate off (reason `None`,
 consent still on file) stays off; a redelivered payment webhook must not switch a deliberately
 disabled policy back on.
 
@@ -712,7 +762,7 @@ PaymentIntent is the payment. Note also that invoice creation can be **priced se
 and Stripe invoice emails depend on Customer emails → Successful payments being enabled in the
 dashboard. treg's own receipt email is sent independently.
 
-**`list_payments` reads rows from us and documents from Stripe.** The payment list is built from our
+**`get_payment_history` merges top-ups and SSO invoices for the Team Billing tab.** The top-up rows are built from our
 own `CreditBlock` rows - the same table the balance is computed from, so the history can never show a
 payment the balance disagrees with, and amounts and dates need no network call. Stripe is asked only
 for the links, in two list calls (`Charge.list` + `Invoice.list`, joined through invoice payments or
@@ -720,8 +770,14 @@ the legacy charge invoice field) rather than two
 per row; a failure degrades to rows without links and reports `stripe_ok: false`, because a Stripe
 hiccup should cost the payer a download button, not their payment history. Both Stripe windows cap at
 100 payments, so a very old top-up on a busy account comes back link-less - the portal is the
-unbounded archive. The dashboard marks these credited payments Paid and shows separate invoice and
-Stripe receipt links when each exists; the invoice PDF can still show the amount originally due.
+unbounded archive. SSO invoice rows use Stripe's own total, status and document links, and never
+add to the prepaid balance. `_subscription_invoices` scans the team's Stripe customer invoices and
+selects invoices whose subscription metadata identifies this team (or whose subscription ID matches
+its current SSO subscription); this includes an earlier subscription after cancellation and
+re-purchase without mixing in top-up invoices. The API's `kind` filter and per-source cursor build
+one newest-first page across both kinds; the dashboard has All, Manual top-ups, Auto top-ups and
+Subscriptions filters with Previous/Next controls. Stripe invoice failure is reported separately
+as `subscription_invoices_ok: false` while the ledger-backed top-ups remain visible.
 
 **`create_portal_session` is the self-serve surface** for card, billing address, tax ID and the full
 invoice archive: hosted, because every one of those is a form we would otherwise own and the tax-ID
@@ -735,6 +791,24 @@ consent (the PSD2/SCA mandate, a compliance requirement rather than a checkbox),
 cooldown stamped in the DB *before* the charge so a second web worker sees it, a consecutive-failure
 limit, and an idempotency key derived from the threshold crossing - so a burst of concurrent calls
 that all notice the low balance produces exactly ONE charge.
+
+The monthly cap counts automatic top-ups only (`monthly_autotopup_spend`, from the ledger) and
+refuses a charge that would pass it (`autotopup_cap_reached`). Neither dashboard path names a cap,
+so a stored 0 resolves to the single-top-up ceiling (`TOPUP_MAX_USD`) and moves with it; `treg
+topup --cap` stores a lower one (0 restores the default), and a cap below one refill is refused. The
+billing page shows the month's automatic spend against the limit, and a banner from
+`billing_state.autotopup.cap_reached` when the next charge would pass it. The inline credit in
+`attempt_auto_topup` emits `topup_completed` (`auto: true`) itself: the webhook that follows finds
+the PaymentIntent credited and emits nothing.
+
+The stamp is a compare-and-set, not a plain write: `attempt_auto_topup` updates
+`autotopup_last_attempt_at` only where it still holds the value the attempt read. `_lock` is per
+process, so web processes and instances that read the same old stamp all reach this UPDATE; only
+the first matches, and the rest return `cooldown` before any Stripe call. Without it, every process
+drove the same invoice at once, Stripe answered the losers with 409, each 409 counted as a failure,
+and auto top-up switched itself off while the one real payment went through. A 409 that still
+arrives (`stripe_busy`) means Stripe is running another request on the invoice; it is logged and is
+not a failed attempt.
 
 The wait between charges (`billing.autotopup_wait_s`) is one hour after a FAILED charge
 (`autotopup_cooldown_s`), else one hour divided by the team's `autotopup_max_per_hour` (0 = the
@@ -752,13 +826,13 @@ and an invoice archive are the org's money, not a member's preference.
 `GET /orgs/{id}/balance` is different, and deliberately so. Any **member** sees the figure and the
 in-flight holds; the **funding detail** (credit blocks, the ledger) stays admin+. It used to be
 admin-only, which meant a machine identity could not read the balance it was spending - while every
-402 already hands the caller `balance_micro`, and both `llms.txt` and `skill.md` tell an agent to run
-`treg balance` after a call. Refusing the number there while shipping it in an error was incoherent.
+402 already hands the caller `balance_micro`, and `skill.md` points an agent at `treg balance` when
+the balance runs out. Refusing the number there while shipping it in an error was incoherent.
 (Reported by Jason, 2026-08-07.)
 
 The 402 also carries `autotopup_enabled` and an `auto top-up:` line in `message`. Off → the one
 command that turns it on. On → the amount, threshold, charges per hour and monthly cap, plus the flags that
-raise them - because a team that is out of money *with* auto top-up on is being held by the cooldown
+raise the refill rate (`--amount`, `--per-hour`) - because a team that is out of money *with* auto top-up on is being held by the cooldown
 or the cap, and "add funds" alone reads as "auto top-up is broken" (cobl.ai, 2026-08-25: ~1,500
 refusals between hourly $20 refills against a $60/day burn). The org fields are read **before**
 the application reservation transaction: its rollback cannot be a source for refusal rendering after
@@ -1238,7 +1312,19 @@ check (`X-Treg-Route-Verify`, catalog.md) is one more such child: it gets what t
 its refusal leaves the find charged and the check unrun. A refusal is a 402
 `route_max_cost` and moves no money for that attempt. Overflow inherits the same field via its
 child snapshot and checks its own estimate; a preceding direct charge reduces the remainder.
-This is a pre-reservation guard, not a rewrite of provider-reported settlement evidence.
+
+When the catalog declares `ceiling_param` (`{in: query, name, unit: usd}` on the provider file, or
+on that endpoint's `cost`), and `max_cost_micro` is set, and the caller did not already send that
+query name, the call application appends `name=<USD>` to the outbound query before `relay()`. The
+USD figure is the largest provider charge that still settles within the caller's ceiling after
+`with_margin` (which rounds up). At margin 0 that is the ceiling itself. AnyAPI's parameter is
+`max_cost_usd`: the provider refuses a source dearer than that price with HTTP 400
+`max_cost_exceeded` and no charge, so a failover cannot settle above the ceiling. That 400 stays a
+non-2xx uncharged relay; a routed waterfall treats it as a failed attempt and may move on. An
+explicit caller value is never rewritten. The appended pair is not part of the inbound query, so
+it does not change `params_hash` or the archive key. For every other provider the ceiling remains
+a pre-reservation guard: provider-reported settlement can still exceed the estimate the guard
+checked.
 
 ## Overflow money
 

@@ -65,7 +65,7 @@ PUBLIC_BASE = "https://treg.to"
 
 CODEX_TARGET = ROOT / "plugin" / "skills" / "treg" / "SKILL.md"
 CLAUDE_TARGET = ROOT / "skills" / "treg" / "SKILL.md"
-# Cursor's layout is prescribed by github.com/cursor/plugin-template: a marketplace manifest at the
+# Cursor's layout is prescribed by github.com/cursor/plugin-template: a listing manifest at the
 # repo root, and every plugin under `plugins/<name>/` with its OWN `.cursor-plugin/plugin.json`.
 # Unlike Claude Code, the plugin root is never the repo root — `source` must be `./plugins/treg`.
 CURSOR_TARGET = ROOT / "plugins" / "treg" / "skills" / "treg" / "SKILL.md"
@@ -128,10 +128,9 @@ ask the human for - treg adds the provider credential on its server.
 """
 
 # Cursor now ships MCP alongside the skill, so its bootstrap is closer to Codex: check for the tools
-# first, and fall back to CLI only if they are not there. The MCP config uses `${env:TREG_TOKEN}` for
-# the bearer token, so the tools will 401 until the user sets that env var — which is what the
-# bootstrap explains. Unlike Codex (where `bearer_token_env_var` works the same way), Cursor's
-# variable syntax (`${env:...}`) is documented and standard.
+# first, and fall back to CLI only if they are not there. The MCP config declares the URL only and the
+# host runs OAuth itself. A `${env:TREG_TOKEN}` header made hosts that read this plugin (Grok Bot)
+# demand the variable before sign-in could start, which no phone user can supply.
 CURSOR_BOOTSTRAP = """
 ## First, check which treg you have
 
@@ -141,12 +140,9 @@ This plugin ships MCP tools alongside the skill. **Look at your tools before you
 connected. Use those; there is nothing to install. The rest of this page is written around the `treg`
 command line, so read `treg catalog search` as `catalog_search`, `treg call` as `call`, and so on.
 
-**If the tools error or you cannot see them**, the plugin needs a token. The human sets `TREG_TOKEN`:
-
-1. Sign in at {BASE} (GitHub / Google / email code)
-2. Copy the token from Settings → API Token
-3. Set `TREG_TOKEN` in the environment Cursor reads (or add it in Cursor's plugin configuration)
-4. Restart the agent — the tools will appear
+**If the tools error or you cannot see them**, the connector is not signed in yet. The human connects
+it in the app's MCP or connector settings; the app opens treg's sign-in page (GitHub / Google / email
+code) and the tools appear after it.
 
 A new team starts with **$1.00 of free balance**, so there is nothing to pay before the first call.
 If sign-in is needed, say so plainly and stop — never ask the human for a provider's API key, which
@@ -322,7 +318,6 @@ def render(variant: str) -> str:
     #    every user of every agent installs, while the hub is open only to the teams in
     #    TREG_HUB_TEAMS: so the plugin never carries it. A member of such a team gets the section
     #    from the server itself (`treg skill bootstrap` signed in, or /skill.md with their key).
-    #    (Owner's decision, 2026-09-26; it replaces the 2026-09-16 one to always ship it.)
     out = re.sub(r"<!--hub-->.*?<!--/hub-->\n?", "", out, flags=re.S)
     # `{ENDPOINTS}` / `{PROVIDERS}`: the server fills these per request from the loaded catalog; a
     # static plugin copy gets the numbers as of generation, refreshed with every release.
@@ -331,7 +326,7 @@ def render(variant: str) -> str:
     return out.replace("{BASE}", PUBLIC_BASE)
 
 
-# Accepted and ignored: a plugin never ships the hub section now (see the comment in the renderer).
+# Accepted and ignored: a plugin never ships the hub section (see the comment in the renderer).
 WITH_HUB = "--with-hub" in sys.argv
 
 

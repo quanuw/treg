@@ -17,6 +17,8 @@ async loadBilling(){ if(!this.canAdmin || !this.activeOrgId){ this.billing=null;
         this.autoAmount=Math.round(this.billing.autotopup.amount_usd);
         this.autoThreshold=Math.round(this.billing.autotopup.threshold_usd);
         this.autoPerHour=this.billing.autotopup.per_hour||5;
+        if(this.bhistOrgId!==this.activeOrgId){
+          this.bhistFilter='all'; this.bhistPage=0; this.bhistCursors=['']; this.bhistOrgId=this.activeOrgId; }
         this.loadBillingHistory(); }
       // The daily cap lives beside the balance for the user even though it is an org setting.
       const capCfg=await this.api(`/orgs/${org}/settings`).catch(()=>null);
@@ -82,12 +84,20 @@ async saveCap(){ this.capBusy=true; this.capErr='';
       }catch(e){
         this.capErr=this._errMsg(e, 'could not save that limit');
       }finally{ this.capBusy=false; } },
-// Amounts come from our own credit blocks, so this list can never disagree with the balance above
-    // it; Stripe supplies only the document links, and bhist.ok===false means those were unavailable.
-    async loadBillingHistory(){ if(!this.canAdmin || !this.billing || !this.billing.configured){ this.bhist={items:[],loading:false,ok:true}; return; }
-      this.bhist={items:[],loading:true,ok:true}; const live=this.ticket('billingHistory');
-      const out=await this.api('/billing/history').catch(()=>null);
-      if(live()) this.bhist={items:(out&&out.items)||[], loading:false, ok:!out||out.stripe_ok!==false}; },
+// Top-ups use our credit ledger; subscription invoices come from Stripe and never change balance.
+    async loadBillingHistory(){ if(!this.canAdmin || !this.billing || !this.billing.configured){ this.bhist={items:[],loading:false,ok:true,invoicesOk:true,nextCursor:null,error:false}; return; }
+      this.bhist={...this.bhist,loading:true,error:false}; const live=this.ticket('billingHistory');
+      const cursor=this.bhistCursors[this.bhistPage]||'';
+      const query=new URLSearchParams({kind:this.bhistFilter,limit:'20',cursor});
+      const out=await this.api('/billing/history?'+query).catch(()=>null);
+      if(live()) this.bhist={items:(out&&out.items)||[],loading:false,ok:!out||out.stripe_ok!==false,
+        invoicesOk:!out||out.subscription_invoices_ok!==false,nextCursor:out?.next_cursor||null,error:!out}; },
+    setBillingHistoryFilter(kind){ if(this.bhistFilter===kind)return;
+      this.bhistFilter=kind; this.bhistPage=0; this.bhistCursors=['']; this.loadBillingHistory(); },
+    nextBillingHistoryPage(){ if(!this.bhist.nextCursor || this.bhist.loading)return;
+      this.bhistCursors[this.bhistPage+1]=this.bhist.nextCursor; this.bhistPage++; this.loadBillingHistory(); },
+    previousBillingHistoryPage(){ if(this.bhistPage===0 || this.bhist.loading)return;
+      this.bhistPage--; this.loadBillingHistory(); },
 async openPortal(){ this.billingBusy=true; this.err='';
       try{ const out=await this.api('/billing/portal',{method:'POST'});
         // Stripe's hosted portal owns card, billing address, tax ID and the full invoice archive. Its
@@ -108,7 +118,6 @@ async addFunds(amount){ this.billingBusy=true; this.topupAmount=amount; this.err
         // on the return redirect (which a payer could simply type). Same tab, so the return lands here.
         window.location.href=out.url; }
       catch(e){ this.err='Could not start the payment: '+(e.detail||e.status); this.billingBusy=false; } },
-// ---- top-up modal ----
     openTopup(){ this.topupPick=this.billing.topup.default_usd; this.topupOther=null; this.topupErr='';
       // Default ON only for a team with no mandate; a team that already decided is not re-asked.
       this.topupAuto=!(this.billing.autotopup.enabled||this.billing.autotopup.consented_at);
@@ -136,7 +145,7 @@ async payTopup(){ const usd=this.topupUsd; if(!this.topupValid) return;
           // saved card then arms it from the setup webhook. A failure here stops the payment too -
           // paying without the auto top-up the user just agreed to would be a silent downgrade.
           const armed=await this.api('/billing/autotopup',{method:'POST',headers:{'content-type':'application/json'},
-            body:JSON.stringify({enabled:true, consent:true, amount_usd:this.autoAmount, threshold_usd:this.autoThreshold, monthly_cap_usd:this.autoCapUsd, per_hour:this.autoPerHour, setup_url:false})});
+            body:JSON.stringify({enabled:true, consent:true, amount_usd:this.autoAmount, threshold_usd:this.autoThreshold, per_hour:this.autoPerHour, setup_url:false})});
           if(this.activeOrgId===org) this.billing=armed;
         }
         // The request below carries the ACTIVE team; after a switch it would buy credit for the

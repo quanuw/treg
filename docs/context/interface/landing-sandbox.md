@@ -1,6 +1,6 @@
 ---
-title: Landing sandbox backend - front-end entry removed
-status: shipped
+title: Landing sandbox backend - closed
+status: closed
 sources:
   - src/treg/sandbox.py
   - src/treg/sandbox_identity.py
@@ -11,6 +11,7 @@ sources:
   - src/treg/api.py
   - src/treg/routers/onboard.py
   - src/treg/routers/web.py
+  - src/treg/domain/identity/access.py
   - frontend/src/state/boot.js
   - frontend/src/components/SignedOutPage.vue
   - src/treg/web/install.sh
@@ -30,8 +31,18 @@ related:
 > key-leak explanation and footer CTA it used to render were dropped from this component along with
 > the sandbox studio; that marketing content now lives on the public landing page (`/`) instead.
 
-The sections below document backend behavior that is still shipped but has no visitor-facing mint
-path in the Dashboard components. Provisioning, export, samples, and garbage collection remain in
+> **Closed.** `POST /demo/sandbox` returns 410 and mints nothing. Authentication refuses every
+> `@sandbox.treg.local` visitor with 403 ("the demo sandbox is closed"), centrally in
+> `domain/identity/access.py`: `_membership_by_token` checks the token's user, and
+> `_user_from_identity_token` / `_user_from_session` check theirs, so `require_member`,
+> `require_identity` and every direct resolver inherit it. The sandbox was an anonymous identity on
+> production guarded by per-route exceptions; one missed route (`POST /onboard/demo`) let a visitor
+> mint a real team. Since nothing mints, `gc` (which only ran from the mint) no longer runs on its
+> own; leftover sandbox orgs are cleaned up deliberately. The code below stays until a separate
+> removal change deletes it.
+
+The sections below document backend behavior that is still in the tree but unreachable: no mint path
+and no accepted visitor token. Provisioning, export, samples, and garbage collection remain in
 `application/onboard/sandbox.py`; the call-side sandbox engine remains in `sandbox.py`; and the routes
 remain in `routers/onboard.py`. Their removal is intentionally deferred to the backend follow-up.
 
@@ -54,8 +65,11 @@ onboarding demo teams (also `demo`, but team-named).
 
 `is_sandbox_user(user)` is the companion check on the **visitor** (email ends in `@sandbox.treg.local`,
 `SANDBOX_DOMAIN`). Such a login-free visitor may act ONLY inside its own sandbox org — it can **never
-create a real team** (`POST /orgs` → `create_org` returns 403: "sign in with GitHub, Google, or email")
-nor otherwise graduate to a real account. Escaping the sandbox requires a real sign-in door.
+create a real team** (`POST /orgs` → `create_org` and `POST /onboard/demo` → `provision_demo` both
+return 403: "sign in with GitHub, Google, or email") nor otherwise graduate to a real account. The
+demo seeder needs its own check: the visitor is a `member` of its sbx-* team, not an owner, so
+`existing_demo_org` misses it and the seeder would mint a second team whose slug `is_sandbox` never
+matches. Escaping the sandbox requires a real sign-in door.
 
 ## Safety: sandbox calls never touch the network (except the one live wire)
 `application.call.service` checks `demo_sandbox.is_sandbox(caller.org)` and, for a sandbox, short-circuits to
@@ -110,7 +124,9 @@ a deploy without the secret exposes no unauthenticated POST surface. Design poin
 
 Bounds: `MAX_TOOLS`/`MAX_SECRETS` (3) are enforced by `domain/governance/sandbox.py` on
 `POST /tools|/secrets`; `SANDBOX_TTL_MIN` (60) + `gc(db)` reaps expired visitors (their org + all
-org-scoped rows), run opportunistically on each mint. The reaper deletes the org through the ONE shared
+org-scoped rows), run opportunistically on each mint. It deletes only orgs `is_sandbox` matches: a
+visitor that also belongs to any other org is kept whole (user and every org) and logged for review,
+since that membership should not exist and deleting it would erase the only record of it. The reaper deletes the org through the ONE shared
 `cascade_delete_org` (`domain/governance/teams.py`) - it must never keep its own list of org-scoped
 tables. It once did, the copy never learned about `IdempotentCall`, and on 2026-09-02 Postgres refused
 the membership delete on every mint. `mint_sandbox` now also isolates the reaper: a gc failure is
@@ -158,7 +174,7 @@ and an index name must be a plain slug before it becomes a folder), falling back
 `{BASE}/skill.md` into `~/.claude/skills/treg`. Because the package is public on PyPI,
 `curl … /install.sh | sh` now works for anyone with no repo/git access needed. The **Getting started**
 dashboard view (`view==='start'`) surfaces this install command + `treg login`/`onboard`/`add`/`call` and
-links to the tutorial and `/llms.txt`; `llms.txt` has a matching **Install the CLI** section.
+links to the tutorial and `/llms.txt`; `llms.txt` gives the same install command in its setup paragraph.
 
 ## Backend follow-up
 Remove the now-unreachable sandbox mint, export, sample, live-wire, feed, governance, and call-pipeline

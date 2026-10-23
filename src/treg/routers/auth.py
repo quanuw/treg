@@ -17,37 +17,29 @@ from .. import client_ip, crypto
 from ..application import auth as auth_use_cases
 from ..application import signup
 from ..application import images
-from ..application.onboard import first_run
 from ..application.auth import (
-    CLI_APPROVE_MAX_TRIES,
-    EMAIL_CODE_TTL,
-    HANDSHAKE_TTL,
-    MAX_OTP_ATTEMPTS,
-    OTP_NS,
-    OTP_START_MAX_PER_EMAIL,
-    OTP_START_MAX_PER_IP,
-    OTP_START_NS,
-    OTP_START_WINDOW_S,
+    CLI_APPROVE_MAX_TRIES as CLI_APPROVE_MAX_TRIES,
+    MAX_OTP_ATTEMPTS as MAX_OTP_ATTEMPTS,
+    OTP_START_MAX_PER_EMAIL as OTP_START_MAX_PER_EMAIL,
+    OTP_START_MAX_PER_IP as OTP_START_MAX_PER_IP,
 )
 from ..config import get_settings
 from ..domain.identity import mcp_oauth
 from ..domain.identity import session as sess
 from ..domain.identity.access import require_identity
-from ..domain.identity.mcp_oauth import REFRESH_TTL_S
 from ..models import User
 from .auth_helpers import _is_https, _remember_oauth_return, _same_origin, require_managed_cli
 from .web import _esc_html
 
-# The app alias preserves the moved handlers' original @app.post decorator text byte-for-byte.
 app = APIRouter()
 email_router = app
 
 
-# ---- human login via email one-time code (the third identity door) ------------------------
-# OTP code + its brute-force counter, and the /auth/email/start throttle, live in the DB (treg.ratestore
-# over the Ephemeral table) — NOT per-process dicts — so a restart can't reset them and they stay correct
-# across instances (backlog #3). The 'otp' namespace holds {code_hash, attempts} keyed by email; the
-# 'otp_start' namespace holds the per-email + per-IP sliding windows (email-bomb + brute-force guard).
+# Human login via email one-time code. OTP code + its brute-force counter, and the
+# /auth/email/start throttle, live in the DB (treg.ratestore over the Ephemeral table) - NOT
+# per-process dicts - so a restart can't reset them and they stay correct across instances. The
+# 'otp' namespace holds {code_hash, attempts} keyed by email; the 'otp_start' namespace holds the
+# per-email + per-IP sliding windows (email-bomb + brute-force guard).
 
 
 class EmailStartIn(BaseModel):
@@ -204,7 +196,6 @@ def _login_callback_base(request: Request) -> str:
     return get_settings().public_url.rstrip("/")
 
 
-# The app alias preserves the moved handlers' original @app.get decorators byte-for-byte.
 app = APIRouter()
 social_router = app
 
@@ -234,7 +225,6 @@ def _social_http_error(exc: auth_use_cases.SocialLoginError) -> HTTPException:
     return HTTPException(status_code=status_code, detail=detail)
 
 
-# ---- human login via GitHub OAuth (dashboard sessions) ------------------------------------
 @app.get("/auth/github")
 async def auth_github(request: Request, cli: str = "", return_to: str = ""):
     try:
@@ -270,7 +260,7 @@ def _arena_return_target(target: str) -> str:
     except ValueError:
         return ""
     if url.scheme or url.netloc or url.fragment or url.path not in {
-        "/enrich-arena", "/enrich-arena/leaderboard", "/enrich-arena/people-search-bench",
+        "/enrich-arena", "/enrich-arena/leaderboard", "/enrich-arena/people-search-bench", "/web-arena",
     }:
         return ""
     params = parse_qsl(url.query, keep_blank_values=True)
@@ -371,7 +361,6 @@ async def auth_google_callback(
     return _finish_oauth_login(request, proof.user, proof.cli_state)
 
 
-# The app alias preserves the moved handlers' original @app decorators byte-for-byte.
 app = APIRouter()
 cli_router = app
 
@@ -428,6 +417,7 @@ _CLI_HTTP_ERRORS = {
     "too_many_wrong_codes": (400, "too many wrong codes — run `treg login` again"),
     "wrong_code": (400, "that code doesn't match the one in your terminal"),
     "not_member": (403, "not a member of that team"),
+    "sign_in_through_sso": (403, "sign in through this team's SSO"),
     "unavailable": (503, "login storage unavailable — please try again"),
 }
 
@@ -482,8 +472,6 @@ async def login_page(request: Request, cli: str = "", treg_session: str = Cookie
 def _login_page_html(login_id: str, *, session_email: str | None, github: bool, google: bool) -> str:
     """Server-rendered /login card. login_id is whitelist-validated by the caller; the session email
     is HTML-escaped (it's the only other interpolated value)."""
-    from html import escape
-
     # A pairing-code block sits above everything: whichever door the user takes, approve() won't complete
     # the CLI handshake until the code shown in their own terminal is echoed back (phishing guard — a
     # login they didn't start has no matching code). A `treg login` link carries the code in the URL
@@ -643,7 +631,6 @@ async function verifyCode(){err('');const em=document.getElementById('em').value
 if(HAS_SESSION)loadOrgs();
 """
 
-# The app alias preserves the moved handlers' original @app decorators byte-for-byte.
 app = APIRouter()
 session_router = app
 
@@ -673,12 +660,6 @@ async def auth_me(
     out = {"email": identity.email, "is_superadmin": identity.is_superadmin, "onboarded": identity.onboarded,
            "github": identity.github, "avatar_url": images.public_url(identity.avatar_key),
            "uploads": images.enabled()}
-    if first_run.enabled(identity.email):
-        out["onboarding_v2"] = True
-    elif not identity.onboarded and first_run.in_experiment(identity.email):
-        out["onboarding_v2_experiment"] = True     # the dashboard reads the flag `onboarding-v2`
-    if first_run.may_preview(identity.email, identity.is_superadmin):
-        out["onboarding_preview"] = True
     if (ich := _intercom_user_hash(identity.email)):
         out["intercom_user_hash"] = ich
     if identity.org_id is not None:
@@ -697,7 +678,6 @@ async def auth_logout(request: Request) -> JSONResponse:
     return resp
 
 
-# The app alias preserves the moved handlers' original @app decorators byte-for-byte.
 app = APIRouter()
 invite_router = app
 
@@ -725,7 +705,6 @@ async def auth_invite_signin(
     email through a real door (OTP / GitHub / Google) and the invite auto-appears via /invites/mine.
     An invalid/expired secret of either kind just lands on the site."""
     from urllib.parse import quote
-    base = get_settings().public_url.rstrip("/")
     try:
         landing = await auth_use_cases.invite_signin_landing(t, code, treg_session)
     except auth_use_cases.InviteSigninError as exc:
@@ -789,7 +768,6 @@ async def auth_invite_signin_confirm(request: Request):
     return resp
 
 
-# The app alias preserves the moved handlers' original @app decorators byte-for-byte.
 app = APIRouter()
 oauth_server_router = app
 
@@ -1011,9 +989,7 @@ async def oauth_authorize(
         return _oauth_server_failure(exc, redirect_uri, state)
     if view is None:
         # Sign in first, then come back to THIS request. Parked in a cookie rather than a `?next=`
-        # query the sign-in page would have to understand — the first version invented that
-        # convention and nothing implemented it, so the user signed in and landed on the dashboard
-        # with the authorization silently dropped.
+        # query the sign-in page would have to understand.
         # The query is only a UI cue. The validated request stays in the HttpOnly return cookie.
         resp = RedirectResponse("/?signin=oauth", status_code=302)
         _remember_oauth_return(resp, request)
@@ -1131,17 +1107,21 @@ async def oauth_token(
 
 @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
 @app.get("/.well-known/oauth-protected-resource/mcp", include_in_schema=False)
+@app.get("/.well-known/oauth-protected-resource/mcp/", include_in_schema=False)
 async def oauth_protected_resource():
     """Tells an MCP client which authorization server guards /mcp/ and what it may ask for.
 
-    Two paths for one document: the spec has clients look it up either at the host root or under the
-    resource's own path, and which one a given client tries is not something we get to choose.
+    Several paths for one document: the spec has clients look it up either at the host root or under
+    the resource's own path, and which one a given client tries is not something we get to choose.
+    The resource is `/mcp/`, so RFC 9728's path insertion yields the trailing-slash form; it is
+    served directly because some clients do not follow a redirect during discovery.
     """
     return JSONResponse(mcp_oauth.protected_resource_metadata(),
                         headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/.well-known/oauth-protected-resource/mcp/v2", include_in_schema=False)
+@app.get("/.well-known/oauth-protected-resource/mcp/v2/", include_in_schema=False)
 async def oauth_protected_resource_v2():
     """Protected-resource metadata for the catalog-only connector."""
     if not get_settings().claude_connector_enabled:
@@ -1174,7 +1154,6 @@ async def openai_apps_challenge():
     return PlainTextResponse(token, headers={"Cache-Control": "no-store"})
 
 
-# The app alias preserves the moved handlers' original @app decorators byte-for-byte.
 app = APIRouter()
 grants_router = app
 
@@ -1217,7 +1196,6 @@ async def oauth_grant_set_team(family_id: str, body: GrantTeamIn,
         raise HTTPException(status_code=404, detail=exc.detail) from exc
 
 
-# The app alias preserves the moved handlers' original @app decorators byte-for-byte.
 app = APIRouter()
 token_router = app
 
@@ -1225,9 +1203,11 @@ token_router = app
 @app.get("/auth/cli-token")
 async def auth_cli_token(
     response: Response,
+    request: Request,
     user: User = Depends(require_identity),
     x_treg_org: str = Header(default=""),
     x_treg_token: str = Header(default=""),
+    treg_session: str = Cookie(default=""),
 ) -> dict:
     """Mint a fresh CLI/bearer token for the authenticated caller (session cookie OR token). Identity
     tokens are signed (`sess.make_identity`); minting the current generation invalidates nothing — it lets
@@ -1246,12 +1226,14 @@ async def auth_cli_token(
     if (claims or {}).get("scope") == sess.BOOTSTRAP_SCOPE:
         raise HTTPException(status_code=403, detail=(
             "complete team selection in the browser — a bootstrap token cannot mint a Default key"))
-    result = await auth_use_cases.issue_cli_token(
-        user_id=user.id,
-        email=user.email,
-        token_version=user.token_version,
-        org_ref=x_treg_org,
-    )
+    try:
+        result = await auth_use_cases.issue_cli_token(
+            user_id=user.id, email=user.email, token_version=user.token_version,
+            org_ref=x_treg_org,
+            sso_org_id=getattr(request.state, "sso_org_id", None),
+        )
+    except auth_use_cases.IdentityLookupError as exc:
+        raise HTTPException(403, str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     return result
 
@@ -1268,7 +1250,8 @@ async def auth_revoke_tokens(
     a fresh session cookie + token for the caller, so the device that pressed the button stays signed in
     while every other device is signed out. (Org membership tokens from accept-invite are a separate token
     type and are unaffected — those are revoked by removing the membership.)"""
-    revoked = await auth_use_cases.revoke_identity_tokens(user.id)
+    revoked = await auth_use_cases.revoke_identity_tokens(
+        user.id, sso_org_id=getattr(request.state, "sso_org_id", None))
     resp = JSONResponse({"token": revoked.token, "email": revoked.email, "revoked": True})
     resp.headers["Cache-Control"] = "no-store"
     resp.set_cookie(sess.COOKIE, revoked.session_cookie, httponly=True,

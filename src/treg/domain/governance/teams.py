@@ -33,6 +33,11 @@ from ...models import (
     CapabilityPin,
     CreditBlock,
     DenyRule,
+    EnterpriseDirectoryUser,
+    EnterpriseSSOAudit,
+    EnterpriseSSO,
+    EnterpriseSSOBlock,
+    EnterpriseSSOIdentity,
     Feedback,
     CallReview,
     Media,
@@ -57,6 +62,8 @@ from ...models import (
     Secret,
     TagBudget,
     TagSpend,
+    TableDoc,
+    TeamDatabase,
     Tool,
     ToolRequest,
     User,
@@ -106,7 +113,7 @@ SLUG_LEN = (3, 40)
 
 
 # Letters that look like Latin ones in other scripts, and digits that stand in for letters: a name is
-# judged by how it READS (hub simulation run 3: `trеg-hub` with a Cyrillic е, `apol1o`, passed).
+# judged by how it READS (`trеg-hub` with a Cyrillic е, `apol1o`).
 _LOOKALIKE = str.maketrans({
     "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x", "і": "i", "ј": "j", "ѕ": "s",
     "к": "k", "м": "m", "н": "h", "т": "t", "в": "b", "г": "r", "ԁ": "d", "ɡ": "g", "ⅼ": "l",
@@ -248,19 +255,11 @@ async def list_user_orgs(
     return out
 
 
-# Every model carrying an `org_id`. Deleting the org without clearing these leaves rows pointing at
-# a row that no longer exists, and the delete fails with a 500 at the foreign key.
-#
-# This list has to be kept in step with the schema, and twice it was not: the money tables arrived
-# with the prepaid balance and `CapabilityPin` with capability pins, and neither was added here. The
-# effect was invisible until someone tried it - since every NEW team is granted $1.00, every team has
-# a CreditBlock, so NO team could be deleted at all. `test_org_delete_clears_every_org_scoped_table`
-# now walks the models module and fails if a new one is ever missed, rather than trusting this list.
-#
-# Order matters: LedgerEntry references a CreditBlock, so it goes first; `IdempotentCall.membership_id`
-# points at Membership, so Membership stays last and IdempotentCall sits above it.
+# Every model carrying an `org_id`, in foreign-key order: LedgerEntry before CreditBlock,
+# IdempotentCall before Membership, Membership last.
 ORG_SCOPED_MODELS = (
     ArenaEvaluation, ArenaRun, WebArenaRun,
+    TableDoc, TeamDatabase,
     Tool, Secret, Bundle, PendingOAuth, CallRecord, RunRecord, Invite, DenyRule, Project,
     ApiKeyEvent, ApiKey,
     ApiKeySpendDay,  # the spend rollup: a deleted team's history goes with it
@@ -279,6 +278,7 @@ ORG_SCOPED_MODELS = (
     CallReview,
     Media,        # hosted reference files expire on their own; a deleted team's go now
     AdConversion,  # pending Google Ads conversions belong to the team they'd be attributed to
+    EnterpriseSSOIdentity, EnterpriseSSOBlock, EnterpriseDirectoryUser, EnterpriseSSOAudit, EnterpriseSSO,
     Membership,   # last: it is what makes the caller a member of the org being deleted
 )
 
@@ -369,11 +369,8 @@ async def cascade_delete_org(org: Org, db: AsyncSession) -> None:
     """Delete every org-scoped row, then the org. Does not commit.
 
     THE one way a team leaves the database - owner delete, admin force-delete, the landing-sandbox
-    reaper and the onboarding demo reset all come through here. There used to be three lists of
-    "which tables to clear": this one, one in the sandbox reaper and one in the demo reset. Only this
-    one was guarded by a test, so when `IdempotentCall` arrived the other two never learned of it,
-    and on 2026-09-02 the reaper hit its foreign key on every run - from inside the sandbox mint, so
-    every visitor got a 500 until it was noticed. Do not grow a private copy of this list again."""
+    reaper and the onboarding demo reset all come through here. Do not grow a private copy of this
+    list."""
     # OAuthGrant names its mutable team `current_org_id` to distinguish family authority from the
     # immutable `OAuthRefresh.org_id` provenance. A family can name this team on EITHER side: after
     # a move, only a retired provenance row still names the former team. Deleting just that row
@@ -439,7 +436,7 @@ async def drop_member_deny_rules(db: AsyncSession, user_id: int, org_id: int | N
     so a surviving rule would dangle, which Postgres rejects outright (SQLite does not enforce it by
     default, which is why only a real deployment would have shown this). Every path that deletes a
     User row must call this first: member removal, leave, agent revoke, admin user delete AND the
-    onboarding demo reset, which skipped it until the 2026-09-02 review.
+    onboarding demo reset.
 
     ORG-wide rules (`user_id` NULL) are untouched: they are about the team, not about one caller.
     The caller commits - this only stages the deletes, so it composes with the removal itself."""
@@ -470,3 +467,17 @@ async def delete_membership(
         IdempotentCall.membership_id == membership.id))
     await drop_member_deny_rules(db, membership.user_id, membership.org_id)
     await db.delete(membership)
+
+
+async def ensure_sso_membership(db: AsyncSession, user: User, org_id: int) -> tuple[Membership, bool]:
+    """Join an authenticated SSO user to a team as a member; caller commits."""
+    membership = (await db.execute(select(Membership).where(
+        Membership.org_id == org_id, Membership.user_id == user.id,
+    ))).scalar_one_or_none()
+    if membership is not None:
+        return membership, False
+    membership = Membership(user_id=user.id, org_id=org_id, role="member", token_hash="")
+    db.add(membership)
+    await db.flush()
+    await managed_keys.ensure_default_key(db, membership, user)
+    return membership, True

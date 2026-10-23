@@ -13,7 +13,7 @@ from sqlmodel import select
 from ... import crypto
 from ...config import get_settings
 from ...infra.db import get_admin_session, get_session
-from ...models import ROLE_RANK, ApiKey, Membership, Org, User
+from ...models import ROLE_RANK, ApiKey, EnterpriseSSO, Membership, Org, User
 from . import api_keys as managed_keys
 from . import session as sess
 
@@ -67,10 +67,13 @@ async def _membership_by_token(token: str, db: AsyncSession) -> Membership | Non
         membership = await db.get(Membership, key.membership_id) if key.membership_id else None
         if membership is None:
             raise HTTPException(status_code=403, detail="membership removed or suspended")
-        return membership
-    return (
-        await db.execute(select(Membership).where(Membership.token_hash == token_hash))
-    ).scalar_one_or_none()
+    else:
+        membership = (
+            await db.execute(select(Membership).where(Membership.token_hash == token_hash))
+        ).scalar_one_or_none()
+    if membership is not None:
+        _refuse_sandbox_visitor(await db.get(User, membership.user_id))
+    return membership
 
 
 async def _membership_and_key_by_token(
@@ -109,6 +112,7 @@ async def _user_from_session(cookie: str, db: AsyncSession) -> User | None:
     user = await db.get(User, claims["uid"])
     if user is None or user.suspended or claims["tv"] != user.token_version:  # revoked = tv mismatch
         return None
+    _refuse_sandbox_visitor(user)
     return user
 
 
@@ -130,7 +134,18 @@ async def _resolve_org(ref: str, db: AsyncSession) -> Org | None:
     return await db.get(Org, int(ref)) if (ref.isdigit() and int(ref) < 2**63) else None
 
 
+async def sso_team_allowed(db: AsyncSession, membership: Membership,
+                           sso_org_id: int | None) -> bool:
+    """Whether this human sign-in may act for a team, including its SSO scope."""
+    if sso_org_id is not None and sso_org_id != membership.org_id:
+        return False
+    enterprise = await db.get(EnterpriseSSO, membership.org_id)
+    return not (enterprise is not None and enterprise.enforced
+                and membership.role != "owner" and sso_org_id != membership.org_id)
+
+
 async def require_identity(
+    request: Request,
     x_treg_token: str = Header(default=""),
     x_treg_org: str = Header(default=""),
     treg_session: str = Cookie(default=""),
@@ -140,23 +155,20 @@ async def require_identity(
     if x_treg_token:
         m, key = await _membership_and_key_by_token(x_treg_token, db)
         if m is not None:
-            # A published public-demo token must never act as a USER — user-level endpoints mint
-            # identity tokens (/auth/cli-token), create real orgs, and accept invites, all of which
-            # would let a stranger escape the demo org. Admin+ (the real operator) is exempt.
             org = await db.get(Org, m.org_id)
             if org is not None and org.public_demo and not _role_at_least(m.role, "admin"):
                 raise HTTPException(status_code=403, detail=(
                     "this is a public demo token — it can only call the demo team's tools"))
         user = await db.get(User, m.user_id) if m else await _user_from_identity_token(x_treg_token, db)
-        # A machine token must never act as a USER. `create_org` depends on THIS dependency, so an
-        # agent could otherwise create a fresh org in which it is the OWNER — and owners are exempt
-        # from `_require_tool_access` and `_require_local_run`, escaping every limit set on it.
         if user is not None and _is_machine_email(user.email):
             raise HTTPException(status_code=403, detail=(
                 "this token belongs to a machine identity — it can call this team's tools, "
                 "but cannot act as a user"))
         if user is not None and not user.suspended:
             claims = sess.read_identity_claims(x_treg_token)
+            sso_org_id = (claims or {}).get("sso_org_id", key.sso_org_id if key else None)
+            if sso_org_id is not None and not _sso_scope_allows(request, sso_org_id):
+                raise HTTPException(status_code=403, detail="sign in normally for account-wide actions")
             oauth_bridge = bool(
                 claims
                 and claims.get("aud") == sess.IDENTITY_AUDIENCE
@@ -188,13 +200,27 @@ async def require_identity(
             # holding this pool slot while waiting for a second one can deadlock a bounded pool.
             await db.commit()
             managed_keys.touch(key)
+            request.state.sso_org_id = sso_org_id
             return user
         raise HTTPException(status_code=401, detail="invalid token")
     user = await _user_from_session(treg_session, db)
     if user is not None:
+        sso_org_id = (sess.read_session_claims(treg_session) or {}).get("sso_org_id")
+        if sso_org_id is not None and not _sso_scope_allows(request, sso_org_id):
+            raise HTTPException(status_code=403, detail="sign in normally for account-wide actions")
         await db.commit()
+        request.state.sso_org_id = sso_org_id
         return user
     raise HTTPException(status_code=401, detail="not authenticated")
+
+
+def _sso_scope_allows(request: Request, org_id: int) -> bool:
+    path = request.url.path.split("/")
+    scoped_team_path = len(path) > 2 and path[1] == "orgs" and path[2] == str(org_id)
+    scoped_entry = request.url.path == "/orgs" and request.method == "GET"
+    scoped_key = request.url.path == "/auth/cli-token"
+    account_kill_switch = request.url.path == "/auth/revoke-tokens" and request.method == "POST"
+    return scoped_team_path or scoped_entry or scoped_key or account_kill_switch
 
 
 async def _user_from_identity_token(token: str, db: AsyncSession) -> User | None:
@@ -205,6 +231,7 @@ async def _user_from_identity_token(token: str, db: AsyncSession) -> User | None
     user = await db.get(User, claims["uid"])
     if user is None or user.suspended or claims["tv"] != user.token_version:  # revoked = tv mismatch
         return None
+    _refuse_sandbox_visitor(user)
     return user
 
 
@@ -219,6 +246,8 @@ async def require_member(
     - **token** (agents/CLI): the token IS a membership, so the org is baked in.
     - **session** (dashboard): the cookie identifies the user; the org is chosen via `X-Treg-Org`.
     """
+    oauth_bridge = False
+    identity_claims = None
     membership, api_key = (
         await _membership_and_key_by_token(x_treg_token, db)
         if x_treg_token else (None, None)
@@ -316,6 +345,22 @@ async def require_member(
         raise HTTPException(status_code=403, detail="account suspended")
     if org.suspended:
         raise HTTPException(status_code=403, detail="org suspended")
+    token_sso_org_id = (sess.read_identity_claims(x_treg_token) or {}).get("sso_org_id") if x_treg_token else None
+    if token_sso_org_id is not None and token_sso_org_id != org.id:
+        raise HTTPException(status_code=403, detail="this key belongs to another team")
+    # A company SSO cookie proves identity for that company only, even when the same
+    # global User belongs to another team whose own SSO policy is not enforced.
+    if not x_treg_token:
+        sso_claims = sess.read_session_claims(treg_session) or {}
+        if sso_claims.get("sso_org_id") is not None and sso_claims["sso_org_id"] != org.id:
+            raise HTTPException(status_code=403, detail="sign in separately for this team")
+    # All non-owner credentials need corporate proof once SSO is required.
+    # This also invalidates bearer keys minted before enforcement.
+    proof_org_id = ((identity_claims or {}).get("sso_org_id", api_key.sso_org_id if api_key else None)
+                    if x_treg_token
+                    else sso_claims.get("sso_org_id"))
+    if not await sso_team_allowed(db, membership, proof_org_id):
+        raise HTTPException(status_code=403, detail="sign in through this team's SSO")
     # Public-demo lockdown: the published token (non-admin roles) may ONLY call tools and read.
     # Centralized here — not per-endpoint — so every mutation (tools, secrets, skills, members,
     # leave, runs) is frozen no matter what routes are added later. Admin+ keeps full control.
@@ -345,9 +390,13 @@ async def require_superadmin(
         return "env-admin"
     user: User | None = None
     if x_treg_token:
+        if (sess.read_identity_claims(x_treg_token) or {}).get("sso_org_id") is not None:
+            raise HTTPException(status_code=403, detail="sign in normally for platform administration")
         m, _ = await _membership_and_key_by_token(x_treg_token, db)
         user = await db.get(User, m.user_id) if m else await _user_from_identity_token(x_treg_token, db)
     else:
+        if (sess.read_session_claims(treg_session) or {}).get("sso_org_id") is not None:
+            raise HTTPException(status_code=403, detail="sign in normally for platform administration")
         user = await _user_from_session(treg_session, db)
     if user is not None and user.is_superadmin and not user.suspended:
         await db.commit()
@@ -383,7 +432,6 @@ def _norm_email(email: str) -> str:
     return f"{local}@{domain.rstrip('.')}" if at and domain.rstrip(".") else email
 
 
-# ---- machine identities: the publishable demo token, and agents ----------------------------
 # Both are Users on an UNROUTABLE domain, which is what makes them machines rather than people: no
 # login door can ever resolve one (guarded in `_find_or_create_user`) and neither may act as a USER
 # (guarded in `require_identity`). Everything else they inherit from Membership for free.
@@ -392,10 +440,17 @@ PUBLIC_DEMO_DOMAIN = "public-demo.treg.local"  # unroutable — the public ident
 # skill-directory table in `agents.py` (which answers "where does each coding agent keep its skills").
 # The words collide, the concepts don't; kept apart deliberately.
 AGENT_DOMAIN = "agents.treg.local"  # unroutable — an agent acts only by its token
+SANDBOX_DOMAIN = "sandbox.treg.local"  # landing sandbox visitors; the sandbox is closed
+SANDBOX_CLOSED = "the demo sandbox is closed — sign in at treg.to to use treg"
 
 
 def _is_agent_email(email: str) -> bool:
     return _norm_email(email).endswith(f"@{AGENT_DOMAIN}")
+
+
+def _refuse_sandbox_visitor(user: User | None) -> None:
+    if user is not None and _norm_email(user.email).endswith(f"@{SANDBOX_DOMAIN}"):
+        raise HTTPException(status_code=403, detail=SANDBOX_CLOSED)
 
 
 def _is_machine_email(email: str) -> bool:
@@ -403,7 +458,6 @@ def _is_machine_email(email: str) -> bool:
     return _is_agent_email(email) or _norm_email(email).endswith(f"@{PUBLIC_DEMO_DOMAIN}")
 
 
-# ---- the email-domain blocklist ------------------------------------------------------------------
 # Entirely configuration: `TREG_BLOCKED_EMAIL_DOMAINS` and nothing else. An unset variable blocks
 # nothing, which is the default. Two rules:
 #   - match the DOMAIN only, never the whole address. Matching the address false-flags real people
@@ -417,9 +471,7 @@ def _is_machine_email(email: str) -> bool:
 #
 # There is deliberately no list in the code. A blocklist is a speed bump — a new domain costs the
 # other side minutes — so its only value is being editable in the same minutes, which a deploy is
-# not. Substring rules on the domain were tried and removed: measured against a public
-# throwaway-domain corpus they matched 0.17% of it, added nothing over the exact entries, and
-# refused a real company whose domain merely contained one of the strings.
+# not.
 
 
 def _email_domain(email: str) -> str:

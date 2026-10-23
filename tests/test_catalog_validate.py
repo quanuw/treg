@@ -82,7 +82,7 @@ def test_cost_modifiers_accept_only_supported_declarative_credit_rules():
 
     bad_settle: list[str] = []
     validator.check_cost(base | {"settle": "estimate"}, "catalog:test", bad_settle, [])
-    assert any("cost.settle currently supports only 'base', 'modifiers' or 'usage'" in error for error in bad_settle)
+    assert any("cost.settle currently supports only 'base', 'modifiers', 'usage' or 'quantity'" in error for error in bad_settle)
 
 
 def test_status_marker_references_must_exist_and_end_at_a_live_endpoint():
@@ -585,7 +585,7 @@ def test_flat_price_usage_settlement_is_accepted():
     (lambda c: c.update(usage={"path": "usage.cost", "unit": "tokens"}),
      "needs a numeric fx.yaml unit_rates_usd entry"),
     (lambda c: c.update(settle="base"), "usage is only valid with settle: usage"),
-    (lambda c: c.update(settle="later"), "supports only 'base', 'modifiers' or 'usage'"),
+    (lambda c: c.update(settle="later"), "supports only 'base', 'modifiers', 'usage' or 'quantity'"),
 ])
 def test_flat_price_usage_settlement_rejects_bad_shapes(mutate, message):
     cost = _flat_usage_cost()
@@ -637,6 +637,26 @@ def test_reported_charge_requires_supported_units_and_path(rule):
     ))
 
 
+@pytest.mark.parametrize("rule,ok", [
+    ({"in": "query", "name": "max_cost_usd", "unit": "usd"}, True),
+    ({"in": "header", "name": "max_cost_usd", "unit": "usd"}, False),
+    ({"in": "query", "name": "max_cost_usd", "unit": "micro"}, False),
+    ({"in": "query", "name": "", "unit": "usd"}, False),
+    ({"in": "query", "name": "max-cost", "unit": "usd"}, False),
+    ({"in": "query", "name": "max_cost_usd", "unit": "usd", "extra": 1}, False),
+    (None, False),
+])
+def test_ceiling_param_shape(rule, ok):
+    errors: list[str] = []
+    validator.check_ceiling_param(rule, "test", errors, prefix="cost.ceiling_param")
+    assert bool(errors) is not ok
+    cost = dict(catalog_store.load().by_id["trykitt.people.email.find"]["cost"])
+    cost["ceiling_param"] = rule
+    errors = []
+    validator.check_cost(cost, "test", errors, [], provider="serper")
+    assert bool(errors) is not ok
+
+
 def test_reported_credit_charge_requires_a_provider_fx_rate():
     cost = dict(catalog_store.load().by_id['trykitt.people.email.find']['cost'])
     cost['reported_charge'] = {'path': 'billing.charge', 'unit': 'credit'}
@@ -660,6 +680,61 @@ def test_platform_request_requires_declared_fixed_body_value(rule, valid):
     validator.check_platform_request(rule, {'body': {
         'realtime': {'type': 'boolean', 'enum': [True]},
     }, 'queryParams': {'memory': {'type': 'integer', 'enum': [1024]}}}, 'test', errors)
+    assert (not errors) is valid
+
+
+_LABEL_INPUT = {'body': {'agent': {'type': 'string'}, 'credits': {'type': 'integer'}},
+                'pathParams': {'label': {'type': 'string'}}, 'headers': {'x-agent': {'type': 'string'}}}
+
+
+@pytest.mark.parametrize('rule,valid', [
+    (['body.agent'], True),
+    (['pathParams.label', 'headers.x-agent'], True),
+    (['body.credits'], False),          # a label is text, never a number
+    (['body.missing'], False),
+    (['body.agent', 'body.agent'], False),
+    ([], False),
+    ('body.agent', False),
+])
+def test_team_label_names_declared_text_fields(rule, valid):
+    errors = []
+    validator.check_team_label(rule, _LABEL_INPUT, 'test', errors)
+    assert (not errors) is valid
+
+
+@pytest.mark.parametrize('rule,valid', [
+    (['body.notify.email'], True),
+    (['body.notify'], False),            # an object, not an address
+    (['pathParams.label'], False),
+    (['body.nope'], False),
+    ([], False),
+])
+def test_caller_email_names_declared_text_fields(rule, valid):
+    errors = []
+    validator.check_caller_email(rule, {**_LABEL_INPUT, 'body': {**_LABEL_INPUT['body'], 'notify': {
+        'type': 'object', 'properties': {'email': {'type': 'string'}}}}}, 'test', errors)
+    assert (not errors) is valid
+
+
+_QTY = {'type': 'per_success', 'value': 1, 'currency': 'credit', 'per': 1, 'unit': 'credit',
+        'quantity': {'field': 'body.credits', 'max': 100000}, 'settle': 'quantity'}
+
+
+@pytest.mark.parametrize('patch,valid', [
+    ({}, True),
+    ({'quantity': {'field': 'body.agent', 'max': 10}}, False),        # not an integer field
+    ({'quantity': {'field': 'body.credits'}}, False),                  # no maximum
+    ({'quantity': {'field': 'body.credits', 'max': 0}}, False),
+    ({'settle': None}, False),                                         # must settle at what was bought
+    ({'type': 'per_call'}, False),
+    ({'quantity': {'field': 'body.credits', 'max': 10, 'applied': 'added'}}, True),
+    ({'quantity': {'field': 'body.credits', 'max': 10, 'applied': 5}}, False),
+    ({'reported_charge': {'path': 'cost', 'unit': 'credit'}}, False),  # a report must not change it
+])
+def test_a_quantity_price_is_bounded_and_settles_at_what_was_bought(patch, valid):
+    cost = {k: v for k, v in {**_QTY, **patch}.items() if v is not None}
+    errors = []
+    validator.check_cost_quantity(cost, _LABEL_INPUT, 'test', errors)
     assert (not errors) is valid
 
 
@@ -1013,5 +1088,5 @@ def test_the_fast_catalog_loader_reads_every_file_like_the_pure_python_one():
     assert issubclass(store._Loader, yaml.CSafeLoader)
     for path in sorted(store.CATALOG_DIR.rglob("*.yaml")):
         text = path.read_text(encoding="utf-8")
-        assert yaml.load(text, Loader=store._Loader) == yaml.load(text, Loader=Pure), path.name  # noqa: S506
-    assert yaml.load("checked: 2026-09-01", Loader=store._Loader) == {"checked": "2026-09-01"}  # noqa: S506
+        assert yaml.load(text, Loader=store._Loader) == yaml.load(text, Loader=Pure), path.name
+    assert yaml.load("checked: 2026-09-01", Loader=store._Loader) == {"checked": "2026-09-01"}

@@ -5,7 +5,7 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
@@ -16,6 +16,7 @@ from .. import analytics, crypto, email as email_sender, health, localrun
 from .. import oauth_providers
 from .. import providers as _providers
 from ..application import key_spend
+from ..application import enterprise_sso
 from ..application import images
 from ..application.onboard import demo as demo_seed
 from ..application import archive_erasure
@@ -55,6 +56,7 @@ from ..models import (
     Bundle,
     CallRecord,
     DenyRule,
+    EnterpriseSSO,
     Invite,
     Membership,
     Org,
@@ -67,19 +69,18 @@ from ..models import (
 )
 from ..timeutil import as_naive as _as_naive
 from ..timeutil import utcnow_naive as _utcnow_naive
+from .auth_helpers import _is_https, require_managed_cli
+from .signup_cookies import REFERRAL_COOKIE
 
 
 _day_start_utc = usage_policy._day_start_utc
 count_today = usage_policy.count_today
 _deny_match = access_policy._deny_match
 _org_deny_rules = access_policy._org_deny_rules
-from .auth_helpers import _is_https, require_managed_cli
-from .signup_cookies import REFERRAL_COOKIE
 
 
 INVITE_TTL_DAYS = 7  # invite codes are one-time AND expire after this many days
 
-# list_cli_deny keeps its original lazy relative import after moving one package level deeper.
 sys.modules.setdefault("treg.routers.providers", _providers)
 
 
@@ -289,7 +290,7 @@ class OrgPatchIn(BaseModel):
 
 class OrgSettingsIn(BaseModel):
     daily_cap_micro: int | None = None
-    platform_overflow: bool | None = None  # False = opt out of the overflow relay (ops/capacity.md)
+    platform_overflow: bool | None = None  # False = opt out of the overflow relay
     archive: bool | None = None  # False = opt out of the archive (archive.md, "Opting out")
     budget_dims: list[str] | None = None
     primary_dim: str | None = None
@@ -384,7 +385,6 @@ def _signup_http_error(exc: signup_use_cases.SignupError) -> HTTPException:
     return HTTPException(status_code=status_code, detail=detail)
 
 
-# The app alias preserves the handlers' @app decorators and the ordered attachment convention.
 app = APIRouter()
 signup_router = app
 
@@ -411,7 +411,11 @@ async def register_user(body: UserIn, request: Request, response: Response) -> d
 async def create_org(
     body: OrgIn, request: Request, response: Response,
     user: User = Depends(require_identity),
+    treg_session: str = Cookie(default=""),
+    x_treg_token: str = Header(default=""),
 ) -> dict:
+    if not x_treg_token and (identity_session.read_session_claims(treg_session) or {}).get("sso_org_id") is not None:
+        raise HTTPException(403, "sign in normally to create another team")
     require_managed_cli(request, team_change=True)
     try:
         result = await signup_use_cases.create_org(
@@ -438,6 +442,7 @@ async def list_orgs(
     user: User = Depends(require_identity),
     x_treg_token: str = Header(default=""),
     x_treg_org: str = Header(default=""),
+    treg_session: str = Cookie(default=""),
     db: AsyncSession = Depends(get_session),
 ) -> list[dict]:
     orgs = await teams.list_user_orgs(
@@ -446,6 +451,10 @@ async def list_orgs(
         x_treg_org=x_treg_org,
         db=db,
     )
+    sso_org_id = ((identity_session.read_identity_claims(x_treg_token) or {}).get("sso_org_id")
+                  if x_treg_token else (identity_session.read_session_claims(treg_session) or {}).get("sso_org_id"))
+    if sso_org_id is not None:
+        orgs = [org for org in orgs if org["org_id"] == sso_org_id]
     for o in orgs:  # the team's picture as a URL (None = initials); the key stays internal
         o["avatar_url"] = images.public_url(o.pop("avatar_key", None))
     return orgs
@@ -476,8 +485,7 @@ async def create_invite(
         ))).scalar_one_or_none()
         if m is not None:
             raise HTTPException(status_code=409, detail="that email is already a member of this org")
-    # Supersede any prior pending invite for this email so there's exactly one live code per invitee
-    # (re-inviting used to stack duplicate pending rows that all point at the same seat).
+    # Supersede any prior pending invite for this email so there's exactly one live code per invitee.
     for prior in (await db.execute(select(Invite).where(
         Invite.org_id == org_id, Invite.email == email, Invite.status == "pending"
     ))).scalars().all():
@@ -572,9 +580,9 @@ async def accept_invite(
     invite.status = "accepted"
     try:
         await db.commit()  # a concurrent double-accept trips uq_membership_user_org — 409, not 500
-    except IntegrityError:
+    except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=409, detail="already a member of this org")
+        raise HTTPException(status_code=409, detail="already a member of this org") from exc
     org = await db.get(Org, invite.org_id)
     response.headers["Cache-Control"] = "no-store"
     return {"org": org.slug, "org_id": org.id, "name": org.name, "role": invite.role, "token": token}
@@ -591,7 +599,7 @@ async def my_invites(
                          .order_by(Invite.created_at.desc(), Invite.id.desc()))  # stable newest-first order
     ).scalars().all()
     now = _utcnow_naive()
-    orgs = {  # batch the org lookup (was one db.get per invite)
+    orgs = {  # batch the org lookup, not one db.get per invite
         o.id: o for o in (await db.execute(
             select(Org).where(Org.id.in_([inv.org_id for inv in rows]))
         )).scalars().all()
@@ -676,9 +684,9 @@ async def accept_my_invite(
     invite.status = "accepted"
     try:
         await db.commit()  # a concurrent double-accept trips uq_membership_user_org — 409, not 500
-    except IntegrityError:
+    except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=409, detail="already a member of this org")
+        raise HTTPException(status_code=409, detail="already a member of this org") from exc
     org = await db.get(Org, invite.org_id)
     response.headers["Cache-Control"] = "no-store"
     return {"org": org.slug, "org_id": org.id, "name": org.name, "role": invite.role, "token": token}
@@ -727,7 +735,7 @@ async def list_members(
 ) -> list[dict]:
     _require_admin_of(org_id, caller)
     memberships = (await db.execute(select(Membership).where(Membership.org_id == org_id))).scalars().all()
-    users = {  # batch the user lookup (was one db.get per member)
+    users = {  # batch the user lookup, not one db.get per member
         u.id: u for u in (await db.execute(
             select(User).where(User.id.in_([m.user_id for m in memberships]))
         )).scalars().all()
@@ -833,6 +841,7 @@ async def remove_member(
         raise HTTPException(status_code=404, detail="not a member of this org")
     if membership.role == "owner":  # only an owner manages owners; an admin cannot remove one
         raise HTTPException(status_code=403, detail="owners cannot be removed")
+    await enterprise_sso.block_removed_member(db, org_id, user_id, caller.user.id)
     await teams.delete_membership(db, membership, actor_email=caller.email)
     await db.commit()
     return {"removed": user_id}
@@ -866,6 +875,8 @@ async def set_member_role(
             raise _owned_team_limit_error() from exc
     if membership.role == "owner" and body.role != "owner" and await _count_owners(org_id, db) <= 1:
         raise HTTPException(status_code=409, detail="cannot demote the last owner — promote another owner first")
+    await enterprise_sso.record_role_change(db, org_id, actor=caller.user.id,
+        subject=user_id, from_role=membership.role, to_role=body.role)
     membership.role = body.role
     await db.commit()
     return {"user_id": user_id, "role": body.role, "org_id": org_id}
@@ -903,6 +914,12 @@ async def delete_org(
     if confirm != org.slug:
         raise HTTPException(status_code=422, detail=(
             f"to delete this team, confirm with its slug: ?confirm={org.slug}"))
+    from ..models import EnterpriseSSO
+    sso = await db.get(EnterpriseSSO, org_id)
+    if sso is not None and sso.stripe_subscription_id and sso.subscription_status not in {"canceled", "incomplete_expired"}:
+        raise HTTPException(status_code=409, detail="cancel the SSO subscription in Billing before deleting this team")
+    if sso is not None and sso.workos_org_id and sso.workos_cleanup_completed_at is None:
+        raise HTTPException(status_code=409, detail="wait for SSO setup cleanup before deleting this team")
     # The team's archived answers go with it (archive.md, "Opting out"). The opt-out is set and
     # committed first, so nothing new of the team's is recorded from here on; the object phase
     # then runs on its own short sessions after this one has let go of its connection, and a
@@ -916,10 +933,10 @@ async def delete_org(
     return {"deleted_org": org_id}
 
 
-# ---- machine identities: the publishable demo token, and agents ----------------------------
-# Both are Users on an UNROUTABLE domain, which is what makes them machines rather than people: no
-# login door can ever resolve one (guarded in `_find_or_create_user`) and neither may act as a USER
-# (guarded in `require_identity`). Everything else they inherit from Membership for free.
+# Machine identities (the publishable demo token, and agents) are both Users on an UNROUTABLE
+# domain, which is what makes them machines rather than people: no login door can ever resolve one
+# (guarded in `_find_or_create_user`) and neither may act as a USER (guarded in `require_identity`).
+# Everything else they inherit from Membership for free.
 # NOTE: "agent" here is an IDENTITY — a coding agent / automation that calls treg. It is NOT the
 # skill-directory table in `agents.py` (which answers "where does each coding agent keep its skills").
 # The words collide, the concepts don't; kept apart deliberately.
@@ -1010,7 +1027,6 @@ async def delete_public_token(
     return {"public_token_revoked": True, "org": org.slug}
 
 
-# ---- agents: a member identity for a machine caller ----------------------------------------
 # An agent is JUST a Membership whose user lives on AGENT_DOMAIN, which is why this needs no new
 # table and no migration: it inherits every per-member control already in place — `daily_call_cap`
 # (enforced by `_enforce_daily_cap`), `tool_access` (`_require_tool_access`, on the proxy AND both run
@@ -1102,14 +1118,16 @@ async def create_agent(
         # rows without ever passing the parser.
         pins = dict(_validate_tag_pair(k, v) for k, v in pins.items())
     membership.pinned_tags = pins or None
+    enterprise = await db.get(EnterpriseSSO, org_id)
     try:
         token, key = await managed_keys.rotate_agent_key(
             db, membership, user, actor_email=caller.email,
+            sso_org_id=org_id if enterprise is not None and enterprise.enforced else None,
         )
         await db.commit()
-    except (managed_keys.RotationConflict, IntegrityError):
+    except (managed_keys.RotationConflict, IntegrityError) as exc:
         await db.rollback()
-        raise HTTPException(status_code=409, detail="another rotation already replaced this agent key")
+        raise HTTPException(status_code=409, detail="another rotation already replaced this agent key") from exc
     response.headers["Cache-Control"] = "no-store"
     return {"token": token, "name": name, "email": email, "org": caller.org.slug, "user_id": user.id,
             "api_key_id": key.id,
@@ -1312,8 +1330,8 @@ async def usage_spend(
     try:
         last = min(date.fromisoformat(to) if to else today, today)
         first = date.fromisoformat(from_) if from_ else key_spend.first_day(last, key_spend.WINDOW_DAYS)
-    except ValueError:
-        raise HTTPException(status_code=422, detail="from and to are dates: YYYY-MM-DD")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="from and to are dates: YYYY-MM-DD") from exc
     if first > last:
         raise HTTPException(status_code=422, detail="from must not be after to")
     state = await key_spend.history(db)
@@ -1376,9 +1394,7 @@ async def usage_by_tag(
 
     by_value = await ledger.spend_by_tag(db, org_id, dim, since)
     org_total = (await ledger.spend_since(db, org_id, since))["spend_micro"]
-    # Counts come from the tag rows too. `CallRecord` holds only the primary dimension, so counting
-    # there reported 0 for every non-primary key while the money column was correct — a report that
-    # disagrees with itself is worse than one that admits its grain.
+    # Counts come from the tag rows too: `CallRecord` holds only the primary dimension.
     counts = await ledger.calls_by_tag(db, org_id, dim, since)
     rows = [{"value": val, "charged_micro": micro, "charged_usd": ledger.usd(micro),
              "calls": int(counts.get(val, 0))}
@@ -1416,10 +1432,10 @@ async def rename_org(
                                allow_reserved=bool(caller.user.is_superadmin))
         await db.commit()
     except ValueError as e:
-        raise HTTPException(status_code=409 if "taken" in str(e) else 400, detail=str(e))
-    except IntegrityError:
+        raise HTTPException(status_code=409 if "taken" in str(e) else 400, detail=str(e)) from e
+    except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=409, detail="slug is taken")
+        raise HTTPException(status_code=409, detail="slug is taken") from exc
     analytics.capture(caller.email, "org_renamed", {
         "org_id": org.id, "slug_changed": org.slug != old_slug})
     return {"org_id": org.id, "org": org.slug, "previous_slug": org.previous_slug, "name": org.name}
@@ -1541,9 +1557,8 @@ async def set_tag_budget(
         _validate_tag_pair(dim, val)  # same rule as the call path — this value becomes a storage key
     declared = _budget_dims_of(caller.org)
     if dim not in declared:
-        # Setting a limit IS the declaration. Requiring a separate PATCH first made the common path a
-        # hidden two-step: the tag shows up in usage reports, so a person reasonably expects to be
-        # able to cap it, and got a 422 telling them to go configure something else first.
+        # Setting a limit IS the declaration: the tag shows up in usage reports, so a person
+        # reasonably expects to be able to cap it without configuring something else first.
         #
         # The BOUND still holds, because it is what keeps the call path cheap — each declared
         # dimension is another indexed lookup on every proxied call and another row per value. Past

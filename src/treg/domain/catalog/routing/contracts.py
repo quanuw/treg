@@ -42,8 +42,7 @@ class Contract:
     # true — a found contact the provider did not confirm deliverable, which an agent should verify
     # before outreach. Empty = no advice. A search contract has no `verified` output, so advice
     # set there attaches to EVERY hit — deliberate for `people.search`, whose rows carry emails
-    # nobody vouched for (2026-09-08: 73 of 79 bounces were unverified directory rows). A
-    # suggestion only unless the caller asks for the check (`check`, below).
+    # nobody vouched for. A suggestion only unless the caller asks for the check (`check`, below).
     advice_unverified: str = ""
     # False = the contract exists so the archive can judge found/empty (`results.has_result_rules`
     # needs a verified adapter, and an adapter verifies only against a contract); no
@@ -95,6 +94,7 @@ class Adapter:
     body_array: bool = False                   # the provider wants `[body]` (DataForSEO's task list)
     test_identity: dict[str, Any] = field(default_factory=dict)  # what the endpoint's test_request stands for, when `in` cannot read it back
     cost_units: str = ""                      # optional upper-bound chargeable units for a routed request
+    filter_max: dict[str, int] = field(default_factory=dict)  # `max:` a filter this provider caps (`limit: 8`); a request above it skips the provider
     additional_capabilities: tuple[str, ...] = ()  # opt-in reuse of the same request/output mapping
     route: bool = True                        # False: hit/miss evidence only, never a router candidate
     verified_capabilities: tuple[str, ...] = ()
@@ -203,6 +203,14 @@ def parse_contracts(doc: dict) -> dict[str, Contract]:
             # A typo'd key would silently scope nothing; failing the routing load instead makes
             # every `treg.*` capability disappear, which test_routing notices at once.
             raise ValueError(f"contract {cap}: scoping must list identity keys of the contract, got {scoping!r}")
+        for section in ("output", "filters"):
+            for k, spec in (c.get(section) or {}).items():
+                mode = spec.get("analytics", "skip") if isinstance(spec, dict) else "skip"
+                if mode not in ("key", "value", "skip") or (section == "filters" and mode == "key"):
+                    # Where a field lands in a call event (application/call_events.py): a typo
+                    # must fail loudly, never quietly emit an identifier as a plain value.
+                    raise ValueError(f"contract {cap}: {section}.{k} analytics must be key, value or skip "
+                                     f"(filters: value or skip), got {mode!r}")
         out[cap] = Contract(
             capability=cap, summary=str(c.get("summary") or ""), identity=_variants(c.get("identity")),
             identity_types=types, derive=dict(c.get("derive") or {}),
@@ -254,6 +262,7 @@ def parse_adapters(doc: dict) -> dict[str, Adapter]:
             in_expr=dict(a.get("in_expr") or {}), body_array=bool(a.get("body_array")),
             test_identity=dict(a.get("test_identity") or {}),
             cost_units=str(a.get("cost_units") or ""),
+            filter_max={str(k): int(v) for k, v in (a.get("max") or {}).items()},
             additional_capabilities=tuple(a.get("additional_capabilities") or ()),
             route=a.get("route", True) is not False,
             const=dict(a.get("const") or {}), out_map=dict(a.get("out") or {}), miss=str(a.get("miss") or ""),
@@ -261,8 +270,6 @@ def parse_adapters(doc: dict) -> dict[str, Adapter]:
             verdicts={_verdict_key(k) or str(k): str(v) for k, v in (a.get("verdicts") or {}).items()})
     return out
 
-
-# ---- identity -------------------------------------------------------------------------------
 
 def miss_status(endpoint: dict) -> int | None:
     """The ERROR status this endpoint's YAML declares as "no result" (`miss: {status, means}`),
@@ -337,8 +344,7 @@ def canonical_identity(contract: Contract, given: dict[str, Any]) -> tuple[dict[
         return ident, None
     if isinstance(ident.get("linkedin_url"), str):
         # One normalisation for every adapter that forwards the URL raw: a scheme-less
-        # `linkedin.com/in/x` reached quickenrich as-is and 422'd "must be a valid URL"
-        # (311 routed calls in two days, 2026-09-18); a handle becomes the public URL.
+        # `linkedin.com/in/x` is refused by some providers; a handle becomes the public URL.
         ident["linkedin_url"] = P.linkedin_url(ident["linkedin_url"]) or ident["linkedin_url"]
     for _ in range(2):  # derive until stable (join needs first+last; split needs full_name)
         for k, expr in contract.derive.items():
@@ -356,8 +362,6 @@ def adapter_accepts(adapter: Adapter, identity: dict[str, Any]) -> tuple[str, ..
     """The first accepted variant fully present in the (derived) identity, or None."""
     return next((v for v in adapter.accepts if all(identity.get(k) not in (None, "") for k in v)), None)
 
-
-# ---- verification ---------------------------------------------------------------------------
 
 def verify(adapter: Adapter, contract: Contract, endpoint: dict, example: Any) -> tuple[bool, str]:
     """Fixture round-trip: `in` must reproduce the endpoint's own `test_request` from the contract's

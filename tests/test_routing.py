@@ -38,7 +38,7 @@ ROUTED = "treg.people.email.find"
 
 
 @pytest.fixture
-def enrichment_on(monkeypatch, platform_on):  # noqa: F811
+def enrichment_on(monkeypatch, platform_on):
     for p in ("HUNTER", "TOMBA", "LEADMAGIC", "LEADSFORGE", "FINDYMAIL", "AVIATO", "FIBER_AI"):
         monkeypatch.setenv(f"TREG_PLATFORM_KEY_{p}", f"PLATFORM-{p}-KEY")
     monkeypatch.setenv("TREG_PLATFORM_KEY_TOMBA_SECRET", "PLATFORM-TOMBA-SECRET")
@@ -62,7 +62,7 @@ def enrichment_with_miss_declarers_on(monkeypatch, enrichment_on):
 
 
 @pytest.fixture
-def enrichment_with_quickenrich_on(monkeypatch, platform_on):  # noqa: F811
+def enrichment_with_quickenrich_on(monkeypatch, platform_on):
     """Like enrichment_on but includes QuickEnrich - the cheapest provider for phone/email lookups."""
     for p in ("HUNTER", "TOMBA", "LEADMAGIC", "LEADSFORGE", "FINDYMAIL", "AVIATO", "FIBER_AI", "QUICKENRICH"):
         monkeypatch.setenv(f"TREG_PLATFORM_KEY_{p}", f"PLATFORM-{p}-KEY")
@@ -271,7 +271,7 @@ def test_search_adapter_does_not_treat_an_answer_without_results_as_a_miss():
     ),
 ])
 async def test_firecrawl_web_routed_calls_serve_and_settle(
-    clients, monkeypatch, firecrawl_platform_on,  # noqa: F811
+    clients, monkeypatch, firecrawl_platform_on,
     parent, child, routed_input, upstream_body, expected_body, expected_cost,
 ):
     seen = []
@@ -505,7 +505,7 @@ async def test_routed_plan_keeps_an_exhausted_provider_when_its_overflow_route_i
 
 
 async def test_routed_call_reaches_an_enabled_overflow_before_the_next_provider(
-    clients: AsyncClient, platform_on, monkeypatch,  # noqa: F811
+    clients: AsyncClient, platform_on, monkeypatch,
 ):
     monkeypatch.setenv("TREG_PLATFORM_PROVIDERS", "akta,predictleads")
     monkeypatch.setenv("TREG_PLATFORM_KEY_AKTA", "AKTA-KEY")
@@ -836,6 +836,18 @@ async def test_catalog_get_on_the_routed_endpoint_shows_the_plan(clients: AsyncC
     assert plan and plan[0]["usd"] <= plan[-1]["usd"] and plan[0]["accepts"]
     assert "hit_rate" not in plan[0], "unmeasured says nothing rather than nulls"
     assert {c["endpoint_id"] for c in plan} <= set(d["endpoint"]["routed_children"] if "routed_children" in d["endpoint"] else [c["endpoint_id"] for c in plan])
+
+
+async def test_the_routed_quote_ranks_the_children_the_router_skips_last(clients: AsyncClient, enrichment_on, monkeypatch):
+    """The quote and the call agree: a child treg's key cannot serve (here `platform_blocked`)
+    stays in the plan for its `accepts`, after every child the router would call, saying why."""
+    from treg.domain.catalog import store as catalog_store
+    monkeypatch.setitem(catalog_store.load().by_id["tomba.people.email.find"], "platform_blocked", "test")
+    plan = (await clients.get(f"/catalog/endpoints/{ROUTED}")).json()["routing"]["plan"]
+    skipped = [c.get("skipped") is not None for c in plan]
+    assert skipped == sorted(skipped) and any(skipped) and not skipped[0]
+    tomba = next(c for c in plan if c["endpoint_id"] == "tomba.people.email.find")
+    assert tomba["skipped"] == "not platform-eligible and no own key" and tomba["accepts"]
 
 
 async def test_idempotent_replay_of_a_routed_call_never_calls_a_provider_twice(clients: AsyncClient, enrichment_on, monkeypatch):
@@ -1228,7 +1240,8 @@ async def test_routed_discovery_is_a_runtime_switch(clients: AsyncClient, enrich
         body = (await clients.get(path)).text
         assert "Routed endpoints" not in body, f"{path} must not teach what search hides"
         assert "<!--routed" not in body, f"{path} leaked a marker"
-        assert "provider_capacity_unavailable" in body, f"{path} lost the unrelated overflow guidance"
+        if path == "/skill.md":  # the failure table lives in the skill; llms.txt links to it
+            assert "provider_capacity_unavailable" in body, f"{path} lost the unrelated overflow guidance"
 
     # …but the endpoint is untouched: still callable, still priced, still found by id
     r = await clients.get("/catalog/endpoints/treg.people.email.find")
@@ -1806,7 +1819,7 @@ def test_arena_and_router_read_the_miss_block_the_same_way():
     assert arena.classify(contract, ad, ep, 400, {"error": True, "error_code": "INVALID_DATAPOINTS"})[0] == "error"
 
 
-async def test_company_blind_search_provider_is_dropped_not_billed(clients: AsyncClient, platform_on, monkeypatch):  # noqa: F811
+async def test_company_blind_search_provider_is_dropped_not_billed(clients: AsyncClient, platform_on, monkeypatch):
     """`people.search` declares `scoping: [company_domain]`. A title-only provider asked for
     `{company_domain, title}` answers with the same strangers for every company and bills them as
     a hit, so it leaves the plan instead of ranking last — and still serves a title-only search."""
@@ -2103,3 +2116,32 @@ async def test_a_missed_child_releases_its_hold_before_the_next_child_reserves(
     assert sorted((e.call_id, e.kind) for e in entries if (e.call_id or "").startswith(call_id)) == [
         (f"{call_id}:r0", "release"), (f"{call_id}:r0", "reserve"),
         (f"{call_id}:r1", "reserve"), (f"{call_id}:r1", "settle")]
+
+
+async def test_a_provider_that_caps_a_filter_is_skipped_above_the_cap(clients: AsyncClient, monkeypatch):
+    """`max: {limit: N}` on an adapter: a request asking for more than N skips that provider with a
+    named drop instead of answering less than was asked; at or under N it stays a candidate."""
+    monkeypatch.setenv("TREG_PLATFORM_PROVIDERS", "akta,predictleads")
+    monkeypatch.setenv("TREG_PLATFORM_KEY_AKTA", "AKTA-KEY")
+    monkeypatch.setenv("TREG_PLATFORM_KEY_PREDICTLEADS", "PREDICTLEADS-KEY")
+    get_settings.cache_clear()
+    cat = catalog_store.load()
+    import dataclasses
+    monkeypatch.setitem(cat.adapters, "akta.companies.news",
+                        dataclasses.replace(cat.adapters["akta.companies.news"], filter_max={"limit": 3}))
+
+    class _Org:
+        id = 1
+        platform_overflow_disabled = False
+
+    class _Caller:
+        org_id = 1
+        org = _Org()
+
+    ep = cat.by_id["treg.companies.news"]
+    options = call_route.RouteOptions.from_headers(lambda key: None)
+    over = await call_route.build_plan(ep, {"domain": "canva.com", "limit": 5}, _Caller(), options)
+    assert all(c.endpoint["id"] != "akta.companies.news" for c in over.candidates)
+    assert {"endpoint_id": "akta.companies.news", "why": "needs limit <= 3"} in over.dropped
+    under = await call_route.build_plan(ep, {"domain": "canva.com", "limit": 3}, _Caller(), options)
+    assert any(c.endpoint["id"] == "akta.companies.news" for c in under.candidates)

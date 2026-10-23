@@ -60,6 +60,8 @@ sources:
   - src/treg/catalog/examples/linkup.web.answer.json
   - src/treg/catalog/examples/linkup.web.answer.status.json
   - src/treg/catalog/parallel.yaml
+  - src/treg/catalog/pdl.yaml
+  - src/treg/catalog/pdl.extended.yaml
   - src/treg/web/logos/parallel.svg
   - src/treg/catalog/examples/parallel.web.search.json
   - src/treg/catalog/examples/parallel.web.search.advanced.json
@@ -85,6 +87,7 @@ sources:
   - src/treg/catalog/examples/tinyfish.web.agent.run.cancel.json
   - tests/test_tinyfish.py
   - src/treg/catalog/exa.yaml
+  - src/treg/catalog/anyapi.yaml
   - src/treg/catalog/anyapi.extended.yaml
   - src/treg/catalog/adyntel.yaml
   - src/treg/catalog/examples/adyntel.meta-ads.library.advertiser.json
@@ -237,6 +240,35 @@ against the declared public predicate after closing the database session, before
 assigned to any organization is never sent through the public lookup. BYOK never applies this
 policy. Fish remains deployment-disabled until live management-price, shared-account permission,
 and commercial checks pass.
+
+`team_label` covers provider objects that outlive a call and are kept per label (monitors,
+schedules, feeds) on treg's one shared account. It lists request fields (body, header, query or
+path) that must carry the calling team's own label, `resolve.team_label(org_id)`: stable, one per
+team. `_enforce_team_label` checks it on the shared key only, before reserve; the caller sends it,
+so the relay stays faithful, and a missing or other team's label is a 400 naming the expected
+value. A team's own key never applies it.
+
+`caller_email` lists request fields (nested body paths allowed, such as `notify.email`) that, when
+sent on the shared key, may only carry the caller's own verified email, compared case-insensitively;
+another address is a 400 before reserve, and leaving the field out is fine. `_enforce_caller_email`
+checks without rewriting, so a shared provider account sends alerts only to the person who asked.
+
+For a signed-in reader, `GET /catalog/endpoints/{id}` (and so MCP `catalog_get`) adds
+`your_values` on rows with `team_label` or `caller_email` fields: the exact values that reader may
+send (its team's label, its own email), so an agent gets its first call right without a bounce. An
+anonymous reader gets nothing extra; the route is not cached at the edge. MCP `my_tools` also
+returns the team's `team_label`.
+
+`cost.quantity` prices a call by a whole number the caller chooses (a budget of provider credits):
+`{field, max}` names a declared integer body or query field and its ceiling. A missing or
+out-of-range value is a 400 before reserve, the hold is `quantity x price`, and `settle: quantity`
+settles exactly that on success, ignoring any provider-reported charge (adding room is often free on
+the provider's side and reported as 0). An optional `applied` JSON path names the answer field that
+says the units were added; when it is not `true` (a retry the provider recognised by its purchase
+id) the call settles at 0. A cancel after the request has left (`settle._finish_cancelled_call` with
+`sent`) charges the hold instead of returning it, because the provider may already have added the
+units; the retry with the same purchase id then settles at 0, so the team pays exactly once. The validator requires it on a `per_success` price with no
+`reported_charge`. Together they let a team buy a budget for background work under its own label.
 
 ## Authorization metadata
 
@@ -1133,7 +1165,9 @@ that slice: it bills one whole credit (~$0.0245) for one email or ten (observed 
 `usd_per_call`. Settlement still reads `usd` and the derived email-count rule — display only.
 `Catalog.cost_view` reads the provider-neutral `cost.display` flags: `unit` names the shown unit,
 `grouped` shows the price for `cost.per` units, `round_up` labels a started block, `variable` adds
-a plus sign for selected additions, and `maximum` labels a validated reserve ceiling as "up to"
+a plus sign for selected additions, `value` shows the price of one `unit` when that is not the reserve
+unit (a job held at its full size but billed per page shows the page price; the hold still reads `usd`),
+and `maximum` labels a validated reserve ceiling as "up to"
 (it may wrap a price table, whose fallback is already the global upper bound). The result is
 display USD / unit / prefix / suffix fields only; `usd` and settlement are untouched. The validator
 checks the flags, requires a grouped price to declare a positive integer `per`, and refuses a table
@@ -1176,6 +1210,14 @@ ceiling. A finite nonnegative response value settles the call at that amount; a 
 body whose own `status` is 400 or more settles at zero; other missing, invalid, or non-finite
 evidence falls back to the normal estimate/miss rules. `reported_charge` is generic
 catalog metadata, not a provider-specific billing branch, and cannot be combined with `cost.settle`.
+
+A provider file, or one endpoint's `cost`, may declare `ceiling_param: {in: query, name, unit: usd}`.
+When the call has a caller ceiling and the caller did not send that query name, the call application
+appends it to the outbound query at the remaining ceiling in USD, so the provider refuses a dearer
+source instead of settling it. The validator requires `in: query`, `unit: usd` and an identifier
+`name`. The provider rule lives on `Catalog.ceiling_params`, not on `provider_meta` and not copied
+onto every cost, so catalog reads stay unchanged. A row-level `cost.ceiling_param` overrides it.
+The appended pair is outbound only: `params_hash` and the archive key stay the inbound query.
 
 `spooled_response: true` marks a synchronous endpoint whose answer inlines media too large for
 the 8 MiB settlement buffer (Gemini returns images as base64 in its JSON: ~9 MB at 2K, ~23 MB at
@@ -1847,10 +1889,12 @@ Five rules worth keeping:
   same). Endpoints with evidenced miss behaviour carry a `miss: {status, means}` block in their
   YAML, surfaced through `endpoint_view` — so an agent reads "404 = no match, don't retry" instead
   of treating an expected empty answer as a failure. Only annotate what the wire has demonstrated.
-  **The router and the arena read the same block through one function**
+  **The router, the arena and the hit verdict read the same block through one function**
   (`routing.contracts.declared_miss`, wrapped by `route._declared_miss` and called by
-  `arena.classify`): a child answering the declared 4xx is a MISS — the waterfall goes on and a
-  fully-missed call ends as a 200 miss, never `route_failed`. Where one status carries both a
+  `arena.classify` and `results.classify`): a child answering the declared 4xx is a MISS — the
+  waterfall goes on and a fully-missed call ends as a 200 miss, never `route_failed` — and any
+  call answering it records `CallRecord.hit = False` (state `empty`, reason `declared_miss`).
+  Without that, a provider that errors its misses recorded only its hits and read 100%. Where one status carries both a
   miss and a fault, `when:` adds a body predicate in the adapter expression language, evaluated
   only on a JSON-object body (`catalog_validate.py` rejects a `when` that is not a comparison or
   call, since a misspelt path would evaluate False forever and silently revert the endpoint to
@@ -2073,7 +2117,9 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   never provider names — `{full_name, domain}`, `{first_name, last_name, domain}`,
   `{linkedin_url}`), `derive` rules so the two name shapes match the same adapters, a small
   *output* core (`email` required; `confidence`, names, `verified` optional) and `miss` in
-  canonical terms. `raw` — the winning provider's body — is always returned and never documented
+  canonical terms. An output field may say where it lands in a call event (`analytics: key |
+  value | skip`, default skip; [call-events.md](call-events.md)); the public contract view drops
+  it. `raw` — the winning provider's body — is always returned and never documented
   as stable. `advice_unverified` (email and phone finds, and `people.search`) is one sentence the
   router attaches as `_treg.advice` to a hit whose `verified` is not true — a found contact is not
   a confirmed one (Hunter's `accept_all`, LeadMagic's personal finder, every phone provider), and a
@@ -2161,6 +2207,8 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   expresses an upper bound in catalog-priced units (for example, fixed-page billing). Both the
   public quote and call-time plan use it through `routing/plan.py::cost_at`; invalid unit values
   remain unpriced. It does not replace the child's normal reserve/settle rules.
+  Optional adapter `max` (`{limit: 8}`) names a filter the provider caps: `build_plan` drops that
+  child for a request above the cap (`needs limit <= 8`) instead of letting it answer less than was asked.
 - **Verified at load, or absent** — `routing/contracts.py::verify`: `in` must reproduce the
   endpoint's own `test_request` and `out` must fill every required core field from its
   `example_response` (an example that is itself a miss passes with the hit half unverified).
@@ -2180,7 +2228,8 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   carries the range. Never hand-written; not in any
   provider file.
   `catalog_get` on it returns the contract and the ranked **plan** (the quote) —
-  nothing is reserved.
+  nothing is reserved. A child the router would not call on treg's key (paused, not
+  `platform_eligible`, no key on this deployment) ranks after the rest with a `skipped` reason.
 - **Ranking** — `routing/plan.py`: own keys (tier 2) first at cost 0; then
   `expected_cost_per_hit = cost_at(request) × P(billed) / P(hit)` where `cost_at` prices *this*
   request at its requested size (per-result × limit, credit-with-minimum rounded up) and `P(hit)`
@@ -2265,7 +2314,8 @@ to choose (`docs/CAPABILITY-ROUTING-PLAN.md`). Everything else in the catalog st
   and charge; the existing async worker owns eventual settlement. Only declared terminal misses and
   failures may continue under the normal bounded fallback rules.
 - **Hit rate** — `CallRecord.hit` (nullable, alembic `0009`, last column) is the adapter's verdict
-  for a completed result. An accepted async submission leaves it NULL; the terminal finalizer
+  for a completed result: a 2xx the adapter judges, or the endpoint's declared `miss:` status
+  (False); any other error status stays NULL. An accepted async submission leaves it NULL; the terminal finalizer
   classifies the finished body and queues an audit update for the originating row, including a
   routed child. The poll response does not wait for that best-effort write. A
   confirmed terminal failure counts as a miss; pending and timed-out jobs remain undecided. Its

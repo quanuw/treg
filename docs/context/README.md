@@ -19,6 +19,7 @@ covers (frontmatter `sources:`). Regenerate this index with
 | [Google Ads conversion tracking — capture, outbox, upload](architecture/ads-conversions.md) | shipped | adsconv.py, signup.py, adtrack.js, gtag.js, … |
 | [Archive - versioned history and cache admission](architecture/archive.md) | building | archive.py, hunter.yaml, results.py, 0031_archive_result_admission.py, … |
 | [Auth & secrets — injectors, encryption, OAuth freshness, health](architecture/auth-secrets.md) | shipped | injectors.py, ssrf.py, crypto.py, oauth.py, … |
+| [Call events — one pseudonymous event per call, to an Iceberg table outside Postgres](architecture/call-events.md) | building | call_events.py, call_events.py, contracts.yaml, test_call_events.py |
 | [Endpoint catalog — what you can DO with a connected key, and which provider should do it](architecture/catalog.md) | shipped | catalog_added.py, catalog_backfill_added.py, catalog-added.yml, fetchinio.yaml, … |
 | [Application composition and deployment roles](architecture/composition.md) | shipped | bootstrap.py, bootstrap_handlers.py, bootstrap_http.py, worker.py, … |
 | [Data model — the registry tables, async DB, audit writer](architecture/data-model.md) | shipped | 0042_pinned_read_scope.py, alembic.ini, env.py, 0001_baseline_current_schema.py, … |
@@ -42,6 +43,7 @@ covers (frontmatter `sources:`). Regenerate this index with
 | [Showcase leaderboard and pictures - applications, review, votes, avatars](architecture/showcase.md) | shipped | __init__.py, showcase.py, showcase.py, __init__.py, … |
 | [Super-admin — cross-tenant read + control](architecture/super-admin.md) | shipped | api.py, admin.py, evidence_retention.py, access.py, … |
 | [The table layer — one call, answered as rows and columns (`/table/`)](architecture/table.md) | built, behind `table_enabled` (TREG_TABLE_ENABLED), off by default | __init__.py, table.py, table.py, call.py, … |
+| [Workbench table storage](architecture/workbench-storage.md) | foundational | models.py, 0077_workbench_table_metadata.py, teams.py, test_workbench_table_schema.py, … |
 
 ## Interfaces (API · CLI · skill)
 
@@ -53,20 +55,20 @@ covers (frontmatter `sources:`). Regenerate this index with
 | [The web dashboard (served from FastAPI)](interface/dashboard.md) | shipped | App.vue, TeamShowcase.vue, TeamAvatar.vue, UserAvatarDialog.vue, … |
 | [Enrich Arena — paid comparisons, one-click feedback, and visible waterfalls](interface/enrich-arena.md) | shipped | arena.py, arena.py, arena.py, models.py, … |
 | [Import — scan a .env AND/OR a skills dir, auto-register as tools + bundles](interface/env-import.md) | in-progress | providers.py, skills.py |
-| [Landing sandbox backend - front-end entry removed](interface/landing-sandbox.md) | shipped | sandbox.py, sandbox_identity.py, pubfeed.py, sandbox.py, … |
+| [Landing sandbox backend - closed](interface/landing-sandbox.md) | closed | sandbox.py, sandbox_identity.py, pubfeed.py, sandbox.py, … |
 | [Onboarding — the first-run demo team (dashboard + CLI)](interface/onboarding.md) | shipped | auth.py, __init__.py, demo.py, first_run.py, … |
 | [Search surfaces — robots, sitemap, the crawlable catalog, and the social card](interface/seo.md) | shipped | api.py, web.py, agent_pages.py, robots.txt, … |
 | [Shell mode (treg shell) — transparent CLI interception](interface/shell.md) | shipped | shell.py, cli.py |
 | [Test cases for the ChatGPT plugin submission](interface/skill-openai-test-cases.md) | reference | — |
 | [Tool justifications for the ChatGPT plugin submission](interface/skill-openai-tool-justifications.md) | reference | — |
-| [The shippable tools-registry skill (3 personas)](interface/skill.md) | shipped | skill.md, SKILL.md, SKILL.md, SKILL.md, … |
+| [The shippable tools-registry skill (3 personas)](interface/skill.md) | shipped | skill.md, integrate.md, SKILL.md, SKILL.md, … |
 | [Web Arena — private comparisons and live provider observations](interface/web-arena.md) | gated | web_arena.py, web_arena_scores.py, web_arena.py, web_arena_quality.py, … |
 
 ## Ops (deploy, scale)
 
 | Fragment | Status | Covers |
 |---|---|---|
-| [Provider capacity — knowing what treg's own vendor accounts have left](ops/capacity.md) | shipped | __init__.py, collectors.py, policy.py, sweep.py, … |
+| [Provider capacity — knowing what treg's own vendor accounts have left](ops/capacity.md) | shipped | __init__.py, capacity_notice.py, test_capacity_notice.py, collectors.py, … |
 | [Running & deploying the server](ops/deploy.md) | shipped | pyproject.toml, hatch_build.py, build-dashboard.sh, build-web.sh, … |
 
 ## Reference

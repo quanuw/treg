@@ -23,6 +23,11 @@ from datetime import datetime, timedelta, timezone
 import pytest
 import stripe
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import update
+from stripe.params.checkout._session_create_params import (
+    SessionCreateParams,
+    SessionCreateParamsSetupIntentData,
+)
 from sqlmodel import select
 
 from conftest import make_upstream, verified_signup
@@ -33,7 +38,7 @@ from treg.domain import money as ledger
 from treg.api import app
 from treg.config import get_settings
 from treg.infra.db import reset_db, session_maker
-from treg.models import AdConversion, Org
+from treg.models import AdConversion, EnterpriseSSO, Org
 
 WHSEC = "whsec_test_secret_for_the_suite"
 
@@ -381,6 +386,107 @@ async def test_history_of_a_team_that_never_paid_is_empty_not_an_error(c: AsyncC
     assert r.status_code == 200 and r.json()["items"] == []
 
 
+async def test_history_merges_and_pages_topups_with_sso_invoices(c: AsyncClient, monkeypatch):
+    org_id, owner = await _org(c)
+    await _set_org(org_id, stripe_customer_id="cus_one_team")
+    async with session_maker() as db:
+        db.add(EnterpriseSSO(org_id=org_id, plan="sso_directory", subscription_status="active",
+                             stripe_subscription_id="sub_one_team"))
+        await ledger.topup(db, org_id, 20_000_000, "pi_manual", meta={"source": "stripe"})
+        await db.commit()
+    seen = []
+
+    async def fake_sdk(fn, /, **kw):
+        seen.append((fn, kw))
+        if fn == billing.stripe_adapter.CHARGE_LIST:
+            if kw.get("payment_intent") == "pi_sso":
+                return {"data": [{"status": "succeeded", "receipt_url": "https://pay.stripe.test/sso-receipt"}]}
+            return {"data": [_charge("pi_manual")]}
+        if fn == billing.stripe_adapter.INVOICE_LIST:
+            assert kw["customer"] == "cus_one_team"
+            return {"data": [{**_invoice("in_sso"), "created": int(time.time()) + 3600,
+                              "total": 29900, "currency": "usd", "status": "paid",
+                              "parent": {"subscription_details": {"subscription": "sub_one_team"}},
+                              "payments": {"data": [{"payment": {"payment_intent": "pi_sso"}}]}}],
+                    "has_more": False} if not kw.get("starting_after") else {"data": [], "has_more": False}
+        pytest.fail(f"unexpected Stripe call: {fn}")
+
+    monkeypatch.setattr(billing, "_sdk", fake_sdk)
+    first = (await c.get("/billing/history?limit=1", headers=_h(owner))).json()
+    assert len(first["items"]) == 1
+    assert first["items"][0]["kind"] == "subscription"
+    assert first["items"][0]["amount_micro"] == 299_000_000
+    assert first["items"][0]["invoice_pdf"].endswith("/pdf")
+    assert first["items"][0]["receipt_url"] == "https://pay.stripe.test/sso-receipt"
+    assert first["next_cursor"]
+    second = (await c.get("/billing/history", params={"limit": 1, "cursor": first["next_cursor"]},
+                          headers=_h(owner))).json()
+    assert [i["kind"] for i in second["items"]] == ["manual"]
+    assert second["items"][0]["amount_micro"] == 20_000_000
+    assert second["next_cursor"] is None
+    assert any(kw.get("starting_after") == "in_sso" for _, kw in seen)
+
+
+async def test_history_keeps_invoices_from_an_earlier_sso_purchase(c: AsyncClient, monkeypatch):
+    org_id, owner = await _org(c)
+    await _set_org(org_id, stripe_customer_id="cus_one_team")
+    async with session_maker() as db:
+        db.add(EnterpriseSSO(org_id=org_id, stripe_subscription_id="sub_current"))
+        await db.commit()
+
+    async def fake_sdk(fn, /, **kw):
+        assert fn == billing.stripe_adapter.INVOICE_LIST
+        assert kw["customer"] == "cus_one_team"
+        return {"data": [
+            {**_invoice("in_topup"), "total": 2000, "created": 3,
+             "metadata": {"treg_kind": "topup"}},
+            {**_invoice("in_old_sso"), "total": 29900, "created": 2,
+             "parent": {"subscription_details": {"subscription": "sub_old",
+                         "metadata": {"treg_kind": "enterprise_sso", "treg_org_id": str(org_id)}}}},
+        ], "has_more": False}
+
+    monkeypatch.setattr(billing, "_sdk", fake_sdk)
+    body = (await c.get("/billing/history?kind=subscription", headers=_h(owner))).json()
+    assert [i["id"] for i in body["items"]] == ["in_old_sso"]
+
+
+async def test_history_filters_and_rejects_bad_cursor(c: AsyncClient, monkeypatch):
+    org_id, owner = await _org(c)
+    await _set_org(org_id, stripe_customer_id="cus_one_team")
+    async with session_maker() as db:
+        await ledger.topup(db, org_id, 10_000_000, "pi_manual", meta={"source": "stripe"})
+        await ledger.topup(db, org_id, 20_000_000, "pi_auto", meta={"source": "stripe", "auto": True})
+        await db.commit()
+    monkeypatch.setattr(billing, "_sdk", _docs_sdk([], []))
+    for kind, expected in [("manual", "pi_manual"), ("auto", "pi_auto")]:
+        body = (await c.get("/billing/history", params={"kind": kind}, headers=_h(owner))).json()
+        assert [i["payment_intent"] for i in body["items"]] == [expected]
+    first = (await c.get("/billing/history?limit=1&kind=all", headers=_h(owner))).json()
+    second = (await c.get("/billing/history", params={"limit": 1, "kind": "all",
+                                                       "cursor": first["next_cursor"]}, headers=_h(owner))).json()
+    assert {first["items"][0]["payment_intent"], second["items"][0]["payment_intent"]} == {"pi_auto", "pi_manual"}
+    assert second["next_cursor"] is None
+    assert (await c.get("/billing/history?cursor=invalid", headers=_h(owner))).status_code == 422
+
+
+async def test_history_stripe_outage_keeps_topups_but_marks_invoices_unavailable(c: AsyncClient, monkeypatch):
+    org_id, owner = await _org(c)
+    await _set_org(org_id, stripe_customer_id="cus_one_team")
+    async with session_maker() as db:
+        db.add(EnterpriseSSO(org_id=org_id, stripe_subscription_id="sub_one_team"))
+        await ledger.topup(db, org_id, 10_000_000, "pi_manual", meta={"source": "stripe"})
+        await db.commit()
+
+    async def unavailable(fn, /, **kw):
+        raise stripe.APIConnectionError("Stripe unavailable")
+
+    monkeypatch.setattr(billing, "_sdk", unavailable)
+    body = (await c.get("/billing/history", headers=_h(owner))).json()
+    assert [i["kind"] for i in body["items"]] == ["manual"]
+    assert body["subscription_invoices_ok"] is False
+    assert body["next_cursor"] is None
+
+
 # ---- webhook: signature ------------------------------------------------------------------------
 async def test_webhook_rejects_a_bad_signature(c: AsyncClient):
     org_id, _ = await _org(c)
@@ -543,8 +649,9 @@ async def test_disabling_autotopup_clears_the_failure_banner(c: AsyncClient, mon
 
 
 async def test_setup_checkout_sends_valid_stripe_params(c: AsyncClient, monkeypatch):
-    """mode=setup Checkout must NOT pass `usage` under setup_intent_data: Stripe rejects it with
-    InvalidRequestError, and Checkout's SetupIntent is already off_session by default."""
+    """The fake cannot reject what Stripe rejects, so the call is checked against the SDK's own
+    parameter types: an unknown key (`setup_intent_data.usage`) and a missing `currency` in setup
+    mode each made every card-less enable fail with 422."""
     org_id, owner = await _org(c)
     captured: list[dict] = []
 
@@ -564,8 +671,11 @@ async def test_setup_checkout_sends_valid_stripe_params(c: AsyncClient, monkeypa
     assert len(captured) == 1, "expected one Checkout session create call"
     session_kw = captured[0]
     assert session_kw["mode"] == "setup"
+    assert set(session_kw) <= set(SessionCreateParams.__annotations__)
+    # Required in setup mode without `payment_method_types`; the account default is not USD.
+    assert session_kw["currency"] == "usd"
     setup_data = session_kw.get("setup_intent_data", {})
-    assert "usage" not in setup_data, "setup_intent_data must not contain 'usage' — Stripe rejects it"
+    assert set(setup_data) <= set(SessionCreateParamsSetupIntentData.__annotations__)
     assert setup_data.get("metadata", {}).get("treg_org_id") == str(org_id)
     assert session_kw.get("metadata", {}).get("treg_org_id") == str(org_id)
 
@@ -945,6 +1055,156 @@ async def test_repeated_unknown_outcomes_pause_without_another_charge(c: AsyncCl
     assert sum("outcome unconfirmed" in record.message for record in caplog.records) == limit
 
 
+async def test_auto_topup_that_loses_the_claim_never_reaches_stripe(c: AsyncClient, monkeypatch):
+    """`_lock` is per process. Another web process that read the same old stamp and claimed first
+    must leave this attempt with nothing to do, not a second request on the same invoice."""
+    org_id, owner = await _org(c)
+    await _armed(org_id)
+    monkeypatch.setattr(billing, "_sdk", _no_sdk)
+    spend = billing.monthly_autotopup_spend
+
+    async def rival_claims_first(db, oid):
+        # Runs after this attempt read the stamp and before it claims: the rival's UPDATE lands.
+        await db.execute(update(Org).where(Org.id == oid)
+                         .values(autotopup_last_attempt_at=billing._now()))
+        await db.commit()
+        return await spend(db, oid)
+
+    monkeypatch.setattr(billing, "monthly_autotopup_spend", rival_claims_first)
+    assert (await _attempt(org_id))["reason"] == "cooldown"
+    state = (await c.get("/billing", headers=_h(owner))).json()["autotopup"]
+    assert state["failures"] == 0 and state["enabled"] is True
+
+
+async def test_stripe_conflict_is_not_a_failed_attempt(c: AsyncClient, monkeypatch):
+    """A 409 means Stripe is still running another request on this invoice. Counting it as a
+    failure switched auto top-up off for teams whose payment then went through."""
+    org_id, owner = await _org(c)
+    await _armed(org_id)
+    conflict = stripe.APIError("concurrent request on this invoice", http_status=409)
+    sdk = _invoice_sdk(pay_error=conflict)
+    monkeypatch.setattr(billing, "_sdk", sdk)
+    notices = []
+
+    async def disabled_notice(*args, **kwargs):
+        notices.append(args)
+
+    monkeypatch.setattr(billing.email_mod, "send_autotopup_disabled", disabled_notice)
+    for _ in range(get_settings().autotopup_max_attempts + 1):
+        await _set_org(org_id, autotopup_last_attempt_at=None)
+        assert (await _attempt(org_id))["reason"] == "stripe_busy"
+    state = (await c.get("/billing", headers=_h(owner))).json()["autotopup"]
+    assert state["failures"] == 0 and state["enabled"] is True and not notices
+    assert sdk.state["invoice_count"] == 1 and sdk.state["charge_count"] == 0
+
+
+async def test_a_paid_attempt_re_arms_a_policy_paused_while_it_ran(c: AsyncClient, monkeypatch):
+    """A rival paused the policy as `stripe_unconfirmed` while this attempt was paying the same
+    invoice. The payment that resolves the doubt must switch it back on, not leave it off with no
+    reason, which reads as a deliberate off."""
+    org_id, owner = await _org(c)
+    await _armed(org_id)
+    monkeypatch.setattr(billing, "_sdk", _invoice_sdk(payment_method="pm_armed"))
+    find = billing._attempt_invoice
+
+    async def rival_pauses(*args, **kwargs):
+        await _set_org(org_id, autotopup_enabled=False, autotopup_disabled_reason="stripe_unconfirmed",
+                       autotopup_failures=3)
+        return await find(*args, **kwargs)
+
+    monkeypatch.setattr(billing, "_attempt_invoice", rival_pauses)
+    assert (await _attempt(org_id))["ok"] is True
+    state = (await c.get("/billing", headers=_h(owner))).json()["autotopup"]
+    assert state["enabled"] is True and state["disabled_reason"] is None and state["failures"] == 0
+
+
+@pytest.mark.parametrize("auto, enabled", [("1", True), ("0", False)])
+async def test_a_paid_auto_invoice_re_arms_an_unconfirmed_pause(c: AsyncClient, monkeypatch,
+                                                                auto, enabled):
+    """`stripe_unconfirmed` asks whether an automatic charge went through. Its payment webhook
+    answers that; a manual payment does not, so the pause stays for support to check."""
+    org_id, owner = await _org(c)
+    monkeypatch.setattr(billing, "_sdk", _no_sdk)
+    await _set_org(org_id, **_declined(autotopup_disabled_reason="stripe_unconfirmed",
+                                       stripe_default_pm="pm_card_visa"))
+    r = await _deliver(c, _pi_event(org_id, pi="pi_auto_resolved", auto=auto))
+    assert r.status_code == 200, r.text
+    state = (await c.get("/billing", headers=_h(owner))).json()["autotopup"]
+    assert state["enabled"] is enabled
+    assert state["disabled_reason"] == (None if enabled else "stripe_unconfirmed")
+
+
+@pytest.mark.parametrize("refused_at", ["create", "pay"])
+async def test_a_removed_card_pauses_as_no_card_not_unconfirmed(c: AsyncClient, monkeypatch,
+                                                                refused_at):
+    """Stripe refuses a card no longer attached to the customer, so nothing was charged. Calling
+    it unconfirmed sent teams to support; the fix is a new card, which re-arms."""
+    org_id, owner = await _org(c)
+    await _armed(org_id)
+    gone = stripe.InvalidRequestError(
+        "The customer does not have a payment method with the ID pm_armed.", param="payment_method",
+        http_status=400)
+    sdk = _invoice_sdk(pay_error=gone if refused_at == "pay" else None)
+
+    async def detached(fn, /, **kw):
+        if refused_at == "create" and fn == billing.stripe_adapter.INVOICE_CREATE:
+            raise gone
+        return await sdk(fn, **kw)
+
+    monkeypatch.setattr(billing, "_sdk", detached)
+    notices = []
+
+    async def disabled_notice(*args, **kwargs):
+        notices.append(args)
+
+    monkeypatch.setattr(billing.email_mod, "send_autotopup_disabled", disabled_notice)
+    assert (await _attempt(org_id))["reason"] == "no_card"
+    body = (await c.get("/billing", headers=_h(owner))).json()
+    assert body["card_on_file"] is False
+    assert body["autotopup"]["enabled"] is False and body["autotopup"]["disabled_reason"] == "no_card"
+    assert body["autotopup"]["failures"] == 0
+    assert len(notices) == 1 and notices[0][2] == "no_card"
+    assert sdk.state["charge_count"] == 0
+    assert sdk.state["status"] == ("void" if refused_at == "pay" else "draft")
+    await _setup(c, org_id, "pm_new")
+    state = (await c.get("/billing", headers=_h(owner))).json()["autotopup"]
+    assert state["enabled"] is True and state["disabled_reason"] is None
+
+
+@pytest.mark.parametrize("meanwhile, enabled, reason, card", [
+    ({"stripe_default_pm": "pm_new"}, True, None, True),           # a new card is already the fix
+    ({"autotopup_enabled": False}, False, None, False),            # a deliberate off stays one
+])
+async def test_a_removed_card_respects_what_changed_while_stripe_answered(
+        c: AsyncClient, monkeypatch, meanwhile, enabled, reason, card):
+    org_id, owner = await _org(c)
+    await _armed(org_id)
+    gone = stripe.InvalidRequestError(
+        "The customer does not have a payment method with the ID pm_armed.", param="payment_method",
+        http_status=400)
+
+    async def refused(fn, /, **kw):
+        if fn == billing.stripe_adapter.INVOICE_CREATE:
+            await _set_org(org_id, **meanwhile)
+            raise gone
+        return await _invoice_sdk()(fn, **kw)
+
+    monkeypatch.setattr(billing, "_sdk", refused)
+    notices = []
+
+    async def disabled_notice(*args, **kwargs):
+        notices.append(args)
+
+    monkeypatch.setattr(billing.email_mod, "send_autotopup_disabled", disabled_notice)
+    assert (await _attempt(org_id))["reason"] == "no_card"
+    body = (await c.get("/billing", headers=_h(owner))).json()
+    assert body["card_on_file"] is card and not notices
+    assert body["autotopup"]["enabled"] is enabled
+    assert body["autotopup"]["disabled_reason"] is reason
+    await _setup(c, org_id, "pm_later")
+    assert (await c.get("/billing", headers=_h(owner))).json()["autotopup"]["enabled"] is enabled
+
+
 async def test_invoice_lookup_starts_before_last_auto_credit_not_later_manual_credit(
         c: AsyncClient, monkeypatch):
     org_id, _ = await _org(c)
@@ -1214,6 +1474,42 @@ async def test_auto_topup_stops_at_the_monthly_cap(c: AsyncClient, monkeypatch):
     result = await _attempt(org_id)                        # a second $10 would exceed it
     assert result["reason"] == "monthly_cap"
     assert result["spent_micro"] == 10_000_000 and result["cap_micro"] == 15_000_000
+
+
+async def test_an_unchosen_monthly_cap_is_the_single_topup_ceiling(c: AsyncClient):
+    org_id, _ = await _org(c)
+    await _armed(org_id, autotopup_monthly_cap_micro=0)
+    async with session_maker() as db:
+        org = await db.get(Org, org_id)
+        assert billing.autotopup_prefs(org)["monthly_cap_micro"] == billing.usd_to_micro(billing.TOPUP_MAX_USD)
+
+
+async def test_inline_auto_charge_emits_one_topup_completed(c: AsyncClient, monkeypatch, posthog_events):
+    org_id, _ = await _org(c)
+    await _armed(org_id)
+    monkeypatch.setattr(billing, "_sdk", _invoice_sdk("pi_auto_event"))
+    assert (await _attempt(org_id))["ok"] is True
+    monkeypatch.setattr(billing, "_sdk", _no_sdk)
+    event = _pi_event(org_id, pi="pi_auto_event", cents=1000, auto="1")
+    assert (await _deliver(c, event)).json()["credited"] is False
+
+    done = await posthog_events("topup_completed")
+    assert len(done) == 1, done
+    props = done[0]["properties"]
+    assert props["auto"] is True and props["amount_micro"] == 10_000_000
+    assert props["balance_after_micro"] == 100 + 10_000_000
+    assert props["$groups"] == {"team": props["org"]} and props["org"]
+
+
+async def test_billing_state_says_when_the_monthly_cap_holds_the_next_charge(c: AsyncClient, monkeypatch):
+    org_id, _ = await _org(c)
+    await _armed(org_id, autotopup_monthly_cap_micro=15_000_000)
+    monkeypatch.setattr(billing, "_sdk", _invoice_sdk("pi_cap_state"))
+    async with session_maker() as db:
+        assert (await billing.billing_state(db, await db.get(Org, org_id)))["autotopup"]["cap_reached"] is False
+    assert (await _attempt(org_id))["ok"] is True          # $10 of $15: the next $10 would pass it
+    async with session_maker() as db:
+        assert (await billing.billing_state(db, await db.get(Org, org_id)))["autotopup"]["cap_reached"] is True
 
 
 async def test_monthly_spend_counts_only_automatic_topups(c: AsyncClient, monkeypatch):
@@ -1733,6 +2029,18 @@ async def test_topup_without_an_amount_uses_the_ladder_default(c: AsyncClient, m
     r = await c.post("/billing/topup", json={}, headers=_h(owner))
     assert r.status_code == 200, r.text
     assert r.json()["amount_usd"] == 50
+
+
+async def test_a_monthly_cap_below_one_refill_is_refused_and_0_restores_the_default(c: AsyncClient, monkeypatch):
+    org_id, owner = await _org(c)
+    monkeypatch.setattr(billing, "_sdk", _no_sdk)
+    base = {"enabled": True, "consent": True, "threshold_usd": 5, "amount_usd": 100, "setup_url": False}
+    r = await c.post("/billing/autotopup", headers=_h(owner), json={**base, "monthly_cap_usd": 50})
+    assert r.status_code == 422 and "below one refill" in r.text, r.text
+    r = await c.post("/billing/autotopup", headers=_h(owner), json={**base, "monthly_cap_usd": 300})
+    assert r.json()["autotopup"]["monthly_cap_usd"] == 300
+    r = await c.post("/billing/autotopup", headers=_h(owner), json={**base, "monthly_cap_usd": 0})
+    assert r.json()["autotopup"]["monthly_cap_usd"] == billing.TOPUP_MAX_USD
 
 
 async def test_a_topup_checkout_arms_a_consented_policy_that_was_waiting_for_a_card(c: AsyncClient, monkeypatch):

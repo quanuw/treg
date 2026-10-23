@@ -20,12 +20,10 @@ from ..domain.catalog import store as catalog_store
 from ..domain.catalog import stats as endpoint_stats
 
 
-# The app alias preserves the moved handlers' original @app.get decorator text byte-for-byte.
 app = APIRouter()
 public_router = app
 
-# ---- endpoint catalog (what you can DO once connected) ------------------------------------
-# The credential registry above answers "how do I connect Moz?"; these answer "and then what can I
+# What you can DO once connected. /providers.json answers "how do I connect Moz?"; these answer "and then what can I
 # call?" — platform-grouped operations with cost, verification date and captured example responses.
 # Open like /providers.json: the data is curated public documentation, no org's anything is in it.
 # See docs/context/architecture/catalog.md.
@@ -216,6 +214,17 @@ async def catalog_provider(service: str) -> dict:
     }
 
 
+def _quote_skip(ep: dict, cat) -> str | None:
+    """Why the router would not call this child on treg's key, in `route.py`'s words; None if it would."""
+    if catalog_store.paused(ep):
+        return f"{ep['provider']} is paused on this deployment"
+    if not cat.platform_eligible(ep):
+        return "not platform-eligible and no own key"
+    if not get_settings().platform_key_for(ep["provider"]):
+        return f"no {ep['provider']} key on this deployment and no own key"
+    return None
+
+
 def _plan_row(c) -> dict:
     """One quote line, token-frugal: what an agent needs to pick or set a ceiling. Measured rates
     ride only when they exist; the unmeasured case says nothing rather than four nulls."""
@@ -244,7 +253,7 @@ async def _overflow_disclosure(ep: dict, cat) -> dict:
         return {}
     try:
         await overflow_routes_view.load()
-    except Exception:  # noqa: BLE001 - a disclosure must never take the catalog down
+    except Exception:
         logging.getLogger("treg.catalog").warning("overflow routes unavailable", exc_info=True)
         return {}
     for route in overflow_routes_view.for_endpoint(ep["id"]):
@@ -266,7 +275,7 @@ async def _observed_or_empty(
     """
     try:
         return await reader.get_many(endpoint_ids)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logging.getLogger("treg.catalog").warning("endpoint stats unavailable", exc_info=True)
         return {}
 
@@ -291,7 +300,7 @@ async def _verdicts_or_empty() -> dict[str, dict]:
     `_observed_or_empty`: an enrichment must never take the catalog down."""
     try:
         return await feedback_app.endpoint_verdicts()
-    except Exception:  # noqa: BLE001
+    except Exception:
         logging.getLogger("treg.catalog").warning("endpoint verdicts unavailable", exc_info=True)
         return {}
 
@@ -545,9 +554,35 @@ def _related_capabilities(ep: dict, cat) -> list[dict]:
     return sorted(out, key=lambda r: r["capability"])[:5]
 
 
+async def _your_values(request: Request, db: AsyncSession, ep: dict) -> dict:
+    """The values only this reader may send for a row's `team_label` and `caller_email` fields, so
+    a signed-in agent gets its first call right. The route stays open: an anonymous reader, or one
+    whose token does not resolve to a team, gets nothing extra. Not cached at the edge."""
+    token = request.headers.get("x-treg-token", "")
+    auth = request.headers.get("authorization", "")
+    if not token and auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+    cookie = request.cookies.get("treg_session", "")
+    if not token and not cookie:
+        return {}
+    from ..application.call.resolve import team_label
+    from ..domain.identity.access import require_member
+    try:
+        caller = await require_member(request, x_treg_token=token, x_treg_org=request.headers.get("x-treg-org", ""),
+                                      treg_session=cookie, db=db)
+    except HTTPException:
+        return {}
+    values = {path: team_label(caller.org_id) for path in ep.get("team_label") or ()}
+    values |= {path: caller.email for path in ep.get("caller_email") or ()}
+    return {"your_values": values,
+            "your_values_note": "On treg's key send these exactly: the label is your team's own; "
+                                "an alert email may only be yours."}
+
+
 @app.get("/catalog/endpoints/{endpoint_id}")
 async def catalog_endpoint(
     request: Request,
+    response: Response,
     endpoint_id: str,
     observations: endpoint_stats.EndpointObservationReader = Depends(
         _endpoint_observation_reader),
@@ -582,6 +617,13 @@ async def catalog_endpoint(
             ep["provider"], endpoint_id))
     view = (catalog_store.endpoint_view(ep, _provider_display(ep["provider"]), cat)
             | catalog_store.endpoint_context(ep, cat))
+    if ep.get("team_label") or ep.get("caller_email"):
+        personal = await _your_values(request, db, ep)
+        if personal:
+            # One reader's label and email: never stored by a shared cache, never served to another.
+            response.headers["Cache-Control"] = "private, no-store"
+            response.headers["Vary"] = "Authorization, X-Treg-Token, X-Treg-Org, Cookie"
+        view |= personal
     siblings = [
         catalog_store.endpoint_view(other, _provider_display(other["provider"]), cat)
         for other in sorted(cat.for_capability(ep["capability"]), key=lambda e: e["id"])
@@ -630,12 +672,19 @@ async def catalog_endpoint(
                                    cost_at(cat.cost_view(k.get("cost"), k["provider"]), {}, ad), st.get("hit_rate"),
                                    st.get("ok_rate"), st.get("p50_ms"), st.get("last_ok_days")))
         routing = {
-            "contract": {"identity": [list(v) for v in contract.identity], "output": contract.output,
+            "contract": {"identity": [list(v) for v in contract.identity], "output": {
+                             # `analytics` is treg's own event mapping, not part of the answer.
+                             k: {a: b for a, b in (v or {}).items() if a != "analytics"}
+                             for k, v in contract.output.items()},
                          "miss": contract.miss, "derive": contract.derive} if contract else None,
-            "plan": [_plan_row(c) for c in rank(cands)],
+            # A child the router would not call on treg's key (`route.py` drops it the same way)
+            # stays in the plan for its `accepts`, ranked after the rest and saying why.
+            "plan": [_plan_row(c) for c in rank([c for c in cands if not _quote_skip(c.endpoint, cat)])]
+                    + [_plan_row(c) | {"skipped": _quote_skip(c.endpoint, cat)}
+                       for c in rank([c for c in cands if _quote_skip(c.endpoint, cat)])],
             # The same job from providers whose adapter is not (yet) verified: not chosen by the
             # router, still callable by id — the search page groups them under this row, so the
-            # page it points at must name them too (found 2026-08-28: "+18 more" led to a list of 6).
+            # page it points at must name them too.
             "also": [{"endpoint_id": s["id"], "usd": ((s.get("cost") or {}).get("usd"))}
                      for s in siblings if s["id"] not in set(ep.get("routed_children") or [])],
             "headers": {"X-Treg-Route-Waterfall": "on by default: a miss tries the next provider; 0 = stop at the first miss",
@@ -709,7 +758,7 @@ async def _hub_endpoint_view(endpoint_id: str, db: AsyncSession,
     example = {k: v for k, v in example.items() if v not in ("", None, 0)}
     rng = (await hub_app.price_ranges(db, {row.tool_id: m})).get(row.tool_id)
     # An approved job puts the tool beside that job's providers, and them beside it: the same
-    # comparison catalog_get gives a provider row (round 3). Its own numbers carry the seed.
+    # comparison catalog_get gives a provider row. Its own numbers carry the seed.
     capability = await hub_app.approved_capability(db, row.tool_id)
     cat = catalog_store.load()
     siblings = [catalog_store.endpoint_view(o, _provider_display(o["provider"]), cat)

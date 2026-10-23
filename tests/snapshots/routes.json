@@ -933,6 +933,15 @@
       "GET",
       "HEAD"
     ],
+    "name": "sheets_page",
+    "path": "/sheets"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
     "name": "agent_setup_js",
     "path": "/agent-setup.js"
   },
@@ -1016,6 +1025,15 @@
     ],
     "name": "ugc_page",
     "path": "/ugc"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "aeo_page",
+    "path": "/aeo"
   },
   {
     "kind": "APIRoute",
@@ -1208,6 +1226,15 @@
       "HEAD"
     ],
     "name": "oauth_protected_resource",
+    "path": "/.well-known/oauth-protected-resource/mcp/"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "oauth_protected_resource",
     "path": "/.well-known/oauth-protected-resource/mcp"
   },
   {
@@ -1218,6 +1245,15 @@
     ],
     "name": "oauth_protected_resource",
     "path": "/.well-known/oauth-protected-resource"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "oauth_protected_resource_v2",
+    "path": "/.well-known/oauth-protected-resource/mcp/v2/"
   },
   {
     "kind": "APIRoute",
@@ -1491,58 +1527,8 @@
     "methods": [
       "POST"
     ],
-    "name": "onboarding_start",
-    "path": "/onboarding/start"
-  },
-  {
-    "kind": "APIRoute",
-    "methods": [
-      "GET",
-      "HEAD"
-    ],
-    "name": "onboarding_view",
-    "path": "/onboarding"
-  },
-  {
-    "kind": "APIRoute",
-    "methods": [
-      "POST"
-    ],
-    "name": "onboarding_answer",
-    "path": "/onboarding/answer"
-  },
-  {
-    "kind": "APIRoute",
-    "methods": [
-      "POST"
-    ],
-    "name": "onboarding_preview_start",
-    "path": "/onboarding/preview"
-  },
-  {
-    "kind": "APIRoute",
-    "methods": [
-      "GET",
-      "HEAD"
-    ],
-    "name": "onboarding_preview_view",
-    "path": "/onboarding/preview/{preview_id}"
-  },
-  {
-    "kind": "APIRoute",
-    "methods": [
-      "POST"
-    ],
-    "name": "onboarding_preview_answer",
-    "path": "/onboarding/preview/{preview_id}/answer"
-  },
-  {
-    "kind": "APIRoute",
-    "methods": [
-      "POST"
-    ],
-    "name": "onboarding_preview_call",
-    "path": "/onboarding/preview/{preview_id}/call"
+    "name": "onboard_team",
+    "path": "/onboard/team"
   },
   {
     "kind": "APIRoute",
@@ -1824,6 +1810,115 @@
     ],
     "name": "billing_stripe_webhook",
     "path": "/billing/stripe/webhook"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "sso_status",
+    "path": "/orgs/{org_id}/sso"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "sso_blocked_members",
+    "path": "/orgs/{org_id}/sso/blocked"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "POST"
+    ],
+    "name": "sso_restore_member",
+    "path": "/orgs/{org_id}/sso/blocked/{user_id}/restore"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "POST"
+    ],
+    "name": "sso_checkout",
+    "path": "/orgs/{org_id}/sso/checkout"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "POST"
+    ],
+    "name": "sso_setup",
+    "path": "/orgs/{org_id}/sso/setup/{intent}"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "POST"
+    ],
+    "name": "sso_invite_it",
+    "path": "/orgs/{org_id}/sso/invite-it"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "sso_idp_start",
+    "path": "/auth/sso/idp/start"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "sso_start",
+    "path": "/auth/sso/{org_slug}/start"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "POST"
+    ],
+    "name": "sso_discover",
+    "path": "/auth/sso/discover"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "sso_callback",
+    "path": "/auth/sso/callback"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "POST"
+    ],
+    "name": "sso_enforce",
+    "path": "/orgs/{org_id}/sso/enforce"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "POST"
+    ],
+    "name": "sso_cancel",
+    "path": "/orgs/{org_id}/sso/cancel"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "POST"
+    ],
+    "name": "sso_workos_webhook",
+    "path": "/auth/sso/workos/webhook"
   },
   {
     "kind": "APIRoute",
@@ -2491,6 +2586,15 @@
     ],
     "name": "admin_calls",
     "path": "/admin/calls"
+  },
+  {
+    "kind": "APIRoute",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "admin_daily",
+    "path": "/admin/daily"
   },
   {
     "kind": "APIRoute",

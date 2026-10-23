@@ -284,12 +284,21 @@ hit it live). Now the method rides in the blob and `refresh()` honors it; a lega
 field gets body auth, then ONE retry with Basic on a 4xx, and stamps whichever worked — existing
 broken connections self-heal on their next call, no migration.
 
+The blob also snapshots `client_secret` and `token_uri`, and a team member can rewrite the blob. So
+for treg's own apps `ensure_fresh` does not trust either: when the `Secret` row's `provider` is a
+registry provider and the blob's `client_id` is the one this deployment configures for that provider
+profile, `oauth_providers.platform_refresh_blob` substitutes the current env secret **and** the
+profile's own `token_uri`, and neither is written back (the stored blob keeps its own values). Any other
+blob, including one that merely names treg's `client_id`, refreshes with only what it stores. Rotating a
+treg app secret is therefore an env change plus a deploy on every service that refreshes; the old
+secret can be deleted at the provider as soon as that deploy is live.
+
 **Connect flow (mint the first token):** `consent_url(pending)` builds the provider consent URL
 (default `access_type=offline` + `prompt=consent` so a refresh token comes back); `exchange_code(pending,
 code, client)` trades the auth code for tokens and returns a self-refreshable blob. Both honor
 per-provider quirks carried on the `PendingOAuth` (snapshotted from the registry entry, below): a provider's
 `auth_params` **replaces** the Google defaults entirely (LinkedIn/X/TikTok/Meta reject `access_type`);
-PKCE (`pkce_challenge()` — X requires a verifier); `token_endpoint_auth_method` = `client_secret_basic`
+PKCE (`pkce_challenge()` — X requires a verifier; TikTok's `pkce_loopback_hex` sends a hex SHA-256 challenge, stored in `auth_params`, only when `public_url` is localhost, because TikTok treats a localhost redirect as a desktop app); `token_endpoint_auth_method` = `client_secret_basic`
 (X puts the secret in HTTP Basic, not the body); the `client_id_param`/`scope_separator` dialect; and
 `long_lived_exchange` (`_extend_meta_token()` swaps Meta's ~1-hour code-exchange token for its ~60-day
 one, non-fatal on failure). Driven by the `/oauth/*` endpoints ([interface/api.md](../interface/api.md)).
@@ -486,6 +495,9 @@ module symbols:
   examples (marker `stamped: resource`, so re-picking replaces instead of piling up).
 - Post-connect helpers the dashboard/CLI drive: resource **discovery** (`supports_discovery`,
   `discover_*` — which site/property/account this connection acts on), row **enrichment**.
+  `list_connection_resources` turns YouTube's `quotaExceeded` discovery response into the stable
+  `youtube_quota_exceeded` error code, so the channel picker can explain the temporary limit without
+  showing Google's raw error text.
   Discovery can walk a SECOND listing (`discover_extra_path` + `discover_extra_list_paths`): Meta's
   Business Manager owns assets on the user's behalf, so an agency member sees `[]` from
   `/me/accounts` for exactly the Pages/Instagram accounts they manage all day — the Business walk

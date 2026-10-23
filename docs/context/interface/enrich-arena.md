@@ -154,13 +154,16 @@ Results start directly with the fighter card, with no query-summary row, aggrega
 or New query link. Inputs remain editable after completion; Stop sits in the fighter toolbar
 only during an active run.
 Visitors can select a task, input variant, execution mode, and services before signing in.
-Submission checks the existing browser session. Signed-out visitors see Sign up. Successful email
-or Google/GitHub authentication opens the existing agent setup modal next, without dispatching a run.
+Submission checks the existing browser session. Signed-out visitors see Sign up. The dialog starts
+with email code; Company SSO switches the email field to company discovery, and Google/GitHub remain
+alternate methods when configured. Successful email, company SSO, or Google/GitHub authentication
+opens the existing agent setup modal next, without dispatching a run.
 A ten-minute, single-use session-storage marker resumes setup after OAuth; ordinary page loads do not
-reopen it. OAuth returns allow only Arena, Leaderboard and Benchmark paths with task/run/team query
+reopen it. OAuth returns allow only Arena, Leaderboard, Benchmark and Web Arena paths with task/run/team query
 parameters, validated both before redirect and at callback. The return cookie holds a Fernet-encrypted
 target; callbacks authenticate and decrypt it before repeating the allowlist check. Missing or tampered
-cookies fall back to the dashboard. A ten-minute session-storage draft
+cookies fall back to the dashboard. Company SSO carries the same validated Arena return path in
+its encrypted state cookie. A ten-minute session-storage draft
 preserves the query through signup. The top navigation also links to `https://treg.to` via Treg.
 New users can create a team here. Valid inputs for signed-in
 users fetch a quote after an 800 ms pause. The compact Run button displays the estimated cost
@@ -327,8 +330,8 @@ message, grouped OAuth provider links, a secondary Browse all catalog action, an
 button that closes setup and keeps the user in Arena. Copying an example
 only writes its prompt to the clipboard; provider links open the main app’s provider page without
 starting OAuth. The example definitions and `TryItOut` component are shared with dashboard onboarding.
-Signed-in visitors without a team first name and create their team inside the setup modal, matching
-the dashboard welcome flow. The agent step then fetches a token for that team; authenticated users
+Signed-in visitors without a team first name and create their team inside the setup modal (the
+dashboard instead makes a new account's team for it; see interface/onboarding.md). The agent step then fetches a token for that team; authenticated users
 never silently fall back to guest instructions. Anonymous visitors still receive the setup line and
 agent-guided login instructions. Opening setup does not start an Arena run or change its inputs/history.
 

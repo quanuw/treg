@@ -75,12 +75,12 @@ COST_UNITS, CONFIDENCES, COST_SOURCES = set(_UNITS), set(_CONFIDENCES), set(_SOU
 # price is still the best number we have, and failing the build over the calendar would only teach
 # people to bump the date without re-checking.
 STALE_DAYS = 90
-# The one spelling of free. It was written three incompatible ways across 661 endpoints (`value: 0`,
-# `value: 0.0`, and no value at all), which made "is this free?" a per-entry judgement call and left
-# `cost.usd` null on a third of them — indistinguishable, downstream, from "price unknown".
+# The one spelling of free. Any other (`value: 0.0`, or no value at all) makes "is this free?" a
+# per-entry judgement call and leaves `cost.usd` null - indistinguishable, downstream, from
+# "price unknown".
 CANONICAL_FREE = {"value": 0, "currency": "USD", "unit": "call"}
 TIERS = {"core", "extended"}
-# what an endpoint IS (marketplace browse surface vs. plumbing). Optional — absent reads as "data" —
+# what an endpoint IS (catalog browse surface vs. plumbing). Optional - absent reads as "data" -
 # but a stated one must be from this set. See docs/context/architecture/catalog.md.
 KINDS = {"data", "action", "account", "utility"}
 ENDPOINT_STATUSES = {"retired", "broken"}
@@ -110,8 +110,7 @@ REQUIRED = {
 # The four outcomes an extended endpoint can have once a verification run has touched it. They are
 # mutually exclusive by construction, and an entry that has been through the pipeline must claim
 # exactly one — "no state" reads as "never attempted", which is a different fact and a lie once a
-# run has been over it. This caught a real regression: re-running an endpoint overwrote its result
-# record, dropped the reason string, and stamped an EMPTY state that nothing else noticed.
+# run has been over it.
 STATES = ("verified", "unverified", "untestable", "skipped")
 # a long token-looking literal anywhere in a catalog file is a leak until proven otherwise
 LEAK = re.compile(r"(Bearer\s+[A-Za-z0-9+/_=-]{16,}|[A-Za-z0-9+/]{40,}={0,2})")
@@ -288,6 +287,53 @@ def check_platform_request(rule: object, input_schema: object, where: str,
         if (not isinstance(allowed, list) or len(allowed) != 1
                 or type(value) is not type(allowed[0]) or value != allowed[0]):
             fail(errors, where, "platform_request value must match the field's singleton enum")
+
+
+def check_team_label(rule: object, input_schema: object, where: str, errors: list[str]) -> None:
+    """Fields that must carry the calling team's label on treg's key: declared string fields."""
+    fields = _input_fields(input_schema)
+    if not isinstance(rule, list) or not rule or len(set(map(str, rule))) != len(rule):
+        fail(errors, where, "team_label must be a non-empty list of distinct field paths")
+        return
+    for path in rule:
+        spec = fields.get(path) if isinstance(path, str) else None
+        if (not isinstance(path, str) or spec is None
+                or not path.startswith(("body.", "headers.", "queryParams.", "pathParams."))
+                or spec.get("type") != "string"):
+            fail(errors, where, "team_label must name declared string body, header, query or path fields")
+
+
+def check_caller_email(rule: object, input_schema: object, where: str, errors: list[str]) -> None:
+    """Fields that may only carry the caller's own email on treg's key: declared string fields."""
+    fields = _input_fields(input_schema)
+    if not isinstance(rule, list) or not rule or len(set(map(str, rule))) != len(rule):
+        fail(errors, where, "caller_email must be a non-empty list of distinct field paths")
+        return
+    for path in rule:
+        spec = fields.get(path) if isinstance(path, str) else None
+        if (not isinstance(path, str) or spec is None
+                or not path.startswith(("body.", "headers.", "queryParams."))
+                or spec.get("type") != "string"):
+            fail(errors, where, "caller_email must name declared string body, header or query fields")
+
+
+def check_cost_quantity(cost: dict, input_schema: object, where: str, errors: list[str]) -> None:
+    """A price by a quantity the caller chooses: a declared integer field with a maximum, settled
+    exactly at what was bought."""
+    rule = cost.get("quantity")
+    fields = _input_fields(input_schema)
+    field = rule.get("field") if isinstance(rule, dict) else None
+    spec = fields.get(field) if isinstance(field, str) else None
+    top = rule.get("max") if isinstance(rule, dict) else None
+    applied = rule.get("applied") if isinstance(rule, dict) else None
+    if (not isinstance(rule, dict) or not {"field", "max"} <= set(rule) <= {"field", "max", "applied"}
+            or (applied is not None and (not isinstance(applied, str) or not JSON_PATH.fullmatch(applied)))
+            or spec is None
+            or not str(field).startswith(("body.", "queryParams.")) or spec.get("type") != "integer"
+            or type(top) is not int or top < 1):
+        fail(errors, where, "cost.quantity requires {field: a declared integer body or query field, max: a positive integer, applied?: a JSON path}")
+    if cost.get("settle") != "quantity" or cost.get("type") != "per_success" or "reported_charge" in cost:
+        fail(errors, where, "cost.quantity requires settle: quantity on a per_success price with no reported_charge")
 
 
 TAVILY_RATE_KEYS = {
@@ -815,6 +861,21 @@ def _unit_rate(provider: str | None, unit: object) -> object:
     return entry.get("usd") if isinstance(entry, dict) else entry
 
 
+_CEILING_PARAM_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def check_ceiling_param(rule, where: str, errors: list[str], *, prefix: str) -> None:
+    """A caller ceiling forwarded upstream: query name, USD, and nothing else.
+
+    `in: header` is refused so a declaration the relay cannot honour is not silently ignored.
+    """
+    if (not isinstance(rule, dict) or set(rule) != {"in", "name", "unit"}
+            or rule.get("in") != "query" or rule.get("unit") != "usd"
+            or not isinstance(rule.get("name"), str)
+            or not _CEILING_PARAM_NAME.fullmatch(rule["name"])):
+        fail(errors, where, f"{prefix} must be {{in: query, name: <identifier>, unit: usd}}")
+
+
 def check_cost(cost: dict, where: str, errors: list[str], warnings: list[str],
                input_schema: object = None, provider: str | None = None) -> None:
     """The price block's own rules — the ones that make a figure BILLABLE rather than decorative.
@@ -849,6 +910,8 @@ def check_cost(cost: dict, where: str, errors: list[str], warnings: list[str],
                                 "fx.yaml credit_rates_usd entry")
         if "settle" in cost or cost.get("type") == "free":
             fail(errors, where, "cost.reported_charge requires a paid price without cost.settle")
+    if "ceiling_param" in cost:
+        check_ceiling_param(cost.get("ceiling_param"), where, errors, prefix="cost.ceiling_param")
     if "call_fee" in cost:
         fee = cost["call_fee"]
         if (provider != "apify" or cost.get("type") != "per_result"
@@ -866,12 +929,15 @@ def check_cost(cost: dict, where: str, errors: list[str], warnings: list[str],
         display = cost["display"]
         if (not isinstance(display, dict) or not isinstance(display.get("unit"), str)
                 or not display["unit"].strip() or len(display["unit"]) > 40
-                or set(display) - {"unit", "grouped", "round_up", "variable", "maximum"}):
-            fail(errors, where, "cost.display requires a short unit and optional grouped/round_up/variable/maximum flags")
+                or set(display) - {"unit", "grouped", "round_up", "variable", "maximum", "value"}):
+            fail(errors, where, "cost.display requires a short unit and optional grouped/round_up/variable/maximum flags and value")
         else:
             for flag in {"grouped", "round_up", "variable", "maximum"} & set(display):
                 if type(display[flag]) is not bool:
                     fail(errors, where, f"cost.display.{flag} must be boolean")
+            if "value" in display and (type(display["value"]) not in (int, float) or display["value"] <= 0
+                                       or display.get("grouped")):
+                fail(errors, where, "cost.display.value is a positive price of one unit, in the cost's currency, and not grouped")
             if display.get("round_up") and not display.get("grouped"):
                 fail(errors, where, "cost.display.round_up requires grouped")
             if display.get("grouped") and (type(cost.get("per")) is not int or cost["per"] <= 0):
@@ -920,8 +986,10 @@ def check_cost(cost: dict, where: str, errors: list[str], warnings: list[str],
         check_cost_table(cost, input_schema, where, errors, provider)
     if not has_table:
         settle = cost.get("settle")
-        if settle is not None and settle not in ("base", "modifiers", "usage"):
-            fail(errors, where, "cost.settle currently supports only 'base', 'modifiers' or 'usage'")
+        if settle is not None and settle not in ("base", "modifiers", "usage", "quantity"):
+            fail(errors, where, "cost.settle currently supports only 'base', 'modifiers', 'usage' or 'quantity'")
+        if settle == "quantity" or "quantity" in cost:
+            check_cost_quantity(cost, input_schema, where, errors)
         if settle == "usage":
             # A flat rate-card price with the provider's reported charge settling: the fallback is
             # the reserve, the reply's `usage.path` the charge (sync body or async terminal document).
@@ -1158,7 +1226,7 @@ def main(argv: list[str]) -> int:
     taxonomy = tax.get("capabilities") or {}
     capabilities = set(taxonomy)
 
-    from treg.oauth_providers import REGISTRY  # noqa: E402
+    from treg.oauth_providers import REGISTRY
 
     only = set(argv)
     all_files = sorted(p for p in CATALOG.glob("*.yaml")
@@ -1193,8 +1261,7 @@ def main(argv: list[str]) -> int:
     # (service, method, path) -> {tier: [ids]} — to catch the same operation shipping in BOTH tiers.
     # Some providers multiplex one URL across many jobs (SerpApi's `engine`, BrightData's
     # `dataset_id`, GAQL's query body), so a core/extended path collision is legitimate THERE and
-    # only there. Everywhere else it is the ingest-dedup failure that shipped 27 duplicate rows
-    # (dataforseo via the /v3 prefix mismatch, scrapecreators via core being curated after ingest).
+    # only there. Everywhere else it is an ingest-dedup failure.
     # Some APIs deliberately expose several catalog jobs on one method/path and select the job by
     # required parameters. Instagram Graph's profile read and business_discovery both call
     # GET /{ig_user_id}; the latter is selected by its required business_discovery `fields` value.
@@ -1219,6 +1286,8 @@ def main(argv: list[str]) -> int:
         need = "spec_urls" if extended_file else "docs"
         if not isinstance(src, dict) or not src.get(need):
             fail(errors, name, f"source.{need} missing")
+        if "ceiling_param" in data:
+            check_ceiling_param(data.get("ceiling_param"), name, errors, prefix="ceiling_param")
         proposed = set(data.get("proposed_capabilities") or {})
         known = capabilities | proposed
 
@@ -1315,6 +1384,10 @@ def main(argv: list[str]) -> int:
             check_platform_auth(ep, where, errors)
             if "platform_request" in ep:
                 check_platform_request(ep["platform_request"], inp, where, errors)
+            if "team_label" in ep:
+                check_team_label(ep["team_label"], inp, where, errors)
+            if "caller_email" in ep:
+                check_caller_email(ep["caller_email"], inp, where, errors)
             default_array_encoding = inp.get("queryArrayEncoding")
             if (default_array_encoding is not None
                     and default_array_encoding not in QUERY_ARRAY_ENCODINGS):

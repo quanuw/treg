@@ -23,7 +23,7 @@ adapters:
     const: {queryParams.email_type: work, queryParams.include_phone: false}
     test_identity: {linkedin_url: "https://www.linkedin.com/in/routing-fixture"}
     out: {email: "profile.work_email[0]"}
-    miss: "at_least(status_code != 200, coalesce(profile.work_email) == null)"
+    miss: "at_least(status_code != 200, coalesce(profile.work_email, []) == [])"
   dropleads.people.email.find:
     accepts: [[first_name, last_name, domain]]
     in: {first_name: body.first_name, last_name: body.last_name, domain: body.company_domain}
@@ -184,7 +184,7 @@ adapters:
     const: {queryParams.email_type: personal, queryParams.include_phone: false}
     test_identity: {linkedin_url: "https://www.linkedin.com/in/routing-fixture"}
     out: {email: "profile.personal_email[0]"}
-    miss: "at_least(status_code != 200, coalesce(profile.personal_email) == null)"
+    miss: "at_least(status_code != 200, coalesce(profile.personal_email, []) == [])"
 
   # ---- instagram.user.profile ---------------------------------------------------------------
   # Instagram users come in GraphQL (edge_*.count) or private API (*_count) shape; read both.
@@ -356,7 +356,7 @@ adapters:
     const: {queryParams.email_type: none, queryParams.include_phone: true}
     test_identity: {linkedin_url: "https://www.linkedin.com/in/routing-fixture"}
     out: {phone: "profile.phone[0]", line_type: "'mobile'"}
-    miss: "at_least(status_code != 200, coalesce(profile.phone) == null)"
+    miss: "at_least(status_code != 200, coalesce(profile.phone, []) == [])"
   dropleads.people.phone.find:
     accepts: [[linkedin_url]]
     in: {linkedin_url: body.linkedin_url}
@@ -3468,6 +3468,7 @@ adapters:
   crawl4ai.instagram.user.reels:
     accepts: [[username], [user_id]]
     in: {username: body.username, user_id: body.user_id}
+    max: {limit: 12}
     out: {reels: rows}
     miss: "coalesce(rows, []) == []"
   crawl4ai.tiktok.user.profile:
@@ -3490,6 +3491,50 @@ adapters:
           followers: "rows[0].followers", following: "rows[0].following", posts_count: "rows[0].tweets",
           is_verified: "rows[0].verified", description: "rows[0].bio"}
     miss: "coalesce(rows, []) == []"
+  crawl4ai.google.maps.reviews:
+    accepts: [[place_id]]
+    in: {place_id: body.place}
+    in_expr: {body.limit: limit, body.sort: sort}
+    max: {limit: 100}
+    out: {reviews: rows, count: "len(rows)"}
+    miss: "coalesce(rows, []) == []"
+  anyapi.google.maps.reviews:
+    accepts: [[place_id]]
+    in: {place_id: body.placeId}
+    in_expr: {body.limit: "at_most(limit, 100)", body.sort: sort}
+    out: {reviews: output.data.items, count: "len(output.data.items)"}
+    miss: "coalesce(output.data.items, []) == []"
+  litescrape.google.maps.reviews:
+    accepts: [[place_id]]
+    in: {place_id: queryParams.place_id}
+    in_expr: {queryParams.num: "at_most(limit, 100)"}
+    out: {reviews: reviews, count: "len(reviews)", next_cursor: pagination.next_page_token}
+    miss: "coalesce(reviews, []) == []"
+  crawl4ai.meta-ads.library.advertiser:
+    accepts: [[page_id], [company_name], [company_domain], [facebook_url]]
+    in: {}
+    in_expr: {body.page: "coalesce(page_id, company_name, company_domain, facebook_url)"}
+    test_identity: {page_id: "15087023444"}
+    out: {ads: rows, page_id: "rows[0].page_id", page_name: "rows[0].page_name", count: "len(rows)"}
+    miss: "coalesce(rows, []) == []"
+  anyapi.facebook.company_ads:
+    accepts: [[page_id], [company_name]]
+    in: {page_id: body.pageId, company_name: body.companyName}
+    out: {ads: output.data.ads, page_id: "output.data.ads[0].pageId", count: "len(output.data.ads)",
+          next_cursor: output.data.nextCursor}
+    miss: "coalesce(output.data.ads, []) == []"
+  adyntel.meta-ads.library.advertiser:
+    accepts: [[company_domain]]
+    in: {company_domain: body.company_domain}
+    out: {ads: results, page_id: "results[0].page_id", page_name: "results[0].page_name", count: "len(results)",
+          next_cursor: continuation_token}
+    miss: "coalesce(results, []) == []"
+  scrapecreators.x.v1-facebook-adlibrary-company-ads:
+    accepts: [[page_id], [company_name]]
+    in: {page_id: queryParams.pageId, company_name: queryParams.companyName}
+    out: {ads: results, page_id: "results[0].page_id", page_name: "results[0].page_name", count: "len(results)",
+          next_cursor: cursor}
+    miss: "coalesce(results, []) == []"
   crawl4ai.facebook.user.posts:
     accepts: [[url]]
     in: {url: body.page}

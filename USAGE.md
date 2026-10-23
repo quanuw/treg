@@ -46,6 +46,7 @@ present a per-org token directly.
 
 | Command | Options | What it does |
 |---|---|---|
+| `treg` | `--json` | no arguments: the registry, your account, the active team and role, its balance, its own tools, and the next commands to run (`help[]`). Every line is best-effort and it always exits 0 |
 | `treg config` | `--base-url URL` | show or set the endpoint (prints base URL, email, active org, logged-in) — use `treg org ls` for the full org list |
 | `treg login` | _(none)_ | GitHub browser sign-in (register-or-login), stores one identity token |
 | `treg login` | `--email EMAIL` | email one-time-code sign-in (register-or-login); prompts for the code. A server that requires a browser check finishes the sign-in in the browser instead |
@@ -225,7 +226,7 @@ treg balance --json          # integer micro-USD (1e-6 USD) — the unit the led
 treg topup
 ```
 
-Out of balance is an HTTP **402** carrying `balance_micro`, `estimated_cost_micro` and a `topup_url`,
+Out of balance is an HTTP **402** `error: insufficient_balance` carrying `balance_micro`, `estimated_cost_micro` and a `topup_url`,
 so an agent can act on it without reading prose. There is also a per-day ceiling on spend against
 treg's keys, so a runaway agent has a bounded blast radius.
 
@@ -233,7 +234,10 @@ If treg's **own** account for a provider is out, a metered call is refused with 
 `provider_capacity_unavailable` before anything is reserved — nothing is charged, the body names
 `resets_at` when known and `alternatives` (other providers for the same capability). Your own key
 for the provider is never affected, and treg does not switch providers on your behalf. treg
-re-checks the provider about once a minute, so a retry after a minute can succeed.
+re-checks the provider about once a minute, so a retry after a minute can succeed. A call that
+reaches the provider just as treg's account runs out is relayed as the provider answered, with
+`X-Treg-Capacity: exhausted`; `treg call` then prints a notice that the tool is unavailable on
+treg's side instead of naming the provider's wallet.
 
 Where the deployment has the overflow relay on, treg may instead serve the **same endpoint** through a
 treg-owned aggregator account — same request, same response shape, the relay's real price (0% markup),
@@ -329,9 +333,8 @@ skill (e.g. a `stripe-cli` SKILL.md) auto-becomes runnable — `treg upload` rec
 provider catalog and wires the credential, so `treg run` works with no `treg.json`.
 
 The tool owner opts in per tool for **local** runs (the key reaches the member's machine): the
-dashboard `⌘ run` toggle, or `treg tool update <id> --local-run on|off`. **Server** runs need no
-opt-in — the key never leaves the registry, and the server's bin allow-list gates what may execute.
-One `cli` profile on the tool drives both tiers (`bin`, `inject`, `deny`, `enabled`).
+dashboard `⌘ run` toggle, or `treg tool update <id> --local-run on|off`. **Server** runs are disabled
+globally. The tool's `cli` profile (`bin`, `inject`, `deny`, `enabled`) configures local execution.
 
 | Command | Options | What it does |
 |---|---|---|
@@ -347,14 +350,12 @@ One `cli` profile on the tool drives both tiers (`bin`, `inject`, `deny`, `enabl
   with a warning). A member may run a tool whose key **they own**; a **shared** (teammate/admin) key
   requires the isolated runner **and** the server's `TREG_RUN_PROOF` (pass it as `--run-proof` at
   setup).
-- `--server` — runs on the registry **server** (Tier 0); only catalog-known CLIs (or ones in
-  `TREG_RUN_ALLOWED_BINS`) may execute; stdout/stderr + exit code are streamed back. Use this when
-  the key must never reach the machine at all.
+- `--server` — disabled globally; `POST /run` returns 503 for every caller. `TREG_RUN_ALLOWED_BINS`
+  cannot re-enable server execution.
 
 ```bash
 treg run stripe -- get /v1/balance          # local: CLI runs here, key injected, never held
 treg run gh -- pr list
-treg run --server agentmail-cli inboxes list # server-side: key never leaves the registry
 sudo treg setup-local-run --run-proof "$TREG_RUN_PROOF"   # Linux admin, once
 treg runs --limit 20
 ```
@@ -566,7 +567,7 @@ unapproved, failed and retired tools never appear. The share page's run log show
 day for 30 days: time, outcome, duration, steps, units and the price paid, and never who called,
 the inputs, or the output. The dashboard has the same two switches under Hub → a tool → Listing.
 
-The folder may carry a fifth file, `data.csv` (≤ 50 MB): the script reads it as `ctx.data`. A
+The folder may carry a fifth file, `data.csv` (≤ 5 MB): the script reads it as `ctx.data`. A
 script gets `ctx.inputs`, `ctx.call(target, {method, query, body, headers})`, `ctx.charge(usd, note)`,
 `ctx.csv(text)`, `ctx.data`, `ctx.log(text)`; `target` is a catalog id, one of your own tools as `<tool>/<path>`,
 or a full URL under such a tool's base URL. Never paste a credential into a script: register it

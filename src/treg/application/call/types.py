@@ -246,7 +246,7 @@ class CallInput:
     # The reviewed /catalog/call surface accepts only a catalog id — team tools never shadow it.
     catalog_only: bool = False
     # Set on every child call of a hub run: a child never resolves to a hub tool (no nested
-    # runs, no undisclosed second price; 8.1 review).
+    # runs, no undisclosed second price).
     child_of: str | None = None
 
 
@@ -281,6 +281,9 @@ class CallContext:
     provider: str | None = None
     credential_tier: str | None = None
     refused_by: str | None = None
+    # A routed parent's outcome for its call event (route.py `_summarize`): identity, output,
+    # served_by, tried_count, hit, verdict, check_verdict. Never read by money or relay.
+    route_summary: dict | None = None
 
 
 @dataclass(frozen=True)

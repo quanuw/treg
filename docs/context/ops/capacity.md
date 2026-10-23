@@ -3,6 +3,8 @@ title: Provider capacity — knowing what treg's own vendor accounts have left
 status: shipped
 sources:
   - src/treg/domain/capacity/__init__.py
+  - src/treg/capacity_notice.py
+  - tests/test_capacity_notice.py
   - src/treg/domain/capacity/collectors.py
   - src/treg/domain/capacity/policy.py
   - src/treg/domain/capacity/sweep.py
@@ -53,7 +55,9 @@ Every platform-key slot is either on `BALANCE_ROUTES` (a free collector reads it
 `test_every_platform_key_has_a_balance_decision` fails a new slot that is on neither. A sweep
 reading below `EMPTY_BELOW` refuses the provider's shared-key calls, so a collector reports a meter
 that bills overage rather than refusing (SpyFu's monthly allowance) as informational once spent,
-and sums every pool that can pay for a call (Fiber AI's trial and paid pools).
+and sums every pool that can pay for a call (Fiber AI's trial and paid pools). Vendors in
+`OVERDRAFT_SERVED` keep serving past zero, so their low balance is informational and `overdrawn`;
+each needs a refusal signature.
 
 Octen's PAYG balance has no account balance or usage endpoint in its published OpenAPI, so
 `NO_BALANCE_API` reports it as dashboard-only. `_KNOWN` classifies the account as manually funded
@@ -67,6 +71,9 @@ token, never the API key treg holds, so `NO_BALANCE_API` reports the account as 
 `_KNOWN` classifies it as manually funded cash. The shared key is paced at the documented 600
 requests a minute that Search, Extract and Entity Search each allow. HTTP 402 insufficient credit
 was not forced, and no overflow route is claimed.
+
+OpenRouter's balance needs a management key (`platform_openrouter_management_key`); without it
+the row is `no_api`.
 
 Litescrape's internal collector reads the free `GET /api/keys/status` route with the platform
 Bearer key. It accepts a nonnegative integer `remaining_calls` as the prepaid call balance and
@@ -167,7 +174,7 @@ auto recharge, manually verified as enabled in the portal, and a documented 10 r
 shared-key pace. treg does not read or change the vendor's auto-top-up setting.
 
 HLR Lookup's collector posts the platform key and secret to the free `/apiv2/balance` route and
-accepts only `Status: OK` with a finite nonnegative `Credits`, which can be fractional because
+accepts only `Status: OK` with a finite `Credits`, which can be fractional because
 cache hits and portability lookups cost half a credit. The policy is `credits / manual / api`:
 bundles are bought by hand and expire 18 months after purchase. The vendor caps concurrency at 210
 requests and throttles per telephone network, so shared-key smoothing uses a conservative 50
@@ -455,7 +462,11 @@ pays the aggregator's real price, 0% markup, disclosed in-band when it ships (st
   account (`balance` / `quota` means exhausted, `burst` is smoothed but never exhausted, and an
   `unknown` 429 is logged).
   Lusha's "Daily" 429 and Hunter's "per billing period" 429 are quota exhaustion wearing a 429;
-  a `retry-after ≤ 60 s` is a burst. cloro says it with a **403** `error.code INSUFFICIENT_CREDITS`
+  a quota row with no wait header takes its reset from the row's `resets` (Lusha's is
+  `next_utc_midnight`), else from the sweep's account call. The wait comes from the wait
+  headers, parsed by format and never by provider (`_retry_after` in `signatures.py`); a 429 no
+  row matched is a burst when the wait is ≤ 60 s and a quota when it is longer.
+  cloro says it with a **403** `error.code INSUFFICIENT_CREDITS`
   (from its OpenAPI spec, 2026-09-07 — documented, not yet observed); its 429s are concurrency /
   rate bursts with `X-RateLimit-*` headers and the allowance resets monthly at the
   `cycleResetsAt` that `GET /v1/credits` reports. Apollo says "out of credits" with a **422** and Moz uses a
@@ -472,18 +483,21 @@ pays the aggregator's real price, 0% markup, disclosed in-band when it ships (st
   Two guards against
   the next such vendor: `unrecorded`,
   a signal kind for a 4xx no row matched whose body still names credits/quota/balance (pattern =
-  the table's own phrases plus generic nouns) - never a mark, only an `unrecorded` event and
+  generic nouns plus each row's `tripwire` phrase, so recording a vendor's wording arms it for every
+  other; a row's regex never joins by itself, since alternations like `insufficient|balance` would
+  flag a caller's own error) - never a mark, only an `unrecorded` event and
   `capacity_signal=unrecorded` on `tool_called`; and the coverage guard in
   `tests/test_capacity_overflow_routes.py`, which fails when a `platform_key_*` provider has neither
-  a table row nor an acknowledged gap. `edge_block` is the odd one out: the vendor's CDN refused the
+  a balance/quota row nor an acknowledged gap (a burst row says nothing about an empty account). `edge_block` is the odd one out: the vendor's CDN refused the
   request's shape (decided on headers, never the caller's UA), so it exhausts nothing, overflows
   nothing and alerts nothing; it exists so a chart can tell a bot-filtered UA family from a
   provider outage. Shared by the sweep, the future call-path trigger and alerts.
 - **`infra/upstream/aggregators/`** — the envelopes, and nothing else: `build()` wraps the
   vendor request (Orthogonal `POST /run {api, path, query, body}`; Monid `POST /run {provider,
   endpoint, input}`), `parse()` unwraps the vendor status + body + the real in-band charge, and
-  `build()` restores JSON scalar types that Monid validates and converts Akta enrichment's native
-  comma-separated `sections` query value to Monid's array-shaped envelope field, and
+  `build()` restores JSON scalar types that Monid validates, converts Akta enrichment's native
+  comma-separated `sections` query value to Monid's array-shaped envelope field, moves PDL's four
+  core GET enrichment/search query fields into the `input.body` Monid requires, and
   names who to blame when the aggregator itself refused (`AGGREGATOR_SIDE` = `aggregator_auth`,
   `aggregator_balance`, `malformed` - the call path marks the aggregator unhealthy for everyone, the
   verifier leaves the route alone; `contract` - the aggregator's own per-request refusal, including
@@ -558,6 +572,10 @@ The call path reads the view and runs the breaker (`marks.py`); the mechanics an
 `interface/api.md`. In one line: locked provider or endpoint → 503 before any hold, with
 alternatives named, one probe a minute excepted; two balance/quota signatures in a row on treg's
 key → lock; the probe's 2xx → open, whether the lock or the sweep's reading refused it. Burst 429s are smoothed (D′). Tiers 1/2 untouched.
+
+A signature the call could not avoid (the strike itself, a probe through a lock, a free route) is
+relayed as the provider answered, with `X-Treg-Capacity: exhausted` so the caller is told it is
+treg's account, not its balance (`interface/api.md`).
 
 The breaker is deliberately slow to open and quick to close: a false lock costs every caller a
 503 (or, with an overflow route, the aggregator's price) for as long as it lasts, while a missed

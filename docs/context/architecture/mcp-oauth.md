@@ -9,6 +9,7 @@ sources:
   - src/treg/domain/identity/session.py
   - src/treg/domain/identity/access.py
   - src/treg/domain/identity/api_keys.py
+  - src/treg/alembic/versions/0082_oauth_sso_provenance.py
   - src/treg/routers/api_keys.py
   - src/treg/routers/auth.py
   - src/treg/web/claude-connector.html
@@ -27,6 +28,13 @@ related:
 The same authorization server also serves one non-MCP client, "treg for Sheets" (`treg-sheets`):
 its own resource (`<public_url>/table`) and scope, a grant that belongs to the person rather than one
 team, and a token accepted only on the table routes. See [table](table.md).
+
+When a team requires enterprise SSO, normal-login consent cannot create a grant for that team.
+SSO consent is scoped to its own team, including Sheets requests that select a team per call.
+`OAuthCode.sso_org_id` and `OAuthGrant.sso_org_id` retain that proof through code exchange and
+refresh; access tokens pass it through the internal identity bridge to `require_member`. A grant
+created before enforcement has no such proof and stops working on the enforced team at use and
+refresh. An SSO-scoped grant cannot be moved to another team.
 
 # MCP
 
@@ -353,6 +361,12 @@ AuthKit MCP servers all do this; FastMCP tracks a 401-free `initialize` as a bug
 now fires for **every id-bearing JSON-RPC request** — `initialize`, `tools/list`, `tools/call`. Only
 **notifications** (no id, no response expected) and **`ping`** (liveness) pass without a credential;
 `.well-known/*` discovery is separate GET routes, untouched — that IS the discovery the client needs.
+Any **non-POST** request (a GET probe included) is challenged the same way (missing or dead token),
+and otherwise refused with **405** `Allow: POST`: the transport is stateless, so the SDK's standalone
+GET stream has no session to carry anything, and letting a GET through left a client that probes
+with one waiting on keep-alive pings instead of a 401. The protected-resource metadata is also served at the
+trailing-slash paths RFC 9728 derives from `/mcp/` and `/mcp/v2/`, since some clients do not follow
+a redirect during discovery.
 The challenge also carries `scope` (spec SHOULD) so a client requests least-privilege scopes up front.
 
 The middleware judges two cases, not one. **No credential** → the plain challenge above. **A dead
