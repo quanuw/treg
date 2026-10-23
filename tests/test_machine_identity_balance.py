@@ -7,6 +7,7 @@ symptom. Both are pinned here.
 
 from __future__ import annotations
 
+import httpx
 import pytest
 from httpx import AsyncClient
 
@@ -71,7 +72,38 @@ def test_an_invalid_token_is_named_as_such_not_as_a_missing_org(monkeypatch, cap
 
     with pytest.raises(SystemExit) as exc:
         cli._active_org_id({"base_url": "http://x", "token": "bad"}, _C())
-    assert "invalid/expired" in str(exc.value) and "treg login" in str(exc.value)
+    assert "this key was refused" in str(exc.value) and "treg login" in str(exc.value)
+
+
+def test_a_refused_key_gets_the_servers_reason(monkeypatch):
+    from treg import cli
+
+    class _Resp:
+        status_code = 401
+        def json(self):
+            return {"detail": "invalid token: it was revoked when this account signed out everywhere; "
+                              "sign in again with `treg login`, or copy a new key from the dashboard"}
+
+    class _C:
+        def get(self, path, **kw): return _Resp()
+
+    with pytest.raises(SystemExit) as exc:
+        cli._active_org_id({"base_url": "http://x", "token": "old"}, _C())
+    assert str(exc.value) == ("treg: this key was refused: it was revoked when this account signed out "
+                              "everywhere; sign in again with `treg login`, or copy a new key from the dashboard.")
+
+
+def test_a_refused_call_does_not_point_at_treg_calls(capsys):
+    from treg import cli
+
+    def refused(status):
+        return httpx.Response(status, headers={"X-Treg-Error": "1", "X-Treg-Call-Id": "abc"},
+                              request=httpx.Request("POST", "http://x/call/some.tool"))
+
+    cli._show_failure_diagnostics(refused(401))
+    assert "call id abc (quote it to support)" in capsys.readouterr().err
+    cli._show_failure_diagnostics(refused(402))
+    assert "`treg calls` shows the record" in capsys.readouterr().err
 
 
 def test_the_public_catalog_still_renders_when_signed_out(monkeypatch):

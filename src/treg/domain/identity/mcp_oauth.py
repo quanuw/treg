@@ -245,10 +245,11 @@ def read_access_token(token: str, *, expected_audience: str) -> dict | None:
     if not token or "." not in token or not expected_audience:
         return None
     try:
+        from . import session
+
         payload, signature = token.split(".", 1)
         raw = _unb64(payload)
-        expected_sig = hmac.new(_key(), raw, hashlib.sha256).digest()
-        if not hmac.compare_digest(_unb64(signature), expected_sig):
+        if not session.signature_matches(raw, _unb64(signature)):
             return None
         data = json.loads(raw)
         if data.get("typ") != _TOKEN_TYPE:

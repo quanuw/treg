@@ -202,7 +202,7 @@ async def require_identity(
             managed_keys.touch(key)
             request.state.sso_org_id = sso_org_id
             return user
-        raise HTTPException(status_code=401, detail="invalid token")
+        raise HTTPException(status_code=401, detail=await _refused_token_detail(x_treg_token, db))
     user = await _user_from_session(treg_session, db)
     if user is not None:
         sso_org_id = (sess.read_session_claims(treg_session) or {}).get("sso_org_id")
@@ -221,6 +221,25 @@ def _sso_scope_allows(request: Request, org_id: int) -> bool:
     scoped_key = request.url.path == "/auth/cli-token"
     account_kill_switch = request.url.path == "/auth/revoke-tokens" and request.method == "POST"
     return scoped_team_path or scoped_entry or scoped_key or account_kill_switch
+
+
+_SIGN_IN_AGAIN = "sign in again with `treg login`, or copy a new key from the dashboard"
+
+
+async def _refused_token_detail(token: str, db: AsyncSession) -> str:
+    """Name the two refusals a key holder can act on; anything else stays a bare "invalid token".
+    The first reads only the token's own unsigned claims and the second needs a valid signature, so
+    neither tells a forger more than they sent."""
+    if not sess.signed_here(token):
+        if sess.unverified_claims(token) is not None:
+            return ("invalid token: its signature doesn't match this server's: it was issued by another "
+                    f"treg server, or this server's signing secret has changed since; {_SIGN_IN_AGAIN}")
+        return "invalid token"
+    claims = sess.read_identity_claims(token)
+    user = await db.get(User, claims["uid"]) if claims else None
+    if user is not None and not user.suspended and claims["tv"] != user.token_version:
+        return f"invalid token: it was revoked when this account signed out everywhere; {_SIGN_IN_AGAIN}"
+    return "invalid token"
 
 
 async def _user_from_identity_token(token: str, db: AsyncSession) -> User | None:
@@ -274,7 +293,8 @@ async def require_member(
             ):
                 raise HTTPException(status_code=403, detail="account suspended")
         if user is None:
-            raise HTTPException(status_code=401, detail="invalid token" if x_treg_token else "not authenticated")
+            raise HTTPException(status_code=401, detail=(
+                await _refused_token_detail(x_treg_token, db) if x_treg_token else "not authenticated"))
         # A team-pinned identity token (org baked into its claim) resolves as a BARE bearer where no
         # header can travel — an MCP server's Authorization. New typed Default keys make that claim
         # authoritative. The header-first rule survives only for untyped credentials minted before

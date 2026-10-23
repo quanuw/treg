@@ -641,7 +641,9 @@ shared HTTP client. `/auth/logout` remains an HTTP-only cookie action.
   untyped token with expiry remains compatible only until expiry. `token_version` revokes
   permanent keys; missing `tv` means zero. New scoped credentials do not change those compatibility
   rules. `POST /auth/revoke-tokens` bumps the version and
-  returns a replacement cookie/token for the caller. `/auth/logout` is a same-origin cookie action.
+  returns a replacement cookie/token for the caller. A refused key's 401 detail is `invalid token`,
+  or starts `invalid token: ` with the cause and how to get a new key (see
+  [multi-tenancy](../architecture/multi-tenancy.md)). `/auth/logout` is a same-origin cookie action.
   Onboarding routes are `POST /onboard/demo|skip|reset|team`; see [onboarding](onboarding.md).
 
   The shared dependencies resolve a membership token, a team Default key, a legacy identity bearer
