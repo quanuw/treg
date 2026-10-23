@@ -45,6 +45,16 @@ personal wallet.
 OpenRouter capacity monitoring reads `TREG_PLATFORM_OPENROUTER_MANAGEMENT_KEY` (sweep only);
 without it, OpenRouter reports no balance API.
 
+## Session-signing secret
+
+`TREG_SESSION_SECRET` (else `TREG_SECRET_KEY`) signs browser sessions, every copied key (`treg
+login`, the dashboard's API key, an MCP `Authorization` header) and MCP access tokens. Copied keys
+never expire, so setting it for the first time or changing it refuses every key users hold. To
+rotate without signing everyone out, list the old value (`TREG_SECRET_KEY`'s, if the session secret
+was unset) in `TREG_SESSION_SECRET_PREVIOUS`, comma-separated, on every process in the same deploy.
+Keys signed with a listed secret keep working and new ones use the current secret; removing a value
+refuses what it signed. Leave the list empty when the old secret leaked.
+
 ## Call events
 
 Call events ([call-events.md](../architecture/call-events.md)) are off until

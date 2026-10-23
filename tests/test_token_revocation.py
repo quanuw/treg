@@ -127,3 +127,77 @@ async def test_typed_credentials_and_safe_legacy_boundary_end_to_end(client):
     assert (await client.get(
         "/invites/mine", headers={"X-Treg-Token": stale_pinned},
     )).status_code == 401
+
+
+@pytest.fixture
+def signing_secret():
+    """Set the signing secret and the retired ones still accepted; restores both afterwards."""
+    from treg.config import get_settings
+
+    s = get_settings()
+    before = (s.session_secret, s.session_secret_previous)
+
+    def set_secrets(current: str, previous: str = "") -> None:
+        object.__setattr__(s, "session_secret", current)
+        object.__setattr__(s, "session_secret_previous", previous)
+
+    yield set_secrets
+    set_secrets(*before)
+
+
+async def _team_key(c: AsyncClient, email: str) -> str:
+    identity = await _otp_login(c, email)
+    created = await c.post("/orgs", json={"name": f"Team {email}"}, headers={"X-Treg-Token": identity})
+    assert created.status_code == 200, created.text
+    return created.json()["token"]
+
+
+async def test_a_new_signing_secret_refuses_old_keys_unless_the_old_one_is_listed(client, signing_secret):
+    signing_secret("the-first-signing-secret")
+    key = await _team_key(client, "rotate@x.io")
+    h = {"X-Treg-Token": key}
+    assert (await client.get("/tools", headers=h)).status_code == 200
+
+    signing_secret("a-new-signing-secret")
+    refused = await client.get("/tools", headers=h)
+    assert refused.status_code == 401
+    assert refused.json()["detail"].startswith(
+        "invalid token: its signature doesn't match this server's: it was issued by another treg server, "
+        "or this server's signing secret has changed since; sign in again with `treg login`")
+    assert (await client.get("/invites/mine", headers=h)).status_code == 401
+
+    signing_secret("a-new-signing-secret", " retired-one , the-first-signing-secret")
+    assert (await client.get("/tools", headers=h)).status_code == 200
+    fresh = await _team_key(client, "rotate-later@x.io")
+    signing_secret("a-new-signing-secret")
+    assert (await client.get("/tools", headers={"X-Treg-Token": fresh})).status_code == 200  # signed with the new one
+    assert (await client.get("/tools", headers=h)).status_code == 401
+
+
+async def test_a_signed_out_everywhere_key_says_so_and_junk_stays_bare(client):
+    key = await _team_key(client, "revoked@x.io")
+    assert (await client.post("/auth/revoke-tokens", headers={"X-Treg-Token": key})).status_code == 200
+
+    for path in ("/tools", "/invites/mine"):
+        refused = await client.get(path, headers={"X-Treg-Token": key})
+        assert refused.status_code == 401
+        assert refused.json()["detail"].startswith(
+            "invalid token: it was revoked when this account signed out everywhere; sign in again")
+
+    for junk in ("not-a-key", "eyJ1aWQiOiJ4In0.c2ln"):  # the second: claims whose uid is not a number
+        refused = await client.get("/tools", headers={"X-Treg-Token": junk})
+        assert refused.status_code == 401 and refused.json()["detail"] == "invalid token", junk
+
+
+def test_mcp_access_tokens_follow_the_same_rotation(signing_secret):
+    from treg.domain.identity import mcp_oauth
+
+    signing_secret("the-first-signing-secret")
+    audience = mcp_oauth.mcp_resource_url()
+    token = mcp_oauth.make_access_token(user_id=1, org_id=1, audience=audience)
+    assert mcp_oauth.read_access_token(token, expected_audience=audience) is not None
+
+    signing_secret("a-new-signing-secret")
+    assert mcp_oauth.read_access_token(token, expected_audience=audience) is None
+    signing_secret("a-new-signing-secret", "the-first-signing-secret")
+    assert mcp_oauth.read_access_token(token, expected_audience=audience) is not None

@@ -21,8 +21,10 @@ identity; treg resumes that pending SSO attempt in the same browser.
 
 1. Apply Alembic migrations through `0085` before running the new code.
 2. In the WorkOS environment, create an API key and find the client ID. Set
-   `TREG_WORKOS_API_KEY` and `TREG_WORKOS_CLIENT_ID` on the server. Set a stable
-   `TREG_SECRET_KEY` and `TREG_SESSION_SECRET` for the state and browser cookies.
+   `TREG_WORKOS_API_KEY` and `TREG_WORKOS_CLIENT_ID` on the server. Keep `TREG_SECRET_KEY` and
+   the session-signing secret stable: SSO needs no new `TREG_SESSION_SECRET`, and setting one signs
+   every user out of the CLI, MCP and dashboard unless the old value is listed (see
+   [deploy](context/ops/deploy.md#session-signing-secret)).
 3. Add `<TREG_PUBLIC_URL>/auth/sso/callback` as an allowed WorkOS redirect URI. The URL passed to
    WorkOS comes from `TREG_PUBLIC_URL`, so it must match exactly.
 4. For Directory Sync, register `<TREG_PUBLIC_URL>/auth/sso/workos/webhook` as a WorkOS webhook.

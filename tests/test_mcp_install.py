@@ -313,7 +313,7 @@ def test_cmd_mcp_install_REFUSES_a_bad_token_before_writing(tmp_path, monkeypatc
     with pytest.raises(SystemExit) as e:
         cli.cmd_mcp_install(SimpleNamespace(name=None),
                             {"token": "K", "base_url": "https://treg.to"})
-    assert "rejected" in str(e.value)
+    assert "this key was refused" in str(e.value) and "Nothing was written" in str(e.value)
     assert not (tmp_path / ".config" / "opencode" / "opencode.json").exists()  # nothing written
 
 

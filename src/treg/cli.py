@@ -288,6 +288,13 @@ def _json_dict(resp: httpx.Response) -> dict:
     return body if isinstance(body, dict) else {}
 
 
+def _refused_key(resp: httpx.Response, hint: str = "  Sign in:  treg login") -> str:
+    detail = str(_json_dict(resp).get("detail") or "")
+    if detail.startswith("invalid token: "):
+        return f"treg: this key was refused: {detail.removeprefix('invalid token: ')}."
+    return f"treg: not signed in, or this key was refused (expired, revoked or from another server).\n{hint}"
+
+
 def _org_rows(c: httpx.Client) -> list[dict] | None:
     """Your memberships from `/orgs`, or None when it will not answer: an agent key is refused there
     on purpose, and `/auth/me` names its one team instead."""
@@ -324,9 +331,8 @@ def _active_org(cfg: dict, c: httpx.Client, *, strict: bool = True) -> dict | No
         # SystemExit, which `except Exception` does not catch — a try/except around the call site
         # would NOT have saved it.
         if strict and me.status_code == 401:
-            sys.exit("treg: not signed in, or this token is invalid/expired.\n"
-                     "  Sign in:            treg login\n"
-                     "  Using TREG_TOKEN?   check it is the token `org agent-new` printed.")
+            sys.exit(_refused_key(me, "  Sign in:            treg login\n"
+                                      "  Using TREG_TOKEN?   check it is the token `org agent-new` printed."))
         return None
     return _pick_org(rows, cfg)
 
@@ -461,7 +467,8 @@ def _show_failure_diagnostics(resp: httpx.Response) -> None:
     notice = account_out_notice(headers) if relayed else None
     line = f"treg: HTTP {resp.status_code}" + ("" if notice else f" — {whose}")
     if call_id := headers.get("X-Treg-Call-Id"):
-        line += f"; call id {call_id} (quote it to support; `treg calls` shows the record)"
+        lookup = "" if resp.status_code == 401 else "; `treg calls` shows the record"
+        line += f"; call id {call_id} (quote it to support{lookup})"
     if (cost := headers.get("X-Treg-Cost-Micro")) and not notice:  # the notice says what it cost
         line += f"; charged ${int(cost) / 1_000_000:g}"
     print(line, file=sys.stderr)
@@ -515,8 +522,7 @@ def cmd_login(args, cfg) -> None:
         except Exception as exc:  # noqa: BLE001 — network/DNS: report, don't persist a maybe-bad token
             sys.exit(f"Could not reach {cfg['base_url']} to verify the token: {exc}")
         if who.status_code == 401:
-            sys.exit("That token was rejected (401 invalid token). It's expired or from a different "
-                     "server — copy a fresh one from the dashboard ('API token' / the Access instruction).")
+            sys.exit(_refused_key(who, "  Copy a fresh key from the dashboard ('API token' / the Access instruction)."))
         if who.status_code >= 400:
             sys.exit(f"Token check failed ({who.status_code}): {who.text[:120]}")
         cfg["email"] = who.json().get("email")
@@ -4001,9 +4007,8 @@ def cmd_mcp_install(args, cfg) -> None:
             f"  If it persists, check your network or try: curl -I {base}"
         )
     if who.status_code == 401:
-        sys.exit("That token was rejected (401 invalid token) — nothing was written. It's expired "
-                 "or from a different server; run `treg login` (or copy a fresh token from the "
-                 "dashboard), then retry.")
+        sys.exit(_refused_key(who, "  Nothing was written. Run `treg login` (or copy a fresh key from the "
+                                   "dashboard), then retry."))
     if who.status_code >= 400:
         sys.exit(f"Token check failed ({who.status_code}): {who.text[:120]} — nothing was written.")
     base_url = (cfg.get("base_url") or "https://treg.to").rstrip("/")
@@ -4160,7 +4165,7 @@ def cmd_whoami(args, cfg) -> None:
         me = c.get("/auth/me")
         active = _pick_org(_org_rows(c) or [], cfg)
     if me.status_code == 401:
-        sys.exit("treg: not signed in, or this token is invalid/expired.\n  Sign in:  treg login")
+        sys.exit(_refused_key(me))
     who = me.json() if me.status_code == 200 else {}
     if _JSON_OVERRIDE:
         print(json.dumps({"email": who.get("email") or cfg.get("email"), "team": active and active["slug"],

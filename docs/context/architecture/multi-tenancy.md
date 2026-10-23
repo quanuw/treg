@@ -394,7 +394,11 @@ signed audience: `make_session` creates `aud=session` with a required 7-day `exp
 `make_identity` creates `aud=identity`; copied team keys omit `exp`, while an org-less
 `scp=bootstrap` identity expires after seven days. `read_session_claims` and
 `read_identity_claims` reject the other audience in both directions; `token_version` remains the
-revocation mechanism for either family.
+revocation mechanism for either family. `signature_matches` also accepts the retired secrets in
+`session_secret_previous`, for MCP access tokens too, while signing always uses the current one
+([deploy](../ops/deploy.md#session-signing-secret)). `access._refused_token_detail` names a 401's
+cause when a key holder can act on it: claims whose signature no accepted secret matches, or a
+`tv` behind the user's. Anything else stays a bare `invalid token`.
 
 Legacy tokens predate `aud`, so the compatibility boundary follows what the signed shape can actually
 prove. An `org` claim identifies a team-pinned copied key, which remains usable after its former

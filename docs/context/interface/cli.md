@@ -148,7 +148,8 @@ SQL/HTML bodies through Cloudflare/Render. Transparent — no effect on any requ
 `_active_org_id(cfg, c, strict=True)` resolves the active org's numeric id via `GET /orgs`, falling
 back to `/auth/me` when that 403s — which is what a MACHINE identity gets, since the server refuses it
 there on purpose. An invalid token now exits naming the real problem instead of the bare "no active
-org" that 21 commands used to print. `strict=False` is for callers that only ENRICH output (the pin
+org" that 21 commands used to print; `_refused_key` repeats the server's cause when the 401 gives one.
+A refused call's stderr line leaves out `treg calls`, which needs the refused key. `strict=False` is for callers that only ENRICH output (the pin
 marker on `catalog get`): the catalog is public, and `sys.exit` raises `SystemExit`, which
 `except Exception` does NOT catch — so a try/except at the call site would not have saved that page.
 

@@ -38,6 +38,34 @@ def _key() -> bytes:
     return configured.encode() if configured else _EPHEMERAL_KEY
 
 
+def _verify_keys() -> tuple[bytes, ...]:
+    previous = get_settings().session_secret_previous
+    return (_key(), *(p.strip().encode() for p in previous.split(",") if p.strip()))
+
+
+def signature_matches(raw: bytes, signature: bytes) -> bool:
+    return any(hmac.compare_digest(signature, hmac.new(k, raw, hashlib.sha256).digest()) for k in _verify_keys())
+
+
+def unverified_claims(token: str) -> dict | None:
+    """Claims WITHOUT a signature check: only for wording a refusal, never for authorizing."""
+    try:
+        data = json.loads(_unb64(token.split(".", 1)[0]))
+    except Exception:  # noqa: BLE001
+        return None
+    return data if isinstance(data, dict) and isinstance(data.get("uid"), int) else None
+
+
+def signed_here(token: str) -> bool:
+    if not token or "." not in token:
+        return False
+    try:
+        p, sig = token.split(".", 1)
+        return signature_matches(_unb64(p), _unb64(sig))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _b64(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).decode().rstrip("=")
 
@@ -120,8 +148,7 @@ def _read_claims(token: str) -> dict | None:
     try:
         p, s = token.split(".", 1)
         raw = _unb64(p)
-        expected = hmac.new(_key(), raw, hashlib.sha256).digest()
-        if not hmac.compare_digest(_unb64(s), expected):
+        if not signature_matches(raw, _unb64(s)):
             return None
         data = json.loads(raw)
         out = {"uid": int(data["uid"]), "tv": int(data.get("tv", 0))}

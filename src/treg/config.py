@@ -687,8 +687,11 @@ class Settings(BaseSettings):
     github_client_id: str = ""
     github_client_secret: str = ""
 
-    # Signs the session cookie (HMAC). Falls back to secret_key if unset. Set a real value in prod.
+    # Signs browser sessions, copied keys and MCP access tokens (HMAC). Falls back to secret_key if
+    # unset. Set a real value in prod; see docs/context/ops/deploy.md before changing it.
     session_secret: str = ""
+    # Comma-separated retired signing secrets still accepted when verifying, never used to sign.
+    session_secret_previous: str = ""
     # Overridable for tests; real GitHub by default.
     github_authorize_url: str = "https://github.com/login/oauth/authorize"
     github_token_url: str = "https://github.com/login/oauth/access_token"
